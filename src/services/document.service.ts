@@ -40,6 +40,15 @@ export const DocumentService = {
     return result.data;
   },
 
+  async listDocuments(): Promise<DocumentRecord[]> {
+    const response = await fetch(`${API_BASE_URL}/documents`);
+    const result = await response.json();
+    if (!response.ok || !result.success) {
+      throw new Error(result.message || 'Gagal memuat daftar dokumen.');
+    }
+    return result.data;
+  },
+
   async getDocumentById(id: string): Promise<DocumentRecord> {
     const response = await fetch(`${API_BASE_URL}/documents/${id}`);
     const result = await response.json();
@@ -47,5 +56,5 @@ export const DocumentService = {
       throw new Error(result.message || 'Gagal memuat detail dokumen.');
     }
     return result.data;
-  }
+  },
 };

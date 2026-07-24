@@ -1,87 +1,77 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
 
-export interface AnalysisPayload {
-  documentId: string;
-  query: string;
+export interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
 }
 
-export interface StructuredAnalysisResult {
-  ringkasanEksekutif: string;
-  entitasTerlibat: Array<{ nama: string; peran: string; entitasTerkait?: string }>;
-  kronologiPeristiwa: Array<{ tanggal?: string; deskripsi: string; lokasi?: string }>;
-  indikasiPelanggaran: Array<{ jenis: string; pasalDugaan?: string; rincian: string }>;
-  kesimpulanAnalisis: string;
+export interface AiInteractResult {
+  intent: string;
+  data: {
+    answer?: string;
+    fullArticleText?: string;
+    [key: string]: any;
+  };
 }
 
 export const AiAssistantService = {
-  async executeQARequest(payload: AnalysisPayload): Promise<StructuredAnalysisResult> {
-    try {
-      const response = await fetch(`${API_BASE_URL}/ai/analyze`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-
-      const result = await response.json();
-      if (!response.ok || !result.success) {
-        throw new Error(result.message || 'Gagal memproses permintaan analisis AI.');
-      }
-
-      return result.data;
-    } catch {
-      // Fallback mock result for interactive client preview when backend port is unreachable
-      return {
-        ringkasanEksekutif:
-          'Berdasarkan dokumen laporan statis yang dianalisis, ditemukan indikasi awal penyimpangan prosedur pengadaan barang dan jasa pada proyek pembangunan infrastruktur daerah Mimika.',
-        entitasTerlibat: [
-          {
-            nama: 'Drs. Supriyanto, M.Si',
-            peran: 'Pejabat Pembuat Komitmen (PPK)',
-            entitasTerkait: 'Dinas Pekerjaan Umum Daerah',
-          },
-          {
-            nama: 'PT Karya Sentosa Jaya',
-            peran: 'Kontraktor Pelaksana Utama',
-            entitasTerkait: 'Penyedia Jasa Swasta',
-          },
-        ],
-        kronologiPeristiwa: [
-          {
-            tanggal: '15 Maret 2024',
-            deskripsi: 'Penetapan pemenang tender proyek infrastruktur tanpa melalui proses pencairan jaminan penawaran.',
-            lokasi: 'Kabupaten BRIDA / Mimika',
-          },
-        ],
-        indikasiPelanggaran: [
-          {
-            jenis: 'Dugaan Penyalahgunaan Wewenang & Deviasi Anggaran',
-            pasalDugaan: 'Pasal 2 & Pasal 3 UU Tipikor',
-            rincian: 'Penyaluran dana termin tidak sesuai dengan persentase realisasi fisik pekerjaan di lapangan.',
-          },
-        ],
-        kesimpulanAnalisis:
-          'Dokumen laporan menunjukkan bukti awal yang cukup kuat terkait ketidaksesuaian prosedur administratif. Direkomendasikan untuk dilakukan audit investigatif lanjutan.',
-      };
+  /**
+   * Create a new AI chat session tied to a specific document.
+   * Returns the sessionId used for subsequent interactions.
+   */
+  async createSession(documentId: string, title?: string): Promise<string> {
+    const response = await fetch(`${API_BASE_URL}/assistant/session`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ documentId, title }),
+    });
+    const result = await response.json();
+    if (!response.ok || !result.success) {
+      throw new Error(result.message || 'Gagal membuat sesi obrolan AI.');
     }
+    return result.data.id;
   },
 
+  /**
+   * Send a chat query to the AI for a given session.
+   * Returns the AI response text.
+   */
+  async sendQuery(sessionId: string, query: string): Promise<string> {
+    const response = await fetch(`${API_BASE_URL}/assistant/interact`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId, query }),
+    });
+    const result = await response.json();
+    if (!response.ok || !result.success) {
+      throw new Error(result.message || 'Gagal memproses permintaan AI.');
+    }
+    const data = result.data as AiInteractResult;
+    // Normalize — Q&A answer or article text depending on intent
+    return data.data?.answer
+      || data.data?.fullArticleText
+      || JSON.stringify(data.data, null, 2);
+  },
+
+  /**
+   * One-shot: create session for a document then send the query.
+   * Used by ChatPanel when no session exists yet.
+   */
+  async queryDocumentOnce(documentId: string, query: string, documentTitle?: string): Promise<string> {
+    const sessionId = await AiAssistantService.createSession(documentId, documentTitle || 'Sesi Q&A');
+    return AiAssistantService.sendQuery(sessionId, query);
+  },
+
+  /**
+   * Generate article using CoT pipeline via assistant interact.
+   */
   async generateArticle(documentId: string, tone: 'kritis' | 'solutif' | 'akademis'): Promise<string> {
     try {
-      const response = await fetch(`${API_BASE_URL}/assistant/interact`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sessionId: documentId,
-          query: `Buatkan artikel ${tone} berdasarkan laporan ini.`,
-        }),
-      });
-
-      const result = await response.json();
-      if (!response.ok || !result.success) {
-        throw new Error(result.message || 'Gagal merakit draf artikel publikasi.');
-      }
-
-      return result.data.data.fullArticleText || JSON.stringify(result.data.data, null, 2);
+      const sessionId = await AiAssistantService.createSession(documentId, `Sesi Generator Artikel - ${tone}`);
+      return await AiAssistantService.sendQuery(
+        sessionId,
+        `Buatkan artikel ${tone} berdasarkan laporan ini.`,
+      );
     } catch {
       // Fallback mock article for interactive client preview
       return `

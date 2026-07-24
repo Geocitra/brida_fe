@@ -1,11 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User, Loader2, ShieldCheck, PenTool, ArrowRight } from 'lucide-react';
-import { AiAssistantService, type StructuredAnalysisResult } from '../../../services/ai-assistant.service';
+import { Send, Bot, User, Loader2, ShieldCheck, PenTool, ArrowRight, AlertCircle } from 'lucide-react';
+import { AiAssistantService } from '../../../services/ai-assistant.service';
 
 interface ChatMessage {
   id: string;
   sender: 'user' | 'ai';
-  text: string | StructuredAnalysisResult;
+  text: string;
   timestamp: string;
 }
 
@@ -24,15 +24,36 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const [inputQuery, setInputQuery] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [detectedArticlePrompt, setDetectedArticlePrompt] = useState<string | null>(null);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [sessionError, setSessionError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isLoading]);
 
+  // Reset session when document changes
+  useEffect(() => {
+    setSessionId(null);
+    setMessages([]);
+    setSessionError(null);
+    setDetectedArticlePrompt(null);
+  }, [selectedDocumentId]);
+
   const isArticleIntent = (text: string) => {
     const keywords = ['artikel', 'publikasi', 'naskah', 'rilis', 'buatkan artikel', 'tulis artikel', 'generate artikel'];
     return keywords.some((k) => text.toLowerCase().includes(k));
+  };
+
+  const getOrCreateSession = async (): Promise<string> => {
+    if (sessionId) return sessionId;
+    if (!selectedDocumentId) throw new Error('Pilih dokumen sumber terlebih dahulu.');
+    const newSessionId = await AiAssistantService.createSession(
+      selectedDocumentId,
+      documentTitle || 'Sesi Q&A',
+    );
+    setSessionId(newSessionId);
+    return newSessionId;
   };
 
   const handleSendMessage = async (e: React.FormEvent) => {
@@ -41,7 +62,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
     const currentQuery = inputQuery;
 
-    // Check if query is asking to create an article
+    // Detect article creation intent
     if (isArticleIntent(currentQuery) && onArticleIntentDetected) {
       setDetectedArticlePrompt(currentQuery);
     } else {
@@ -58,26 +79,27 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     setMessages((prev) => [...prev, userMsg]);
     setInputQuery('');
     setIsLoading(true);
+    setSessionError(null);
 
     try {
-      const responseData = await AiAssistantService.executeQARequest({
-        documentId: selectedDocumentId,
-        query: currentQuery,
-      });
+      // Get or create session, then send query
+      const activeSessionId = await getOrCreateSession();
+      const responseText = await AiAssistantService.sendQuery(activeSessionId, currentQuery);
 
       const aiMsg: ChatMessage = {
         id: (Date.now() + 1).toString(),
         sender: 'ai',
-        text: responseData,
+        text: responseText,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
-
       setMessages((prev) => [...prev, aiMsg]);
     } catch (err: any) {
+      const errorText = err.message || 'Gagal terhubung ke engine AI.';
+      setSessionError(errorText);
       const errorMsg: ChatMessage = {
         id: (Date.now() + 1).toString(),
         sender: 'ai',
-        text: `[Error Sistem]: ${err.message || 'Gagal terhubung ke engine AI.'}`,
+        text: `[System Error]: ${errorText}`,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
       setMessages((prev) => [...prev, errorMsg]);
@@ -94,6 +116,9 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           <h2 className="text-h2 text-slate-900">Q&A Chat Assistant</h2>
           <p className="font-roboto text-xs text-slate-600 font-medium">
             Sumber Aktif: <span className="text-teal-700 font-bold">{documentTitle || 'Belum ada dokumen dipilih'}</span>
+            {sessionId && (
+              <span className="ml-2 text-emerald-700 font-bold">[Sesi Aktif]</span>
+            )}
           </p>
         </div>
         <div className="flex items-center gap-1 text-teal-800 text-xs bg-teal-100 px-2.5 py-1 border border-teal-300 font-bold rounded-none">
@@ -101,6 +126,14 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           <span>Zero-Knowledge Q&A</span>
         </div>
       </div>
+
+      {/* Session Error Banner */}
+      {sessionError && (
+        <div className="p-3 bg-red-50 border-b border-red-200 flex items-center gap-2 text-red-800 text-xs font-semibold">
+          <AlertCircle size={14} className="shrink-0" />
+          <span>Backend tidak terhubung. Cek apakah server BE berjalan di port 3000.</span>
+        </div>
+      )}
 
       {/* Article Intent Banner if detected */}
       {detectedArticlePrompt && onArticleIntentDetected && (
@@ -126,7 +159,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             <Bot size={40} className="text-teal-700 mb-2 opacity-80" />
             <p className="font-roboto text-sm font-bold text-slate-800 mb-1">Belum ada percakapan pada sesi ini.</p>
             <p className="font-roboto text-xs text-slate-600 max-w-md">
-              Ketik pertanyaan spesifik mengenai laporan kebijakan Mimika. Sistem akan menganalisis secara Zero-Knowledge.
+              Ketik pertanyaan mengenai isi dokumen yang dipilih. Sesi AI akan dibuat otomatis saat mengirim pesan pertama.
             </p>
           </div>
         ) : (
@@ -142,30 +175,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                   ? 'bg-teal-100 border-teal-300 text-slate-900 shadow-xs' 
                   : 'bg-white border-slate-300 text-slate-900 shadow-xs'
               }`}>
-                {typeof msg.text === 'string' ? (
-                  <p className="text-body text-slate-900 font-medium whitespace-pre-wrap">{msg.text}</p>
-                ) : (
-                  <div className="space-y-3">
-                    <div>
-                      <strong className="block text-xs uppercase tracking-wider text-teal-800 font-bold mb-1">Ringkasan Eksekutif</strong>
-                      <p className="text-body text-slate-900">{msg.text.ringkasanEksekutif}</p>
-                    </div>
-                    {msg.text.indikasiPelanggaran.length > 0 && (
-                      <div className="p-3 bg-red-50 border border-red-200">
-                        <strong className="block text-xs uppercase tracking-wider text-red-800 font-bold mb-1">Indikasi Pelanggaran</strong>
-                        <ul className="list-disc pl-4 space-y-1 text-xs text-slate-800">
-                          {msg.text.indikasiPelanggaran.map((ind, i) => (
-                            <li key={i}><strong>{ind.jenis}</strong>: {ind.rincian}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                    <div>
-                      <strong className="block text-xs uppercase tracking-wider text-teal-800 font-bold mb-1">Kesimpulan Analis</strong>
-                      <p className="text-body text-slate-900">{msg.text.kesimpulanAnalisis}</p>
-                    </div>
-                  </div>
-                )}
+                <p className="text-body text-slate-900 font-medium whitespace-pre-wrap">{msg.text}</p>
                 <span className="block text-[10px] text-slate-500 mt-2 text-right font-medium">{msg.timestamp}</span>
               </div>
               {msg.sender === 'user' && (
@@ -179,7 +189,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         {isLoading && (
           <div className="flex gap-3 items-center text-slate-700 text-sm font-roboto font-bold">
             <Loader2 size={18} className="animate-spin text-teal-700" />
-            <span>Menganalisis dokumen berdasarkan aturan Zero-Knowledge...</span>
+            <span>Menganalisis dokumen berdasarkan konteks dokumen yang diunggah...</span>
           </div>
         )}
         <div ref={messagesEndRef} />
@@ -191,7 +201,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           type="text"
           value={inputQuery}
           onChange={(e) => setInputQuery(e.target.value)}
-          placeholder={selectedDocumentId ? "Ketik pertanyaan analitis Anda di sini (misal: Siapa kontraktor pengadaan jalan?)..." : "Pilih dokumen sumber terlebih dahulu..."}
+          placeholder={selectedDocumentId ? "Ketik pertanyaan analitis Anda di sini..." : "Pilih dokumen sumber terlebih dahulu..."}
           disabled={!selectedDocumentId || isLoading}
           className="flex-1 bg-slate-50 border border-slate-400 px-4 py-2.5 text-sm text-slate-900 font-semibold focus:outline-none focus:border-teal-600 disabled:opacity-50 rounded-none shadow-xs"
         />
