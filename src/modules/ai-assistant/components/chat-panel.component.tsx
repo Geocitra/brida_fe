@@ -73,14 +73,14 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       const history = await AiAssistantService.listQaSessions();
       setQaSessions(history || []);
 
-      // If no active session yet and history exists, auto-load latest QA session
+      // Auto-load latest QA session if no active session yet
       if (!sessionId && history && history.length > 0) {
         handleSelectQaSession(history[0].id);
       }
     } catch (err: any) {
       console.error('Gagal memuat riwayat sesi Q&A:', err);
       setQaSessions([]);
-    } fontally: {
+    } finally {
       setIsLoadingHistory(false);
     }
   };
@@ -151,7 +151,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
     const currentQuery = inputQuery;
 
-    // Detect article creation intent
     if (isArticleIntent(currentQuery) && onArticleIntentDetected) {
       setDetectedArticlePrompt(currentQuery);
     } else {
@@ -199,7 +198,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 h-[650px]">
-      {/* Sidebar: Q&A Chat Sessions History */}
+      {/* Sidebar Kiri: Riwayat Percakapan Q&A dari Database */}
       {showHistorySidebar && (
         <div className="bg-white border border-slate-300 flex flex-col rounded-none shadow-xs">
           <div className="p-3 border-b border-slate-300 bg-slate-100 flex items-center justify-between">
@@ -265,7 +264,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         </div>
       )}
 
-      {/* Main Chat Feed Area */}
+      {/* Main Chat Feed Area (3 Columns when Sidebar open, 4 when closed) */}
       <div className={`bg-white border border-slate-300 flex flex-col rounded-none shadow-xs ${showHistorySidebar ? 'lg:col-span-3' : 'lg:col-span-4'}`}>
         {/* Panel Header */}
         <div className="px-6 py-3 border-b border-slate-300 bg-slate-100 flex items-center justify-between">
@@ -273,7 +272,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             <button
               onClick={() => setShowHistorySidebar(!showHistorySidebar)}
               className="p-1 text-slate-600 hover:text-slate-900 border border-slate-300 bg-white"
-              title="Toggle Sidebar Riwayat"
+              title="Toggle Sidebar Riwayat Chat"
             >
               <History size={16} />
             </button>
