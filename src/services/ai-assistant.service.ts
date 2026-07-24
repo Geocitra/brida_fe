@@ -14,10 +14,33 @@ export interface AiInteractResult {
   };
 }
 
+export interface ArticleSessionDetail {
+  id: string;
+  title: string;
+  articleTitle: string;
+  tone: string;
+  targetLength: 'SHORT' | 'MEDIUM' | 'LONG';
+  createdAt: string;
+  updatedAt: string;
+  sourcesCount?: number;
+  sources: Array<{
+    id: string;
+    title: string;
+    category?: string;
+    fileUrl?: string;
+  }>;
+  messages: Array<{
+    id: string;
+    role: 'USER' | 'ASSISTANT' | 'SYSTEM';
+    content: string;
+    createdAt: string;
+  }>;
+  fullArticleText?: string;
+}
+
 export const AiAssistantService = {
   /**
    * Create a new AI chat session tied to a specific document.
-   * Returns the sessionId used for subsequent interactions.
    */
   async createSession(documentId: string, title?: string): Promise<string> {
     const response = await fetch(`${API_BASE_URL}/assistant/session`, {
@@ -34,7 +57,6 @@ export const AiAssistantService = {
 
   /**
    * Send a chat query to the AI for a given session.
-   * Returns the AI response text.
    */
   async sendQuery(sessionId: string, query: string): Promise<string> {
     const response = await fetch(`${API_BASE_URL}/assistant/interact`, {
@@ -49,11 +71,9 @@ export const AiAssistantService = {
     const data = result.data as AiInteractResult;
     const d = data.data;
 
-    // Normalize to readable text from BE AnalysisResponseDto format
     if (d?.fullArticleText) return d.fullArticleText;
     if (d?.answer) return d.answer;
 
-    // Structured analysis response — build readable formatted text
     if (d?.ringkasanEksekutif) {
       const parts: string[] = [];
       parts.push(d.ringkasanEksekutif);
@@ -86,46 +106,126 @@ export const AiAssistantService = {
       return parts.join('\n');
     }
 
-    // Absolute last resort — stringify raw (should never hit this)
     return JSON.stringify(d, null, 2);
   },
 
-  /**
-   * One-shot: create session for a document then send the query.
-   * Used by ChatPanel when no session exists yet.
-   */
   async queryDocumentOnce(documentId: string, query: string, documentTitle?: string): Promise<string> {
     const sessionId = await AiAssistantService.createSession(documentId, documentTitle || 'Sesi Q&A');
     return AiAssistantService.sendQuery(sessionId, query);
   },
 
-  /**
-   * Generate article using CoT pipeline via assistant interact.
-   */
-  async generateArticle(documentId: string, tone: 'kritis' | 'solutif' | 'akademis'): Promise<string> {
-    try {
-      const sessionId = await AiAssistantService.createSession(documentId, `Sesi Generator Artikel - ${tone}`);
-      return await AiAssistantService.sendQuery(
-        sessionId,
-        `Buatkan artikel ${tone} berdasarkan laporan ini.`,
-      );
-    } catch {
-      // Fallback mock article for interactive client preview
-      return `
-# Draf Artikel Publikasi BRIDA (Tone: ${tone.toUpperCase()})
+  // --- Article Generator Methods ---
 
-**Judul Usulan: Transparansi Pembangunan Mimika: Pembelajaran dari Laporan Investigasi 2026**
+  async generateArticleMulti(req: {
+    documentIds: string[];
+    articleTitle: string;
+    targetLength?: 'SHORT' | 'MEDIUM' | 'LONG';
+    tone?: string;
+    userInstruction?: string;
+    sessionId?: string;
+  }): Promise<ArticleSessionDetail> {
+    const response = await fetch(`${API_BASE_URL}/assistant/article/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req),
+    });
+    const result = await response.json();
+    if (!response.ok || !result.success) {
+      throw new Error(result.message || 'Gagal menghasilkan artikel publikasi.');
+    }
+    return result.data;
+  },
 
-## Pendahuluan
-Berdasarkan analisis mendalam terhadap dokumen laporan kebijakan dan investigasi Kabupaten Mimika, BRIDA mempublikasikan draf opini ini untuk mendorong akuntabilitas publik dan efektivitas tata kelola pemerintahan daerah.
+  async interactArticle(sessionId: string, userInstruction: string): Promise<ArticleSessionDetail> {
+    const response = await fetch(`${API_BASE_URL}/assistant/article/interact`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId, userInstruction }),
+    });
+    const result = await response.json();
+    if (!response.ok || !result.success) {
+      throw new Error(result.message || 'Gagal mengirim instruksi revisi artikel.');
+    }
+    return result.data;
+  },
 
-## Analisis & Temuan Faktual
-1. **Ketidaksesuaian Prosedur Pengadaan**: Ditemukan deviasi signifikan antara realisasi fisik pekerjaan dengan termin pembayaran yang telah dicairkan.
-2. **Kesenjangan Wilayah**: Distrik terpencil seperti Hoya dan Agimuga membutuhkan percepatan perhatian infrastruktur dasar.
+  async listArticleSessions(): Promise<ArticleSessionDetail[]> {
+    const response = await fetch(`${API_BASE_URL}/assistant/article/sessions`);
+    const result = await response.json();
+    if (!response.ok || !result.success) {
+      throw new Error(result.message || 'Gagal memuat riwayat sesi artikel.');
+    }
+    return result.data;
+  },
 
-## Kesimpulan & Rekomendasi
-Pemerintah Kabupaten Mimika direkomendasikan untuk memperketat pengawasan verifikasi lapangan sebelum pencairan anggaran termin berikutnya.
-`.trim();
+  async getArticleSession(id: string): Promise<ArticleSessionDetail> {
+    const response = await fetch(`${API_BASE_URL}/assistant/article/sessions/${id}`);
+    const result = await response.json();
+    if (!response.ok || !result.success) {
+      throw new Error(result.message || 'Gagal mengambil detail sesi artikel.');
+    }
+    return result.data;
+  },
+
+  async deleteArticleSession(id: string): Promise<void> {
+    const response = await fetch(`${API_BASE_URL}/assistant/article/sessions/${id}`, {
+      method: 'DELETE',
+    });
+    const result = await response.json();
+    if (!response.ok || !result.success) {
+      throw new Error(result.message || 'Gagal menghapus sesi artikel.');
+    }
+  },
+
+  // --- QA Chat Session Methods ---
+
+  async listQaSessions(): Promise<Array<{
+    id: string;
+    title: string;
+    documentId: string;
+    documentTitle: string;
+    createdAt: string;
+    updatedAt: string;
+    messagesCount: number;
+    lastMessage?: string;
+  }>> {
+    const response = await fetch(`${API_BASE_URL}/assistant/sessions`);
+    const result = await response.json();
+    if (!response.ok || !result.success) {
+      throw new Error(result.message || 'Gagal memuat riwayat sesi Q&A.');
+    }
+    return result.data;
+  },
+
+  async getQaSessionDetail(id: string): Promise<{
+    id: string;
+    title: string;
+    documentId: string;
+    documentTitle: string;
+    createdAt: string;
+    updatedAt: string;
+    messages: Array<{
+      id: string;
+      role: 'USER' | 'ASSISTANT' | 'SYSTEM';
+      content: string;
+      createdAt: string;
+    }>;
+  }> {
+    const response = await fetch(`${API_BASE_URL}/assistant/sessions/${id}`);
+    const result = await response.json();
+    if (!response.ok || !result.success) {
+      throw new Error(result.message || 'Gagal mengambil detail sesi Q&A.');
+    }
+    return result.data;
+  },
+
+  async deleteQaSession(id: string): Promise<void> {
+    const response = await fetch(`${API_BASE_URL}/assistant/sessions/${id}`, {
+      method: 'DELETE',
+    });
+    const result = await response.json();
+    if (!response.ok || !result.success) {
+      throw new Error(result.message || 'Gagal menghapus sesi Q&A.');
     }
   },
 };
