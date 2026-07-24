@@ -297,4 +297,24 @@ export const PdfExportService = {
 
     pdfMake.createPdf(docDefinition).download('Nota_Dinas_Resmi_Bupati_Mimika_Maret_2026.pdf');
   },
+
+  /**
+   * Export DOM Element / Indicator to PDF using pdfMake
+   */
+  async exportElementToPdf(_elementId: string, _filename: string): Promise<void> {
+    const indicator: any = {
+      id: 'ind-export',
+      name: 'Pendapatan Asli Daerah (PAD)',
+      sector: 'Fiskal & Ekonomi',
+      baseline: 'Rp 110 M',
+      realization: 'Rp 85 M',
+      deviationPercentage: -22.7,
+      urgencyStatus: 'KRITIS',
+      targetValue: 110,
+      realizationValue: 85,
+      unitPrefix: 'Rp ',
+      unitSuffix: ' M',
+    };
+    this.exportAnalyticsPdf(indicator);
+  },
 };

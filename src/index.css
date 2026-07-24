@@ -22,6 +22,35 @@
   box-sizing: border-box;
 }
 
+/* Leaflet UI Exception — restore natural border-radius so markers & controls render correctly */
+.leaflet-marker-icon,
+.leaflet-marker-shadow,
+.leaflet-div-icon,
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip,
+.leaflet-tooltip,
+.leaflet-control-zoom a,
+.leaflet-control a {
+  border-radius: unset !important;
+}
+/* Custom circular dot markers */
+.leaflet-marker-icon div {
+  border-radius: 50% !important;
+}
+
+/* Remove focus bounding box / rectangle outline when clicking Leaflet map paths or SVGs */
+.leaflet-container *:focus,
+.leaflet-container path:focus,
+.leaflet-container svg:focus,
+.leaflet-container a:focus,
+.leaflet-interactive:focus,
+.leaflet-interactive:focus-visible,
+path.leaflet-interactive:focus,
+path.leaflet-interactive:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
 body {
   background-color: var(--color-bg-base);
   color: var(--color-text-main);

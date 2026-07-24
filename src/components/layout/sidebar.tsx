@@ -42,7 +42,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, activeRoute, 
       <aside className={`
         fixed top-0 bottom-0 left-0 z-50 w-64 bg-slate-900 text-slate-100 border-r border-slate-800
         transform transition-transform duration-200 ease-in-out flex flex-col rounded-none shadow-xl
-        ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+        ${isOpen ? 'translate-x-0' : '-translate-x-full'}
       `}>
         {/* Sidebar Header */}
         <div className="h-16 flex items-center justify-between px-6 border-b border-slate-800 bg-slate-950">
@@ -73,7 +73,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, activeRoute, 
                 key={item.id}
                 onClick={() => {
                   onNavigate(item.id);
-                  onClose();
                 }}
                 className={`
                   w-full flex items-center gap-3 px-4 py-3 text-sm font-roboto text-left rounded-none

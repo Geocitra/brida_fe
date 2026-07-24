@@ -17,11 +17,11 @@ import {
   CheckCircle2,
   History,
   Trash2,
-  Plus,
   Send,
   Database,
   Layers,
   Clock,
+  RefreshCw,
 } from 'lucide-react';
 
 interface ArticleGeneratorViewProps {
@@ -47,7 +47,7 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
   const [articleTitle, setArticleTitle] = useState<string>('');
   const [targetLength, setTargetLength] = useState<'SHORT' | 'MEDIUM' | 'LONG'>('MEDIUM');
   const [tone, setTone] = useState<string>('solutif');
-  const [userInstruction, setUserInstruction] = useState<string>(initialPrompt || '');
+  const [userInstruction, _setUserInstruction] = useState<string>(initialPrompt || '');
 
   // Session & Interaction State
   const [activeSession, setActiveSession] = useState<ArticleSessionDetail | null>(null);
@@ -622,7 +622,7 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
                       {session.articleTitle || session.title}
                     </strong>
                     <p className="text-xs text-slate-600 line-clamp-2 italic">
-                      "{session.lastMessage || 'Tidak ada riwayat pesan.'}"
+                      "{(session as any).lastMessage || 'Tidak ada riwayat pesan.'}"
                     </p>
                     <div className="text-[11px] text-slate-500 font-semibold flex flex-wrap items-center gap-3 pt-1">
                       <span>Diperbarui: {new Date(session.updatedAt).toLocaleString('id-ID')}</span>

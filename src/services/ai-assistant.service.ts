@@ -228,4 +228,11 @@ export const AiAssistantService = {
       throw new Error(result.message || 'Gagal menghapus sesi Q&A.');
     }
   },
+
+  /**
+   * Helper alias for single document article generation
+   */
+  async generateArticle(documentId: string, tone: 'kritis' | 'solutif' | 'akademis'): Promise<string> {
+    return this.queryDocumentOnce(documentId, `Buatkan artikel publikasi bertema ${tone} berdasarkan dokumen ini.`);
+  },
 };

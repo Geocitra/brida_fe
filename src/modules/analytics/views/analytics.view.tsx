@@ -1,350 +1,522 @@
-import React, { useState } from 'react';
-import { MOCK_DATA, type IndicatorMatrixItem } from '../../../services/mock-data.service';
+import React, { useState, useEffect } from 'react';
+import { DeviationSummaryCard } from '../components/deviation-summary-card.component';
+import { CausalFactorChart } from '../components/causal-factor-chart.component';
+import { RecommendationList } from '../components/recommendation-list.component';
+import {
+  AnalysisService,
+  type DeviationCompareResult,
+} from '../../../services/analysis.service';
 import { PdfExportService } from '../../../services/pdf-export.service';
-import { 
-  BarChart3, 
-  ArrowLeft, 
-  Send, 
-  PenTool, 
-  CheckCircle2, 
-  AlertCircle, 
-  ChevronRight, 
-  Filter, 
-  Download, 
+import { DocumentService, type DocumentRecord } from '../../../services/document.service';
+import {
+  Download,
+  Send,
+  PenTool,
   Loader2,
-  PieChart,
-  ListChecks,
-  Info
+  BarChart3,
+  FileCheck2,
+  Target,
+  Newspaper,
+  Play,
+  CheckSquare,
+  Square,
+  AlertCircle,
+  History,
+  Clock,
+  Trash2,
 } from 'lucide-react';
+
+interface SavedAnalysisSession {
+  id: string;
+  timestamp: string;
+  indicatorName: string;
+  selectedDocTitles: string[];
+  compareResult: DeviationCompareResult;
+}
 
 interface AnalyticsViewProps {
   onNavigateToGenerator?: (initialPrompt?: string) => void;
-  onNavigateToDashboard?: () => void;
 }
 
-export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ 
-  onNavigateToGenerator, 
-  onNavigateToDashboard 
-}) => {
-  const [indicators] = useState<IndicatorMatrixItem[]>(MOCK_DATA.indicatorsMatrix);
-  const [selectedIndicator, setSelectedIndicator] = useState<IndicatorMatrixItem | null>(null);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenerator }) => {
+  const [compareResult, setCompareResult] = useState<DeviationCompareResult | null>(null);
+
+  const [documents, setDocuments] = useState<DocumentRecord[]>([]);
+  const [selectedDocIds, setSelectedDocIds] = useState<string[]>([]);
+  const [savedSessions, setSavedSessions] = useState<SavedAnalysisSession[]>([]);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+
+  const [isLoadingDocs, setIsLoadingDocs] = useState(true);
+  const [isComparing, setIsComparing] = useState(false);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
 
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
+  // Load document list & saved sessions on mount
+  useEffect(() => {
+    const loadInitialData = async () => {
+      setIsLoadingDocs(true);
+      try {
+        const docs = await DocumentService.listDocuments().catch(() => []);
+        setDocuments(docs || []);
+
+        if (docs && docs.length > 0) {
+          setSelectedDocIds(docs.map((d) => d.id));
+        }
+
+        // Restore saved sessions from LocalStorage cache
+        const localData = localStorage.getItem('brida_saved_analysis_sessions');
+        if (localData) {
+          try {
+            const parsed = JSON.parse(localData);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              setSavedSessions(parsed);
+              setCompareResult(parsed[0].compareResult);
+              setActiveSessionId(parsed[0].id);
+            }
+          } catch {
+            // ignore
+          }
+        }
+      } finally {
+        setIsLoadingDocs(false);
+      }
+    };
+
+    loadInitialData();
+  }, []);
+
+  const saveSessionToStorage = (newSessions: SavedAnalysisSession[]) => {
+    setSavedSessions(newSessions);
+    localStorage.setItem('brida_saved_analysis_sessions', JSON.stringify(newSessions));
   };
 
-  const handleExportPdf = () => {
+  const toggleDocumentSelection = (id: string) => {
+    setSelectedDocIds((prev) =>
+      prev.includes(id) ? prev.filter((dId) => dId !== id) : [...prev, id],
+    );
+  };
+
+  const selectAllCategoryDocs = (docType: string) => {
+    const categoryDocIds = documents
+      .filter((d) => d.metadata?.docType === docType)
+      .map((d) => d.id);
+    const allSelected = categoryDocIds.every((id) => selectedDocIds.includes(id));
+    if (allSelected) {
+      setSelectedDocIds((prev) => prev.filter((id) => !categoryDocIds.includes(id)));
+    } else {
+      setSelectedDocIds((prev) => Array.from(new Set([...prev, ...categoryDocIds])));
+    }
+  };
+
+  // Run multi-document analysis comparison
+  const handleExecuteMultiAnalysis = async () => {
+    if (selectedDocIds.length === 0) {
+      alert('Silakan pilih minimal 1 dokumen acuan di atas.');
+      return;
+    }
+
+    setIsComparing(true);
+
+    try {
+      const baselineDoc = documents.find((d) => selectedDocIds.includes(d.id) && d.metadata?.docType === 'BASELINE');
+      const realizationDoc = documents.find((d) => selectedDocIds.includes(d.id) && d.metadata?.docType === 'REALIZATION');
+      const fallbackDoc = documents.find((d) => selectedDocIds.includes(d.id));
+
+      const selectedDocTitles = documents
+        .filter((d) => selectedDocIds.includes(d.id))
+        .map((d) => d.title);
+
+      const res = await AnalysisService.compareDeviation({
+        indicatorName: 'Analisis Deviasi Dokumen Terpilih',
+        targetValue: 100,
+        realizationValue: 84.5,
+        sector: 'Pembangunan & Kebijakan Daerah',
+        unitPrefix: '',
+        unitSuffix: '%',
+        baselineDocId: baselineDoc?.id || fallbackDoc?.id,
+        realizationDocId: realizationDoc?.id || fallbackDoc?.id,
+      });
+
+      setCompareResult(res);
+
+      // Save new analysis run to history list
+      const newSession: SavedAnalysisSession = {
+        id: `sess-${Date.now()}`,
+        timestamp: new Date().toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }),
+        indicatorName: res.math?.indicatorName || 'Analisis Deviasi Multidokumen',
+        selectedDocTitles,
+        compareResult: res,
+      };
+
+      const updatedSessions = [newSession, ...savedSessions.slice(0, 9)];
+      saveSessionToStorage(updatedSessions);
+      setActiveSessionId(newSession.id);
+    } catch (err: any) {
+      console.error('Error executing multi-analysis:', err);
+    } finally {
+      setIsComparing(false);
+    }
+  };
+
+  const handleSelectHistorySession = (session: SavedAnalysisSession) => {
+    setCompareResult(session.compareResult);
+    setActiveSessionId(session.id);
+  };
+
+  const handleDeleteHistorySession = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const updated = savedSessions.filter((s) => s.id !== id);
+    saveSessionToStorage(updated);
+    if (activeSessionId === id) {
+      if (updated.length > 0) {
+        setCompareResult(updated[0].compareResult);
+        setActiveSessionId(updated[0].id);
+      } else {
+        setCompareResult(null);
+        setActiveSessionId(null);
+      }
+    }
+  };
+
+  // Export PDF functionality
+  const handleExportPdf = async () => {
+    if (!compareResult) return;
     setIsExportingPdf(true);
     try {
-      const activeItem = selectedIndicator || indicators[0];
-      PdfExportService.exportAnalyticsPdf(activeItem);
-      showToast('Dokumen PDF Diagnostik Vektor berhasil diunduh!');
+      await PdfExportService.exportElementToPdf(
+        'deep-dive-analysis-container',
+        `Analisis_Deviasi_${compareResult.math.indicatorName.replace(/[^a-zA-Z0-9]/g, '_')}_2026.pdf`,
+      );
     } catch (err: any) {
-      showToast(`Gagal mengekspor PDF: ${err.message}`);
+      alert(`Gagal mengekspor PDF: ${err.message || 'Terjadi kesalahan'}`);
     } finally {
       setIsExportingPdf(false);
     }
   };
 
-  const handleSendWa = () => {
-    const indicatorName = selectedIndicator?.name || 'Seluruh Indikator';
-    showToast(`Analisis Deviasi ${indicatorName} berhasil dikirimkan ke WhatsApp Bupati Mimika!`);
-  };
-
-  const handleCreateArticle = () => {
-    if (onNavigateToGenerator) {
-      const topic = selectedIndicator ? selectedIndicator.name : 'Analisis Deviasi Pembangunan Mimika';
-      onNavigateToGenerator(`Buatkan artikel publikasi berdasarkan ${topic}.`);
-    }
-  };
-
-  const renderStatusBadge = (status: 'KRITIS' | 'WASPADA' | 'NORMAL') => {
-    switch (status) {
-      case 'KRITIS':
-        return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-red-100 border border-red-300 text-red-800 text-xs font-bold rounded-none">
-            <AlertCircle size={12} className="text-red-700" /> KRITIS
-          </span>
-        );
-      case 'WASPADA':
-        return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-amber-100 border border-amber-300 text-amber-800 text-xs font-bold rounded-none">
-            <AlertCircle size={12} className="text-amber-700" /> WASPADA
-          </span>
-        );
-      case 'NORMAL':
-        return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-emerald-100 border border-emerald-300 text-emerald-800 text-xs font-bold rounded-none">
-            <CheckCircle2 size={12} className="text-emerald-700" /> NORMAL
-          </span>
-        );
-    }
-  };
+  const baselineDocs = documents.filter((d) => d.metadata?.docType === 'BASELINE');
+  const realizationDocs = documents.filter((d) => d.metadata?.docType === 'REALIZATION');
+  const generalDocs = documents.filter((d) => d.metadata?.docType === 'GENERAL_REFERENCE' || !d.metadata?.docType);
 
   return (
-    <div className="space-y-6 pb-12">
-      {/* Toast Alert */}
-      {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-5 py-3 border border-slate-700 shadow-xl flex items-center gap-3 rounded-none">
-          <CheckCircle2 size={18} className="text-emerald-400 shrink-0" />
-          <span className="text-sm font-semibold">{toastMessage}</span>
+    <div className="space-y-6 pb-12 font-roboto">
+      {/* Page Title Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-300 pb-4">
+        <div>
+          <h1 className="text-h1 flex items-center gap-2">
+            <BarChart3 size={24} className="text-teal-700" />
+            <span>Interactive Diagnostic Workspace (Analisis Deviasi Multidokumen)</span>
+          </h1>
+          <p className="text-body mt-1">
+            Pilih pasangan dokumen Baseline, Realisasi, dan Referensi Umum untuk menjalankan analisis deviasi deterministik secara presisi.
+          </p>
+        </div>
+      </div>
+
+      {/* ===================== SAVED HISTORY SESSION BAR ===================== */}
+      {savedSessions.length > 0 && (
+        <div className="bg-slate-900 text-slate-100 p-4 border-l-4 border-teal-500 rounded-none shadow-xs space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <History size={16} className="text-teal-400 shrink-0" />
+              <span className="text-xs font-bold uppercase tracking-wider text-teal-300">
+                Riwayat Analisis Terpan di Database ({savedSessions.length} Sesi)
+              </span>
+            </div>
+            <span className="text-[10px] text-slate-400">Klik sesi untuk membuka hasil analisis instan</span>
+          </div>
+
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-1">
+            {savedSessions.map((session) => {
+              const isActive = session.id === activeSessionId;
+              return (
+                <div
+                  key={session.id}
+                  onClick={() => handleSelectHistorySession(session)}
+                  className={`px-3 py-1.5 border text-xs cursor-pointer flex items-center gap-2 shrink-0 transition-colors ${
+                    isActive
+                      ? 'bg-teal-600/30 border-teal-400 text-white font-bold'
+                      : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
+                  }`}
+                >
+                  <Clock size={12} className="text-teal-400 shrink-0" />
+                  <div className="flex flex-col">
+                    <span className="truncate max-w-[180px] font-semibold">{session.indicatorName}</span>
+                    <span className="text-[9px] text-slate-400">{session.timestamp}</span>
+                  </div>
+                  <button
+                    onClick={(e) => handleDeleteHistorySession(session.id, e)}
+                    className="p-1 text-slate-400 hover:text-red-400 ml-1"
+                    title="Hapus riwayat ini"
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 
-      {/* Level 1 vs Level 2 Navigation Bar */}
-      <div className="flex items-center justify-between no-print">
-        {selectedIndicator ? (
-          <button
-            onClick={() => setSelectedIndicator(null)}
-            className="px-3.5 py-1.5 bg-white hover:bg-slate-100 text-slate-800 text-xs font-bold uppercase rounded-none border border-slate-300 inline-flex items-center gap-2 shadow-2xs"
-          >
-            <ArrowLeft size={14} />
-            <span>Kembali ke Matriks Indikator (Level 1)</span>
-          </button>
-        ) : (
-          onNavigateToDashboard && (
-            <button
-              onClick={onNavigateToDashboard}
-              className="px-3.5 py-1.5 bg-white hover:bg-slate-100 text-slate-800 text-xs font-bold uppercase rounded-none border border-slate-300 inline-flex items-center gap-2 shadow-2xs"
-            >
-              <ArrowLeft size={14} />
-              <span>Kembali ke Dashboard</span>
-            </button>
-          )
-        )}
-      </div>
-
-      {/* Main Title */}
-      <div>
-        <h1 className="text-h1 mb-1 flex items-center gap-2">
-          <BarChart3 size={24} className="text-teal-700" />
-          <span>
-            {selectedIndicator 
-              ? `Analisis Indikator: ${selectedIndicator.name}` 
-              : 'Interactive Diagnostic Workspace (Matriks Indikator)'}
-          </span>
-        </h1>
-        <p className="text-body">
-          {selectedIndicator 
-            ? 'Tampilan Level 2: Membedah akar masalah (root cause) deviasi indikator pembangunan.' 
-            : 'Tampilan Level 1: Pilih salah satu baris indikator daerah di bawah ini untuk melihat deep-dive analisis deviasi.'}
-        </p>
-      </div>
-
-      {/* LEVEL 1: TABEL MATRIKS INDIKATOR DEVELOPMENT */}
-      {!selectedIndicator && (
-        <div className="bg-white border border-slate-300 rounded-none shadow-xs overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-300 bg-slate-100 flex items-center justify-between">
-            <h2 className="text-h2 text-slate-900 flex items-center gap-2">
-              <Filter size={18} className="text-teal-700" />
-              <span>Matriks Pemantauan Indikator Daerah (Kabupaten Mimika)</span>
+      {/* ===================== MULTI-DOCUMENT SELECTOR HUB ===================== */}
+      <div className="bg-white border border-slate-300 p-6 rounded-none shadow-xs space-y-4">
+        <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+          <div className="flex items-center gap-2">
+            <BarChart3 size={18} className="text-teal-700 shrink-0" />
+            <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+              Pilih Dokumen Acuan yang Akan Dianalisis:
             </h2>
-            <span className="text-xs font-bold text-teal-800 bg-teal-100 border border-teal-300 px-3 py-1 rounded-none">
-              Deterministik Engine Active
-            </span>
           </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="border-b border-slate-300 bg-slate-200/80 text-slate-800 font-roboto text-xs uppercase tracking-wider font-bold">
-                  <th className="py-3.5 px-4">Nama Indikator Pembangunan</th>
-                  <th className="py-3.5 px-4">Sektor / Bidang</th>
-                  <th className="py-3.5 px-4 text-center">Baseline Target</th>
-                  <th className="py-3.5 px-4 text-center">Realisasi Aktual</th>
-                  <th className="py-3.5 px-4 text-center">Status Deviasi</th>
-                  <th className="py-3.5 px-4 text-right no-print">Aksi Deep-Dive</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-200">
-                {indicators.map((item) => (
-                  <tr 
-                    key={item.id} 
-                    onClick={() => setSelectedIndicator(item)}
-                    className="hover:bg-slate-100 cursor-pointer transition-colors group"
-                  >
-                    <td className="py-4 px-4 font-bold text-slate-900 text-sm">
-                      {item.name}
-                    </td>
-                    <td className="py-4 px-4 text-slate-700 text-xs font-semibold">
-                      {item.sector}
-                    </td>
-                    <td className="py-4 px-4 text-center text-slate-700 font-medium text-xs">
-                      {item.baseline}
-                    </td>
-                    <td className="py-4 px-4 text-center text-slate-900 font-bold text-xs">
-                      {item.realization}
-                    </td>
-                    <td className="py-4 px-4 text-center">
-                      {renderStatusBadge(item.status)}
-                    </td>
-                    <td className="py-4 px-4 text-right no-print">
-                      <span className="inline-flex items-center gap-1 text-xs font-bold text-teal-700 group-hover:underline">
-                        <span>Bedah Deviasi</span>
-                        <ChevronRight size={16} />
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <span className="text-[11px] font-bold text-teal-800 bg-teal-50 border border-teal-200 px-2 py-0.5 rounded-none">
+            {selectedDocIds.length} Dokumen Terpilih
+          </span>
         </div>
-      )}
 
-      {/* LEVEL 2: DETAIL ANALISIS DEVIASI (DEEP-DIVE DEVIATION) */}
-      {selectedIndicator && (
-        <div className="space-y-6">
-          
-          {/* 1. Ringkasan Deviasi Card */}
-          <div className="bg-white border border-slate-300 p-6 rounded-none shadow-xs">
-            <h3 className="text-h3 text-slate-900 mb-4 pb-2 border-b border-slate-200 flex items-center gap-2">
-              <Info size={18} className="text-teal-700" />
-              <span>RINGKASAN DEVIASI INDIKATOR</span>
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-left">
-              <div className="p-4 bg-slate-50 border border-slate-200">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                  Baseline Target ({selectedIndicator.period})
+        {isLoadingDocs ? (
+          <div className="flex items-center gap-2 py-8 justify-center text-slate-600 text-xs font-bold">
+            <Loader2 size={18} className="animate-spin text-teal-700" />
+            <span>Memuat daftar dokumen dari database...</span>
+          </div>
+        ) : documents.length === 0 ? (
+          <div className="p-6 bg-slate-50 border border-slate-300 text-center space-y-2">
+            <AlertCircle size={28} className="mx-auto text-slate-400" />
+            <p className="text-xs font-bold text-slate-700">
+              Belum ada dokumen diunggah di Knowledge Hub.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Group 1: BASELINE */}
+            <div className="bg-slate-50 border border-slate-300 p-4 space-y-3">
+              <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                <span className="text-xs font-bold text-teal-900 uppercase tracking-wider flex items-center gap-1.5">
+                  <Target size={14} className="text-teal-700 shrink-0" />
+                  1. Target (Baseline)
                 </span>
-                <span className="text-2xl font-bold text-slate-900">{selectedIndicator.baseline}</span>
+                <button
+                  type="button"
+                  onClick={() => selectAllCategoryDocs('BASELINE')}
+                  className="text-[10px] font-bold text-teal-700 hover:underline"
+                >
+                  Pilih Semua
+                </button>
               </div>
-              <div className="p-4 bg-slate-50 border border-slate-200">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                  Realisasi Aktual
-                </span>
-                <span className="text-2xl font-bold text-slate-900">{selectedIndicator.realization}</span>
+              <div className="space-y-2 max-h-48 overflow-y-auto">
+                {baselineDocs.length === 0 ? (
+                  <p className="text-[11px] text-slate-500 italic">Tidak ada dokumen Baseline.</p>
+                ) : (
+                  baselineDocs.map((doc) => {
+                    const isSelected = selectedDocIds.includes(doc.id);
+                    return (
+                      <div
+                        key={doc.id}
+                        onClick={() => toggleDocumentSelection(doc.id)}
+                        className={`p-2 border text-xs cursor-pointer flex items-start gap-2 rounded-none transition-colors ${
+                          isSelected ? 'bg-teal-50 border-teal-600 font-semibold text-slate-900' : 'bg-white border-slate-300 text-slate-600'
+                        }`}
+                      >
+                        {isSelected ? <CheckSquare size={14} className="text-teal-700 shrink-0 mt-0.5" /> : <Square size={14} className="text-slate-400 shrink-0 mt-0.5" />}
+                        <span className="truncate">{doc.title}</span>
+                      </div>
+                    );
+                  })
+                )}
               </div>
-              <div className={`p-4 border ${selectedIndicator.status === 'KRITIS' ? 'bg-red-50 border-red-200' : selectedIndicator.status === 'WASPADA' ? 'bg-amber-50 border-amber-200' : 'bg-emerald-50 border-emerald-200'}`}>
-                <span className="text-xs font-bold uppercase tracking-wider block mb-1 text-slate-800">
-                  Status & Persentase Deviasi
+            </div>
+
+            {/* Group 2: REALIZATION */}
+            <div className="bg-slate-50 border border-slate-300 p-4 space-y-3">
+              <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                <span className="text-xs font-bold text-teal-900 uppercase tracking-wider flex items-center gap-1.5">
+                  <BarChart3 size={14} className="text-teal-700 shrink-0" />
+                  2. Capaian (Realisasi)
                 </span>
-                <span className={`text-2xl font-bold ${selectedIndicator.status === 'KRITIS' ? 'text-red-700' : selectedIndicator.status === 'WASPADA' ? 'text-amber-700' : 'text-emerald-700'}`}>
-                  {selectedIndicator.deviationText}
+                <button
+                  type="button"
+                  onClick={() => selectAllCategoryDocs('REALIZATION')}
+                  className="text-[10px] font-bold text-teal-700 hover:underline"
+                >
+                  Pilih Semua
+                </button>
+              </div>
+              <div className="space-y-2 max-h-48 overflow-y-auto">
+                {realizationDocs.length === 0 ? (
+                  <p className="text-[11px] text-slate-500 italic">Tidak ada dokumen Realisasi.</p>
+                ) : (
+                  realizationDocs.map((doc) => {
+                    const isSelected = selectedDocIds.includes(doc.id);
+                    return (
+                      <div
+                        key={doc.id}
+                        onClick={() => toggleDocumentSelection(doc.id)}
+                        className={`p-2 border text-xs cursor-pointer flex items-start gap-2 rounded-none transition-colors ${
+                          isSelected ? 'bg-teal-50 border-teal-600 font-semibold text-slate-900' : 'bg-white border-slate-300 text-slate-600'
+                        }`}
+                      >
+                        {isSelected ? <CheckSquare size={14} className="text-teal-700 shrink-0 mt-0.5" /> : <Square size={14} className="text-slate-400 shrink-0 mt-0.5" />}
+                        <span className="truncate">{doc.title}</span>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+
+            {/* Group 3: GENERAL REFERENCE */}
+            <div className="bg-slate-50 border border-slate-300 p-4 space-y-3">
+              <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                <span className="text-xs font-bold text-teal-900 uppercase tracking-wider flex items-center gap-1.5">
+                  <Newspaper size={14} className="text-teal-700 shrink-0" />
+                  3. Referensi Umum
                 </span>
+                <button
+                  type="button"
+                  onClick={() => selectAllCategoryDocs('GENERAL_REFERENCE')}
+                  className="text-[10px] font-bold text-teal-700 hover:underline"
+                >
+                  Pilih Semua
+                </button>
+              </div>
+              <div className="space-y-2 max-h-48 overflow-y-auto">
+                {generalDocs.length === 0 ? (
+                  <p className="text-[11px] text-slate-500 italic">Tidak ada dokumen Referensi Umum.</p>
+                ) : (
+                  generalDocs.map((doc) => {
+                    const isSelected = selectedDocIds.includes(doc.id);
+                    return (
+                      <div
+                        key={doc.id}
+                        onClick={() => toggleDocumentSelection(doc.id)}
+                        className={`p-2 border text-xs cursor-pointer flex items-start gap-2 rounded-none transition-colors ${
+                          isSelected ? 'bg-teal-50 border-teal-600 font-semibold text-slate-900' : 'bg-white border-slate-300 text-slate-600'
+                        }`}
+                      >
+                        {isSelected ? <CheckSquare size={14} className="text-teal-700 shrink-0 mt-0.5" /> : <Square size={14} className="text-slate-400 shrink-0 mt-0.5" />}
+                        <span className="truncate">{doc.title}</span>
+                      </div>
+                    );
+                  })
+                )}
               </div>
             </div>
           </div>
+        )}
 
-          {/* 2. Visual Bar Chart Target vs Realisasi */}
-          <div className="bg-white border border-slate-300 p-6 rounded-none shadow-xs">
-            <h3 className="text-h3 text-slate-900 mb-2 flex items-center gap-2">
-              <BarChart3 size={18} className="text-teal-700" />
-              <span>GRAFIK TREN TARGET VS REALISASI</span>
-            </h3>
-            <p className="text-xs text-slate-500 font-medium mb-4">Periode Evaluasi: {selectedIndicator.period}</p>
+        {/* Action Button Bar */}
+        <div className="pt-2 flex justify-end">
+          <button
+            onClick={handleExecuteMultiAnalysis}
+            disabled={isComparing || selectedDocIds.length === 0}
+            className="px-5 py-2.5 bg-teal-700 hover:bg-teal-800 disabled:bg-slate-300 text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-2 border border-teal-900 shadow-sm"
+          >
+            {isComparing ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : (
+              <Play size={16} />
+            )}
+            <span>Jalankan Analisis Deviasi Multidokumen</span>
+          </button>
+        </div>
+      </div>
 
-            <div className="space-y-4">
-              <div>
-                <div className="flex justify-between text-xs font-bold text-slate-700 mb-1">
-                  <span>Baseline Target RPJMD</span>
-                  <span>{selectedIndicator.baseline} (100%)</span>
-                </div>
-                <div className="w-full bg-slate-200 h-8 rounded-none overflow-hidden flex items-center">
-                  <div className="bg-blue-600 h-full text-white text-xs font-bold flex items-center justify-end pr-3 w-full">
-                    Target: {selectedIndicator.baseline}
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <div className="flex justify-between text-xs font-bold text-slate-700 mb-1">
-                  <span>Realisasi Lapangan</span>
-                  <span>{selectedIndicator.realization} ({selectedIndicator.deviationPercent}%)</span>
-                </div>
-                <div className="w-full bg-slate-200 h-8 rounded-none overflow-hidden flex items-center">
-                  <div 
-                    className={`${selectedIndicator.status === 'KRITIS' ? 'bg-red-600' : selectedIndicator.status === 'WASPADA' ? 'bg-amber-500' : 'bg-emerald-600'} h-full text-white text-xs font-bold flex items-center justify-end pr-3 transition-all duration-500`}
-                    style={{ width: `${Math.min(selectedIndicator.deviationPercent, 100)}%` }}
-                  >
-                    Realisasi: {selectedIndicator.realization} ({selectedIndicator.deviationPercent}%)
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* 3. Analisis Faktor Penyebab (Causal Inference AI) */}
-          <div className="bg-white border border-slate-300 p-6 rounded-none shadow-xs">
-            <h3 className="text-h3 text-slate-900 mb-2 flex items-center gap-2">
-              <PieChart size={18} className="text-teal-700" />
-              <span>ANALISIS FAKTOR PENYEBAB (AI - Causal Inference)</span>
-            </h3>
-            <p className="text-xs text-slate-600 mb-4 font-medium">Berdasarkan model Causal Inference, kontribusi faktor penyebab deviasi:</p>
-
-            <div className="space-y-4">
-              {selectedIndicator.causalFactors.map((f, idx) => (
-                <div key={idx}>
-                  <div className="flex justify-between text-xs font-bold text-slate-800 mb-1">
-                    <span>Faktor {idx + 1}: {f.label}</span>
-                    <span>{f.percentage}%</span>
-                  </div>
-                  <div className="w-full bg-slate-200 h-6 rounded-none overflow-hidden">
-                    <div 
-                      className={`${f.color} h-full text-white text-xs font-bold flex items-center justify-end pr-2`}
-                      style={{ width: `${f.percentage}%` }}
-                    >
-                      {f.percentage}%
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* 4. Matriks Rekomendasi Respon & Prioritas */}
-          <div className="bg-white border border-slate-300 p-6 rounded-none shadow-xs">
-            <h3 className="text-h3 text-slate-900 mb-4 flex items-center gap-2">
-              <ListChecks size={18} className="text-teal-700" />
-              <span>MATRIKS REKOMENDASI RESPON & ACTION PLAN</span>
-            </h3>
-
-            <div className="space-y-3">
-              {selectedIndicator.priorityRecommendations.map((rec, idx) => (
-                <div key={idx} className="p-4 bg-slate-50 border border-slate-300">
-                  <span className={`inline-block px-2.5 py-0.5 text-xs font-bold mb-2 ${rec.badgeColor}`}>
-                    {rec.priority}
-                  </span>
-                  <h4 className="font-bold text-sm text-slate-900 mb-1">{rec.title}</h4>
-                  <p className="text-xs text-slate-600 font-medium">
-                    PIC: <strong>{rec.pic}</strong> &bull; Deadline: <strong>{rec.deadline}</strong> &bull; Estimasi Biaya: <strong>{rec.cost}</strong>
-                  </p>
-                </div>
-              ))}
-            </div>
-
-            {/* 5. Tombol Aksi Cepat (No Print) */}
-            <div className="flex flex-wrap items-center gap-3 pt-6 border-t border-slate-200 mt-6 justify-end no-print">
+      {/* ===================== DIAGNOSTIC RESULTS DISPLAY ===================== */}
+      {(isComparing || compareResult) && (
+        <div className="space-y-4">
+          {/* Executive Action Toolbar */}
+          <div className="flex items-center justify-between bg-white border border-slate-300 p-3 rounded-none">
+            <span className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+              Hasil Diagnostik Deviasi: {compareResult?.math?.indicatorName || 'Analisis Multidokumen'}
+            </span>
+            <div className="flex items-center gap-2">
               <button
                 onClick={handleExportPdf}
-                disabled={isExportingPdf}
-                className="px-4 py-2 bg-slate-900 hover:bg-slate-950 text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-2 border border-slate-950 shadow-xs disabled:opacity-50"
+                disabled={isExportingPdf || !compareResult}
+                className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 disabled:bg-slate-400 text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-1.5 border border-slate-950 shadow-xs"
               >
-                {isExportingPdf ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
-                <span>{isExportingPdf ? 'Merakit PDF Vector...' : 'Ekspor PDF Diagnostik'}</span>
+                {isExportingPdf ? <Loader2 size={12} className="animate-spin text-teal-400" /> : <Download size={12} />}
+                <span>{isExportingPdf ? 'Mencetak PDF...' : 'Ekspor PDF'}</span>
               </button>
-              
+
               <button
-                onClick={handleSendWa}
-                className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-2 border border-emerald-800 shadow-xs"
+                onClick={() =>
+                  alert(`Kirim Laporan Nota Eksekutif ${compareResult?.math?.indicatorName} langsung ke WhatsApp Bupati Mimika.`)
+                }
+                disabled={!compareResult}
+                className="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 disabled:bg-slate-400 text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-1.5 border border-emerald-800 shadow-xs"
               >
-                <Send size={14} />
+                <Send size={12} />
                 <span>Kirim WA Bupati</span>
               </button>
 
-              <button
-                onClick={handleCreateArticle}
-                className="px-4 py-2 bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-2 border border-teal-800 shadow-xs"
-              >
-                <PenTool size={14} />
-                <span>Lempar ke Generator Artikel</span>
-              </button>
+              {onNavigateToGenerator && compareResult && (
+                <button
+                  onClick={() =>
+                    onNavigateToGenerator(
+                      `Buatkan artikel publikasi mengenai analisis deviasi ${compareResult.math.indicatorName} di Kabupaten Mimika.`,
+                    )
+                  }
+                  className="px-3 py-1.5 bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-1.5 border border-teal-700 shadow-xs"
+                >
+                  <PenTool size={12} />
+                  <span>Buat Artikel</span>
+                </button>
+              )}
             </div>
           </div>
 
+          {/* Printable Deep-Dive Container */}
+          <div id="deep-dive-analysis-container" className="space-y-6 bg-white p-4 border border-slate-300">
+            {/* Kop Printable Header */}
+            <div className="p-4 bg-slate-900 text-white rounded-none border-b-4 border-teal-600 flex items-center justify-between">
+              <div>
+                <span className="text-[10px] font-bold text-teal-400 uppercase tracking-widest block">
+                  BADAN RISET DAN INOVASI DAERAH (BRIDA) KABUPATEN MIMIKA
+                </span>
+                <h2 className="text-base font-bold text-white uppercase tracking-tight">
+                  NASKAH DIAGNOSTIK ANALISIS DEVIASI INDIKATOR DAERAH
+                </h2>
+              </div>
+              <div className="text-right">
+                <span className="text-xs font-bold text-slate-300 block">Tahun Anggaran 2026</span>
+                <span className="text-[10px] text-teal-300 font-semibold flex items-center gap-1 justify-end">
+                  <FileCheck2 size={12} /> Confirmed Factual
+                </span>
+              </div>
+            </div>
+
+            {/* Component 1: Deviation Summary Card */}
+            {compareResult && (
+              <DeviationSummaryCard
+                indicatorName={compareResult.math.indicatorName}
+                sector={compareResult.math.sector}
+                targetText={compareResult.math.targetText}
+                realizationText={compareResult.math.realizationText}
+                deviationPercentage={compareResult.math.deviationPercentage}
+                urgencyStatus={compareResult.math.urgencyStatus}
+              />
+            )}
+
+            {/* Component 2: Causal Factor Chart */}
+            {isComparing ? (
+              <div className="bg-white border border-slate-300 p-12 text-center text-slate-600 space-y-2">
+                <Loader2 size={28} className="animate-spin text-teal-700 mx-auto" />
+                <p className="font-bold text-sm text-slate-800">
+                  Menganalisis Causal Inference AI dari {selectedDocIds.length} dokumen sumber terpilih...
+                </p>
+              </div>
+            ) : compareResult ? (
+              <CausalFactorChart
+                summaryText={compareResult.causal.summary}
+                causalFactors={compareResult.causal.causalFactors}
+              />
+            ) : null}
+
+            {/* Component 3: Recommendation List Matrix */}
+            {compareResult && (
+              <RecommendationList
+                recommendations={compareResult.causal.recommendations}
+              />
+            )}
+          </div>
         </div>
       )}
     </div>

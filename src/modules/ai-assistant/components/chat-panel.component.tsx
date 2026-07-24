@@ -12,9 +12,6 @@ import {
   Plus,
   Trash2,
   MessageSquare,
-  RefreshCw,
-  Database,
-  Clock,
 } from 'lucide-react';
 import { AiAssistantService } from '../../../services/ai-assistant.service';
 

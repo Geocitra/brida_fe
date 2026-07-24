@@ -14,18 +14,32 @@ export interface DocumentRecord {
     totalTokenCount: number;
     category: string;
     uploadedBy: string;
+    docType?: 'BASELINE' | 'REALIZATION' | string;
   };
   chunkCount?: number;
   extractedLocationsCount?: number;
 }
 
+const formatError = (msg: any, fallback: string): string => {
+  if (!msg) return fallback;
+  if (typeof msg === 'string') return msg;
+  if (Array.isArray(msg)) return msg.join(', ');
+  return String(msg);
+};
+
 export const DocumentService = {
-  async uploadDocument(file: File, title: string, category?: string): Promise<DocumentRecord> {
+  async uploadDocument(
+    file: File,
+    title: string,
+    category?: string,
+    docType: string = 'REALIZATION',
+  ): Promise<DocumentRecord> {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('title', title);
     if (category) formData.append('category', category);
     formData.append('uploadedBy', 'Kepala BRIDA');
+    formData.append('docType', docType);
 
     const response = await fetch(`${API_BASE_URL}/documents/upload`, {
       method: 'POST',
@@ -34,7 +48,7 @@ export const DocumentService = {
 
     const result = await response.json();
     if (!response.ok || !result.success) {
-      throw new Error(result.message || 'Gagal mengunggah dokumen laporan.');
+      throw new Error(formatError(result.message, 'Gagal mengunggah dokumen laporan.'));
     }
 
     return result.data;
@@ -44,7 +58,7 @@ export const DocumentService = {
     const response = await fetch(`${API_BASE_URL}/documents`);
     const result = await response.json();
     if (!response.ok || !result.success) {
-      throw new Error(result.message || 'Gagal memuat daftar dokumen.');
+      throw new Error(formatError(result.message, 'Gagal memuat daftar dokumen.'));
     }
     return result.data;
   },
@@ -53,7 +67,7 @@ export const DocumentService = {
     const response = await fetch(`${API_BASE_URL}/documents/${id}`);
     const result = await response.json();
     if (!response.ok || !result.success) {
-      throw new Error(result.message || 'Gagal memuat detail dokumen.');
+      throw new Error(formatError(result.message, 'Gagal memuat detail dokumen.'));
     }
     return result.data;
   },

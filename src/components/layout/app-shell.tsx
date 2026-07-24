@@ -17,7 +17,7 @@ export const AppShell: React.FC<AppShellProps> = ({
   pageTitle,
   onLogout,
 }) => {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900 flex flex-col font-roboto rounded-none">
@@ -30,8 +30,8 @@ export const AppShell: React.FC<AppShellProps> = ({
         onLogout={onLogout}
       />
 
-      {/* Wrapper Konten Utama yang Bergeser di Desktop */}
-      <div className="flex-1 flex flex-col lg:pl-64">
+      {/* Wrapper Konten Utama yang Bergeser saat Sidebar Dibuka/Ditutup */}
+      <div className={`flex-1 flex flex-col transition-all duration-200 ease-in-out ${isSidebarOpen ? 'lg:pl-64' : 'lg:pl-0'}`}>
         <TopHeader
           onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
           currentPageTitle={pageTitle}

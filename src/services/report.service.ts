@@ -63,6 +63,13 @@ export interface CheckCacheResponse {
   sourceDocumentsCount: number;
 }
 
+const formatError = (msg: any, fallback: string): string => {
+  if (!msg) return fallback;
+  if (typeof msg === 'string') return msg;
+  if (Array.isArray(msg)) return msg.join(', ');
+  return String(msg);
+};
+
 export const ReportService = {
   async generateReport(req: GenerateReportRequest): Promise<GenerateReportResponse> {
     const response = await fetch(`${API_BASE_URL}/reports/generate`, {
@@ -73,7 +80,7 @@ export const ReportService = {
 
     const result = await response.json();
     if (!response.ok || !result.success) {
-      throw new Error(result.message || 'Gagal menghasilkan laporan AI.');
+      throw new Error(formatError(result.message, 'Gagal menghasilkan laporan AI.'));
     }
     return result;
   },
@@ -92,7 +99,7 @@ export const ReportService = {
     const response = await fetch(`${API_BASE_URL}/reports`);
     const result = await response.json();
     if (!response.ok || !result.success) {
-      throw new Error(result.message || 'Gagal memuat riwayat laporan.');
+      throw new Error(formatError(result.message, 'Gagal memuat riwayat laporan.'));
     }
     return result.data;
   },
@@ -101,7 +108,7 @@ export const ReportService = {
     const response = await fetch(`${API_BASE_URL}/reports/${id}`);
     const result = await response.json();
     if (!response.ok || !result.success) {
-      throw new Error(result.message || 'Gagal mengambil detail laporan tersimpan.');
+      throw new Error(formatError(result.message, 'Gagal mengambil detail laporan tersimpan.'));
     }
     return result.data;
   },
@@ -112,7 +119,7 @@ export const ReportService = {
     });
     const result = await response.json();
     if (!response.ok || !result.success) {
-      throw new Error(result.message || 'Gagal menghapus laporan.');
+      throw new Error(formatError(result.message, 'Gagal menghapus laporan.'));
     }
   },
 };
