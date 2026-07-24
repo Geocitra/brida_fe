@@ -1,11 +1,17 @@
 import { useState } from 'react';
 import { AppShell } from './components/layout/app-shell';
-import { KnowledgeHubView } from './modules/knowledge-hub/views/knowledge-hub.view';
+import { LoginView } from './modules/auth/views/login.view';
 import { DashboardView } from './modules/dashboard/views/dashboard.view';
-import { AiWorkspaceView } from './modules/ai-assistant/views/ai-workspace.view';
+import { KnowledgeHubView } from './modules/knowledge-hub/views/knowledge-hub.view';
+import { AnalyticsView } from './modules/analytics/views/analytics.view';
+import { ReportsView } from './modules/reports/views/reports.view';
+import { AiQaView } from './modules/ai-assistant/views/ai-qa.view';
+import { ArticleGeneratorView } from './modules/ai-assistant/views/article-generator.view';
 
 export function App() {
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(true);
   const [activeRoute, setActiveRoute] = useState('dashboard');
+  const [initialArticlePrompt, setInitialArticlePrompt] = useState<string | undefined>(undefined);
 
   const pageTitles: Record<string, string> = {
     dashboard: 'Dashboard Spasial & Metrik Perkembangan',
@@ -16,27 +22,40 @@ export function App() {
     generator: 'Article Generator & Public Drafting (CoT)',
   };
 
+  const handleNavigateToGenerator = (promptText?: string) => {
+    setInitialArticlePrompt(promptText);
+    setActiveRoute('generator');
+  };
+
+  if (!isAuthenticated) {
+    return <LoginView onLoginSuccess={() => setIsAuthenticated(true)} />;
+  }
+
   const renderContent = () => {
     switch (activeRoute) {
       case 'dashboard':
         return <DashboardView />;
       case 'knowledge-hub':
         return <KnowledgeHubView />;
+      case 'analytics':
+        return <AnalyticsView />;
+      case 'reports':
+        return <ReportsView />;
       case 'ai-request':
-      case 'generator':
-        return <AiWorkspaceView />;
-      default:
         return (
-          <div className="bg-[#1e1b4b] border border-[#334155] p-6 rounded-none shadow-sm">
-            <h2 className="text-xl font-bold text-slate-100 mb-2">
-              {pageTitles[activeRoute]}
-            </h2>
-            <p className="text-slate-300 text-sm leading-relaxed">
-              Modul <strong>{activeRoute.toUpperCase()}</strong> telah berhasil terhubung dengan AppShell Layout responsif.
-              Sistem analisis kebijakan publik BRIDA Kabupaten Mimika siap menerima interaksi data.
-            </p>
-          </div>
+          <AiQaView 
+            onNavigateToGenerator={(prompt) => handleNavigateToGenerator(prompt)} 
+          />
         );
+      case 'generator':
+        return (
+          <ArticleGeneratorView 
+            initialPrompt={initialArticlePrompt}
+            onNavigateToQa={() => setActiveRoute('ai-request')}
+          />
+        );
+      default:
+        return <DashboardView />;
     }
   };
 
@@ -45,6 +64,7 @@ export function App() {
       activeRoute={activeRoute}
       onNavigate={(route) => setActiveRoute(route)}
       pageTitle={pageTitles[activeRoute] || 'Executive Dashboard'}
+      onLogout={() => setIsAuthenticated(false)}
     >
       {renderContent()}
     </AppShell>

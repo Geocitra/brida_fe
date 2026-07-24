@@ -1,46 +1,12 @@
 import React, { useState } from 'react';
 import { UploadDropzone } from '../components/upload-dropzone';
 import { DocumentTable } from '../components/document-table';
+import { MOCK_DATA } from '../../../services/mock-data.service';
 import type { DocumentRecord } from '../../../services/document.service';
 
 export const KnowledgeHubView: React.FC = () => {
-  const [documents, setDocuments] = useState<DocumentRecord[]>([
-    {
-      id: 'doc-001',
-      title: 'Laporan Kebijakan Pembangunan Mimika 2026',
-      fileUrl: '/uploads/doc-001.pdf',
-      mimeType: 'application/pdf',
-      checksumHash: 'hash-001',
-      status: 'READY',
-      createdAt: new Date().toISOString(),
-      metadata: {
-        fileSizeBytes: '2450000',
-        pageCount: 13,
-        totalTokenCount: 12500,
-        category: 'Analisis Kebijakan',
-        uploadedBy: 'Kepala BRIDA',
-      },
-      chunkCount: 24,
-    },
-    {
-      id: 'doc-002',
-      title: 'Dokumen RTRW & Infrastruktur Wilayah',
-      fileUrl: '/uploads/doc-002.docx',
-      mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      checksumHash: 'hash-002',
-      status: 'READY',
-      createdAt: new Date().toISOString(),
-      metadata: {
-        fileSizeBytes: '1850000',
-        pageCount: 8,
-        totalTokenCount: 8200,
-        category: 'Dokumen Hukum',
-        uploadedBy: 'Kepala BRIDA',
-      },
-      chunkCount: 16,
-    },
-  ]);
-  const [selectedDocId, setSelectedDocId] = useState<string | null>('doc-001');
+  const [documents, setDocuments] = useState<DocumentRecord[]>(MOCK_DATA.documents);
+  const [selectedDocId, setSelectedDocId] = useState<string | null>(documents[0]?.id || null);
 
   const handleUploadSuccess = (newDoc: DocumentRecord) => {
     setDocuments((prev) => [newDoc, ...prev]);
@@ -52,11 +18,11 @@ export const KnowledgeHubView: React.FC = () => {
   };
 
   return (
-    <div className="space-y-8 pb-12">
+    <div className="space-y-6 pb-12">
       <div>
-        <h1 className="text-h1 mb-2">Manajer Dokumen & Pengetahuan</h1>
+        <h1 className="text-h1 mb-1">Manajer Dokumen & Knowledge Hub</h1>
         <p className="text-body">
-          Unggah laporan investigasi atau dokumen kebijakan statis baru. Sistem akan otomatis memvalidasi, membersihkan teks, melakukan pemotongan semantik, dan menghasilkan *embeddings* vektor untuk keperluan analisis AI eksekutif.
+          Unggah laporan investigasi atau dokumen kebijakan statis baru. Sistem akan otomatis memvalidasi, membersihkan teks, melakukan pemotongan semantik, dan menghasilkan *embeddings* vektor untuk analisis AI eksekutif.
         </p>
       </div>
 

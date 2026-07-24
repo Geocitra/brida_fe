@@ -7,6 +7,7 @@ interface AppShellProps {
   activeRoute: string;
   onNavigate: (route: string) => void;
   pageTitle: string;
+  onLogout?: () => void;
 }
 
 export const AppShell: React.FC<AppShellProps> = ({
@@ -14,17 +15,19 @@ export const AppShell: React.FC<AppShellProps> = ({
   activeRoute,
   onNavigate,
   pageTitle,
+  onLogout,
 }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-roboto rounded-none">
+    <div className="min-h-screen bg-slate-100 text-slate-900 flex flex-col font-roboto rounded-none">
       {/* Sidebar Navigasi Responsif */}
       <Sidebar
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
         activeRoute={activeRoute}
         onNavigate={onNavigate}
+        onLogout={onLogout}
       />
 
       {/* Wrapper Konten Utama yang Bergeser di Desktop */}

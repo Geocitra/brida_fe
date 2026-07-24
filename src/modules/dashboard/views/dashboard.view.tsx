@@ -1,55 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { StatCards } from '../components/stat-cards.component';
 import { SpatialMap, type MapLocationPoint } from '../components/spatial-map.component';
-import type { DocumentRecord } from '../../../services/document.service';
+import { MOCK_DATA } from '../../../services/mock-data.service';
 
 export const DashboardView: React.FC = () => {
-  const [documents] = useState<DocumentRecord[]>([
-    {
-      id: 'doc-001',
-      title: 'Laporan Kebijakan Pembangunan Mimika 2026',
-      fileUrl: '/uploads/doc-001.pdf',
-      mimeType: 'application/pdf',
-      checksumHash: 'hash-001',
-      status: 'READY',
-      createdAt: new Date().toISOString(),
-      metadata: {
-        fileSizeBytes: '2450000',
-        pageCount: 13,
-        totalTokenCount: 12500,
-        category: 'Analisis Kebijakan',
-        uploadedBy: 'Kepala BRIDA',
-      },
-      chunkCount: 24,
-    },
-    {
-      id: 'doc-002',
-      title: 'Dokumen RTRW & Infrastruktur Wilayah',
-      fileUrl: '/uploads/doc-002.docx',
-      mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      checksumHash: 'hash-002',
-      status: 'READY',
-      createdAt: new Date().toISOString(),
-      metadata: {
-        fileSizeBytes: '1850000',
-        pageCount: 8,
-        totalTokenCount: 8200,
-        category: 'Dokumen Hukum',
-        uploadedBy: 'Kepala BRIDA',
-      },
-      chunkCount: 16,
-    },
-  ]);
+  const [documents] = useState(MOCK_DATA.documents);
   const [mapPoints, setMapPoints] = useState<MapLocationPoint[]>([]);
 
   useEffect(() => {
-    // Representative geospatial points for Kabupaten Mimika (Timika, Tembagapura, Mimika Timur)
-    const samplePoints: MapLocationPoint[] = [
-      { id: '1', locationName: 'Distrik Mimika Baru (Timika)', latitude: -4.5448, longitude: 136.8870, documentTitle: 'Laporan Kebijakan Pembangunan Mimika 2026' },
-      { id: '2', locationName: 'Kawasan Tembagapura / PTFI', latitude: -4.2497, longitude: 137.1122, documentTitle: 'Dokumen RTRW & Infrastruktur Wilayah' },
-      { id: '3', locationName: 'Distrik Mimika Timur', latitude: -4.6120, longitude: 137.0150, documentTitle: 'Dokumen RTRW & Infrastruktur Wilayah' }
-    ];
-    setMapPoints(samplePoints);
+    setMapPoints(MOCK_DATA.spatialLocations);
   }, []);
 
   return (
