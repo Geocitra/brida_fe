@@ -3,54 +3,36 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
+// https://vite.dev/config/
 export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'robots.txt', 'apple-touch-icon.png'],
+      workbox: {
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5MB limit for pdfmake fonts
+      },
       manifest: {
-        name: 'BRIDA SMART Analysis',
-        short_name: 'BRIDA SMART',
-        description: 'Executive Static Document Analysis Engine - Kabupaten Mimika',
+        name: 'BRIDA SMART Analysis Engine',
+        short_name: 'BRIDA Mimika',
+        description: 'Sistem Analisis Eksekutif & Pemantauan Indikator Kebijakan BRIDA Kabupaten Mimika',
         theme_color: '#0f172a',
-        background_color: '#0f172a',
+        background_color: '#f1f5f9',
         display: 'standalone',
-        orientation: 'portrait',
         icons: [
           {
             src: '/pwa-192x192.png',
             sizes: '192x192',
-            type: 'image/png'
+            type: 'image/png',
           },
           {
             src: '/pwa-512x512.png',
             sizes: '512x512',
             type: 'image/png',
-            purpose: 'any maskable'
-          }
-        ]
+          },
+        ],
       },
-      workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
-        runtimeCaching: [
-          {
-            urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'google-fonts-cache',
-              expiration: {
-                maxEntries: 10,
-                maxAgeSeconds: 60 * 60 * 24 * 365
-              },
-              cacheableResponse: {
-                statuses: [0, 200]
-              }
-            }
-          }
-        ]
-      }
-    })
-  ]
+    }),
+  ],
 });

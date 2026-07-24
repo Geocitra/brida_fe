@@ -61,3 +61,31 @@ p, .text-body {
   text-align: left;
   color: #334155;
 }
+
+/* Print & PDF Export Rules */
+@media print {
+  aside, header, button, .no-print {
+    display: none !important;
+  }
+
+  body {
+    background-color: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  .lg\:pl-64 {
+    padding-left: 0 !important;
+  }
+
+  main {
+    padding: 0 !important;
+  }
+
+  .shadow-xs, .shadow-sm, .shadow-md, .shadow-lg, .shadow-xl {
+    box-shadow: none !important;
+  }
+
+  .border {
+    border-color: #94a3b8 !important;
+  }
+}

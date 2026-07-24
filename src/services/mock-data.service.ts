@@ -1,22 +1,25 @@
 import type { DocumentRecord } from './document.service';
 import type { MapLocationPoint } from '../modules/dashboard/components/spatial-map.component';
 
-export interface DeterministicMetric {
-  category: string;
-  targetCount: number;
-  realizedCount: number;
-  unit: string;
-  status: 'OPTIMAL' | 'PERLU_PERHATIAN' | 'CRITICAL';
-}
-
-export interface StructuredReportData {
+export interface IndicatorMatrixItem {
   id: string;
-  title: string;
-  category: string;
-  date: string;
-  ringkasan: string;
-  temuan: Array<{ topik: string; deskripsi: string; tingkatResiko: 'TINGGI' | 'SEDANG' | 'RENDAH' }>;
-  rekomendasi: string[];
+  name: string;
+  sector: string;
+  baseline: string;
+  realization: string;
+  deviationText: string;
+  deviationPercent: number;
+  status: 'KRITIS' | 'WASPADA' | 'NORMAL';
+  period: string;
+  causalFactors: Array<{ label: string; percentage: number; color: string }>;
+  priorityRecommendations: Array<{
+    priority: string;
+    title: string;
+    pic: string;
+    deadline: string;
+    cost: string;
+    badgeColor: string;
+  }>;
 }
 
 export const MOCK_DATA = {
@@ -72,40 +75,6 @@ export const MOCK_DATA = {
       },
       chunkCount: 32,
     },
-    {
-      id: 'doc-004',
-      title: 'Evaluasi Kualitas Pendidikan Distrik Hoya',
-      fileUrl: '/uploads/doc-004.pdf',
-      mimeType: 'application/pdf',
-      checksumHash: 'hash-004',
-      status: 'PROCESSING' as const,
-      createdAt: '2026-03-22T09:10:00Z',
-      metadata: {
-        fileSizeBytes: '1200000',
-        pageCount: 6,
-        totalTokenCount: 5400,
-        category: 'Analisis Sosial',
-        uploadedBy: 'Tim Riset BRIDA',
-      },
-      chunkCount: 10,
-    },
-    {
-      id: 'doc-005',
-      title: 'Rekapitulasi Anggaran Bantuan Poktan 2025',
-      fileUrl: '/uploads/doc-005.txt',
-      mimeType: 'text/plain',
-      checksumHash: 'hash-005',
-      status: 'FAILED' as const,
-      createdAt: '2026-03-23T11:00:00Z',
-      metadata: {
-        fileSizeBytes: '450000',
-        pageCount: 2,
-        totalTokenCount: 1800,
-        category: 'General Report',
-        uploadedBy: 'Staf Administrasi',
-      },
-      chunkCount: 0,
-    },
   ] as DocumentRecord[],
 
   spatialLocations: [
@@ -116,41 +85,183 @@ export const MOCK_DATA = {
     { id: '5', locationName: 'Wilayah Pegunungan Hoya', latitude: -4.1200, longitude: 137.4500, documentTitle: 'Evaluasi Kualitas Pendidikan Distrik Hoya' },
   ] as MapLocationPoint[],
 
-  deterministicMetrics: [
-    { category: 'Pembangunan Jalan & Jembatan', targetCount: 120, realizedCount: 98, unit: 'Km', status: 'OPTIMAL' },
-    { category: 'Fasilitas Layanan Kesehatan Desa', targetCount: 45, realizedCount: 28, unit: 'Unit', status: 'PERLU_PERHATIAN' },
-    { category: 'Bantuan Listrik Tenaga Surya', targetCount: 800, realizedCount: 410, unit: 'Rumah', status: 'PERLU_PERHATIAN' },
-    { category: 'Realisasi Anggaran Inovasi Daerah', targetCount: 100, realizedCount: 35, unit: '%', status: 'CRITICAL' },
-  ] as DeterministicMetric[],
+  indicatorsMatrix: [
+    {
+      id: 'pad',
+      name: 'PENDAPATAN ASLI DAERAH (PAD)',
+      sector: 'Keuangan & Pendapatan Daerah',
+      baseline: 'Rp 110 Miliar',
+      realization: 'Rp 85 Miliar',
+      deviationText: '-22.7% (KRITIS)',
+      deviationPercent: 77,
+      status: 'KRITIS',
+      period: 'April 2025 - Maret 2026',
+      causalFactors: [
+        { label: 'Penurunan harga pasar tembaga & royalti PTFI', percentage: 60, color: 'bg-red-600' },
+        { label: 'Tunggakan pajak restoran & hotel daerah', percentage: 30, color: 'bg-amber-500' },
+        { label: 'Gangguan distribusi logistik jalan tambang akibat banjir', percentage: 10, color: 'bg-emerald-600' },
+      ],
+      priorityRecommendations: [
+        {
+          priority: 'PRIORITAS 1 (7 hari)',
+          title: 'Bentuk tim percepatan penagihan pajak hotel/restoran',
+          pic: 'Dinas Pendapatan Daerah',
+          deadline: '4 Mei 2026',
+          cost: 'Rp 50 Juta',
+          badgeColor: 'bg-red-600 text-white',
+        },
+        {
+          priority: 'PRIORITAS 2 (14 hari)',
+          title: 'Koordinasi dengan PTFI untuk proyeksi royalti semester II',
+          pic: 'Bagian Ekonomi Setda',
+          deadline: '19 April 2026',
+          cost: 'Korektif Organisasional',
+          badgeColor: 'bg-amber-500 text-white',
+        },
+        {
+          priority: 'PRIORITAS 3 (30 hari)',
+          title: 'Penyusunan kebijakan diversifikasi PAD non-tambang',
+          pic: 'Bappeda + BRIDA',
+          deadline: '2 Mei 2026',
+          cost: 'Rp 120 Juta',
+          badgeColor: 'bg-emerald-600 text-white',
+        },
+      ],
+    },
+    {
+      id: 'putus-sekolah',
+      name: 'ANGKA PUTUS SEKOLAH DISTRIK HOYA',
+      sector: 'Pendidikan & Sumber Daya Manusia',
+      baseline: '≤ 2.0%',
+      realization: '5.5%',
+      deviationText: '+3.5% (KRITIS)',
+      deviationPercent: 36,
+      status: 'KRITIS',
+      period: 'Maret 2026',
+      causalFactors: [
+        { label: 'Akses jalan & jarak sekolah > 10 km dari pemukiman', percentage: 58, color: 'bg-red-600' },
+        { label: 'Banjir bandang dan cuaca ekstrem', percentage: 32, color: 'bg-amber-500' },
+        { label: 'Keterbatasan ekonomi keluarga', percentage: 10, color: 'bg-emerald-600' },
+      ],
+      priorityRecommendations: [
+        {
+          priority: 'PRIORITAS 1 (7 hari)',
+          title: 'Penyediaan armada transportasi sekolah darurat & beasiswa transportasi',
+          pic: 'Dinas Pendidikan',
+          deadline: '28 April 2026',
+          cost: 'Rp 350 Juta',
+          badgeColor: 'bg-red-600 text-white',
+        },
+        {
+          priority: 'PRIORITAS 2 (14 hari)',
+          title: 'Pembangunan asrama siswa terdekat di Distrik Hoya',
+          pic: 'Dinas PU & Pendidikan',
+          deadline: '15 Mei 2026',
+          cost: 'Rp 1.2 Miliar',
+          badgeColor: 'bg-amber-500 text-white',
+        },
+      ],
+    },
+    {
+      id: 'inflasi-pangan',
+      name: 'INFLASI PANGAN MIMIKA - NABIRE',
+      sector: 'Perekonomian & Ketahanan Pangan',
+      baseline: '≤ 1.5%',
+      realization: '3.6%',
+      deviationText: '+2.1% (WASPADA)',
+      deviationPercent: 58,
+      status: 'WASPADA',
+      period: 'Maret 2026',
+      causalFactors: [
+        { label: 'Kenaikan harga komoditas beras lokal & bawang merah', percentage: 50, color: 'bg-amber-500' },
+        { label: 'Kendala kapal barang rantai pasok dari Nabire', percentage: 35, color: 'bg-blue-600' },
+        { label: 'Biaya logistik penerbangan udara distrik interior', percentage: 15, color: 'bg-emerald-600' },
+      ],
+      priorityRecommendations: [
+        {
+          priority: 'PRIORITAS 1 (7 hari)',
+          title: 'Gelar Operasi Pasar Murah beras dan minyak goreng di 3 Distrik Rawan',
+          pic: 'Dinas Perdagangan + Bulog',
+          deadline: '8 Mei 2026',
+          cost: 'Rp 2.5 Miliar',
+          badgeColor: 'bg-red-600 text-white',
+        },
+      ],
+    },
+    {
+      id: 'pembangunan-jalan',
+      name: 'PEMBANGUNAN JALAN AGIMUGA',
+      sector: 'Infrastruktur & Pekerjaan Umum',
+      baseline: '120 Km',
+      realization: '98 Km',
+      deviationText: '81.6% (NORMAL)',
+      deviationPercent: 82,
+      status: 'NORMAL',
+      period: 'Januari - Maret 2026',
+      causalFactors: [
+        { label: 'Penyelesaian perkerasan sirtu lapangan', percentage: 80, color: 'bg-emerald-600' },
+        { label: 'Kendala pengiriman alat berat lokasi rawa', percentage: 20, color: 'bg-blue-600' },
+      ],
+      priorityRecommendations: [
+        {
+          priority: 'PRIORITAS 2 (14 hari)',
+          title: 'Percepatan drainase samping jalan sebelum pemadatan akhir',
+          pic: 'Dinas Pekerjaan Umum',
+          deadline: '20 Mei 2026',
+          cost: 'Sesuai Kontrak',
+          badgeColor: 'bg-emerald-600 text-white',
+        },
+      ],
+    },
+  ] as IndicatorMatrixItem[],
 
-  structuredReports: [
-    {
-      id: 'rep-101',
-      title: 'Laporan Eksekutif Evaluasi Infrastruktur Mimika 2026',
-      category: 'Infrastruktur & Publik',
-      date: '24 Juli 2026',
-      ringkasan: 'Hasil verifikasi dokumen mengindikasikan pencapaian fisik jalan mencapai 81.6%. Terjadi keterlambatan pada paket pengerjaan Agimuga akibat akses logistik.',
-      temuan: [
-        { topik: 'Pencairan Termin Pembayaran', deskripsi: 'Pencairan dana termin 2 dilakukan sebelum hasil ujipetik fisik selesai.', tingkatResiko: 'TINGGI' },
-        { topik: 'Dokumentasi Spesifikasi Teknis', deskripsi: 'Sebagian besar material menggunakan batu kali lokal tanpa sertifikasi uji lab.', tingkatResiko: 'SEDANG' },
-      ],
-      rekomendasi: [
-        'Melakukan penundaan pencairan termin 3 sampai fisik lapangan diverifikasi 100%.',
-        'Mendorong audit independen atas kualitas beton agregat.',
+  bupatiReport: {
+    title: 'LAPORAN PERKEMBANGAN WILAYAH',
+    recipient: 'Kepada YTH. Bupati Kabupaten Mimika',
+    sender: 'BRIDA SMART Analysis Engine',
+    period: '1-31 Maret 2026',
+    date: '5 April 2026',
+    urgency: 'Segera',
+    executiveSummary:
+      'Berdasarkan analisis data Maret 2026 dibandingkan baseline RPJMD, ditemukan 2 indikator kritis: PAD turun 22,7% dan angka putus sekolah di Distrik Hoya naik 3,5%. Kebijakan nasional kenaikan BBM yang efektif 15 Mei diprediksi akan memperburuk inflasi menjadi +4.9% jika tidak ada intervensi. Rekomendasi utama: operasi pasar murah di 3 distrik rawan dan percepatan penagihan pajak hotel/restoran.',
+    deviations: [
+      {
+        title: '1. PENDAPATAN ASLI DAERAH (PAD)',
+        baseline: 'Rp110 Miliar',
+        realization: 'Rp85 Miliar',
+        deviationText: '-22.7% (KRITIS)',
+        severityColor: 'text-red-700 font-bold',
+        causes: 'Royalti tembaga turun (60%), tunggakan pajak hotel/restoran (30%), gangguan distribusi (10%)',
+      },
+      {
+        title: '2. PENDIDIKAN (Angka Putus Sekolah di Distrik Hoya)',
+        baseline: '≤ 2.0%',
+        realization: '5.5%',
+        deviationText: '+3.5% (KRITIS)',
+        severityColor: 'text-red-700 font-bold',
+        causes: 'Jarak sekolah > 10km (58%), banjir (32%), faktor ekonomi (10%)',
+      },
+      {
+        title: '3. INFLASI PANGAN',
+        baseline: '≤ 1.5%',
+        realization: '3.6%',
+        deviationText: '+2.1% (WASPADA)',
+        severityColor: 'text-amber-700 font-bold',
+        causes: 'Kenaikan harga beras lokal dan bawang merah, gangguan distribusi dari Nabire',
+      },
+    ],
+    nationalPolicyImpact: {
+      policyName: 'Kenaikan Harga BBM Bersubsidi 30% (efektif 15 Mei 2026)',
+      simulationResults: [
+        'Inflasi Mimika diprediksi naik dari 3,6% menjadi 4,9%',
+        'Kemiskinan berpotensi naik 1,3% (sekitar 4.500 jiwa tambahan miskin)',
+        'Daya beli masyarakat di distrik terpencil (Hoya, Agimuga, Jila) akan turun paling tajam',
       ],
     },
-    {
-      id: 'rep-102',
-      title: 'Matriks Analisis Kebijakan Sosial & Kesehatan',
-      category: 'Sosial & Budaya',
-      date: '20 Juli 2026',
-      ringkasan: 'Cakupan program puskesmas keliling di wilayah pedalaman Mimika Barat menunjukkan peningkatan interaksi 24% pasca-penambahan armada bot motor.',
-      temuan: [
-        { topik: 'Ketersediaan Obat Obatan', deskripsi: 'Stok obat dasar di 3 puskesmas pembantu mengalami kekosongan selama 2 minggu.', tingkatResiko: 'TINGGI' },
-      ],
-      rekomendasi: [
-        'Penyusunan jadwal distribusi buffer stock obat berbasis kuartal.',
-      ],
-    },
-  ] as StructuredReportData[],
+    actionPriorities: [
+      '1. Operasi pasar murah beras dan minyak goreng di Distrik Hoya, Iwaka, Agimuga (PIC: Dinas Perdagangan + Bulog | Biaya: Rp 2,5 M | Deadline: 8 Mei 2026)',
+      '2. Bentuk tim percepatan penagihan pajak hotel/restoran (PIC: Dinas Pendapatan | Biaya: Rp 50 Juta | Deadline: 4 Mei 2026)',
+      '3. Koordinasi dengan PTFI untuk proyeksi royalti semester II (PIC: Bagian Ekonomi Setda | Deadline: 19 April 2026)',
+    ],
+  },
 };
