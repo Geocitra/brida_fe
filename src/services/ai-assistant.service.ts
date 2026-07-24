@@ -47,10 +47,47 @@ export const AiAssistantService = {
       throw new Error(result.message || 'Gagal memproses permintaan AI.');
     }
     const data = result.data as AiInteractResult;
-    // Normalize — Q&A answer or article text depending on intent
-    return data.data?.answer
-      || data.data?.fullArticleText
-      || JSON.stringify(data.data, null, 2);
+    const d = data.data;
+
+    // Normalize to readable text from BE AnalysisResponseDto format
+    if (d?.fullArticleText) return d.fullArticleText;
+    if (d?.answer) return d.answer;
+
+    // Structured analysis response — build readable formatted text
+    if (d?.ringkasanEksekutif) {
+      const parts: string[] = [];
+      parts.push(d.ringkasanEksekutif);
+
+      if (Array.isArray(d.entitasTerlibat) && d.entitasTerlibat.length > 0) {
+        parts.push('\n\n📋 Entitas Terlibat:');
+        d.entitasTerlibat.forEach((e: any) => {
+          parts.push(`• ${e.nama} — ${e.peran}${e.entitasTerkait ? ` (${e.entitasTerkait})` : ''}`);
+        });
+      }
+
+      if (Array.isArray(d.kronologiPeristiwa) && d.kronologiPeristiwa.length > 0) {
+        parts.push('\n\n📅 Kronologi:');
+        d.kronologiPeristiwa.forEach((k: any) => {
+          parts.push(`• ${k.tanggal ? `[${k.tanggal}] ` : ''}${k.deskripsi}${k.lokasi ? ` — ${k.lokasi}` : ''}`);
+        });
+      }
+
+      if (Array.isArray(d.indikasiPelanggaran) && d.indikasiPelanggaran.length > 0) {
+        parts.push('\n\n⚠️ Indikasi Pelanggaran:');
+        d.indikasiPelanggaran.forEach((p: any) => {
+          parts.push(`• ${p.jenis}${p.pasalDugaan ? ` (${p.pasalDugaan})` : ''}: ${p.rincian}`);
+        });
+      }
+
+      if (d.kesimpulanAnalisis) {
+        parts.push(`\n\n✅ Kesimpulan: ${d.kesimpulanAnalisis}`);
+      }
+
+      return parts.join('\n');
+    }
+
+    // Absolute last resort — stringify raw (should never hit this)
+    return JSON.stringify(d, null, 2);
   },
 
   /**
