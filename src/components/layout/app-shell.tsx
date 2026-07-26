@@ -1,5 +1,6 @@
 import React from 'react';
 import { TopHeader } from './top-header';
+import { AppFooter } from './app-footer';
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -29,9 +30,12 @@ export const AppShell: React.FC<AppShellProps> = ({
         Mengeliminasi padding bawaan (px-4 lg:px-6 py-4) menjadi p-0 
         agar seluruh elemen anak menyatu secara solid dalam satu kesatuan grid.
       */}
-      <main className="flex-1 w-full p-0 overflow-y-auto flex flex-col">
+      <main className="flex-1 w-full p-0 flex flex-col">
         {children}
       </main>
+
+      {/* Global Application Footer */}
+      <AppFooter />
     </div>
   );
 };

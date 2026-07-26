@@ -1,6 +1,6 @@
 import React from 'react';
 import type { RecommendationItem } from '../../../services/analysis.service';
-import { ClipboardList, Calendar, UserCheck, DollarSign } from 'lucide-react';
+import { ClipboardList, Calendar, UserCheck } from 'lucide-react';
 
 interface RecommendationListProps {
   recommendations: RecommendationItem[];
@@ -52,7 +52,6 @@ export const RecommendationList: React.FC<RecommendationListProps> = ({
                 </td>
                 <td className="py-3 px-3 text-right font-bold text-slate-900">
                   <div className="inline-flex items-center gap-1 text-slate-900 justify-end">
-                    <DollarSign size={13} className="text-teal-700 shrink-0" />
                     <span>{item.estimatedCostText}</span>
                   </div>
                 </td>

@@ -59,61 +59,43 @@ export const KnowledgeHubView: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col w-full min-h-full pb-12 bg-white">
+    <div className="flex flex-col w-full min-h-full bg-slate-100/70 p-6 space-y-6 font-roboto">
       {/* 
-        1. COMMAND STRIP HEADER
-        Menyatukan identitas halaman di kiri dan Live Metadata Status DB di kanan 
-        dalam satu baris horizontal solid berbatas slate tipis.
+        SECTION 1. COMMAND STRIP HEADER
+        Identitas Utama Halaman di kiri (H1), Status DB Telemetry di kanan.
       */}
-      <div className="w-full bg-white border-b border-slate-300 px-6 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        {/* Sisi Kiri: Breadcrumb & Judul Halaman */}
+      <div className="w-full bg-white border border-slate-300 px-6 py-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4 rounded-none shadow-2xs">
+        {/* Sisi Kiri: Breadcrumb & Judul Utama H1 */}
         <div className="flex flex-col">
-          <span className="text-[10px] font-bold tracking-widest text-teal-700 uppercase mb-1">
-            Home / Knowledge Hub
+          <span className="text-[10px] font-bold tracking-widest text-teal-800 uppercase mb-1">
+            Beranda / Repositori Dokumen
           </span>
-          <h1 className="text-sm font-bold uppercase text-slate-900 tracking-tight">
-            Knowledge Warehouse & Ingestion Engine
+          <h1 className="text-xl font-bold uppercase text-slate-900 tracking-tight">
+            Repositori Dokumen
           </h1>
+          <p className="text-xs text-slate-500 font-normal mt-1">
+            Repositori pengumpulan dan pengelolaan dokumen acuan makro, laporan realisasi fisik, serta referensi pengetahuan BRIDA.
+          </p>
         </div>
 
-        {/* Sisi Kanan: Live Database Stats Grid */}
-        <div className="flex items-stretch divide-x divide-slate-200 md:border-l md:border-slate-200 md:pl-6">
-          <div className="px-4 py-1 flex flex-col justify-center">
+        {/* Sisi Kanan: Total Dokumen Badge */}
+        <div className="flex items-center md:border-l md:border-slate-300 md:pl-6">
+          <div className="px-1 py-2 flex flex-col justify-center rounded-none">
             <span className="text-[9px] uppercase font-bold text-slate-500 tracking-wider">
-              Vektor Status
+              Total Dokumen Terunggah
             </span>
-            <span className="text-xs font-bold text-emerald-700 flex items-center gap-1.5 mt-0.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              pgvector Active
-            </span>
-          </div>
-          <div className="px-4 py-1 flex flex-col justify-center">
-            <span className="text-[9px] uppercase font-bold text-slate-500 tracking-wider">
-              Arsip Terindeks
-            </span>
-            <span className="text-xs font-bold text-slate-800 mt-0.5">
-              {isLoading ? '-' : `${documents.length} Dokumen`}
-            </span>
-          </div>
-          <div className="px-4 py-1 flex flex-col justify-center">
-            <span className="text-[9px] uppercase font-bold text-slate-500 tracking-wider">
-              Ingestion Model
-            </span>
-            <span className="text-xs font-bold text-teal-700 mt-0.5">
-              Gemini Flash v1.5
+            <span className="text-sm font-bold text-teal-900 mt-0.5">
+              {isLoading ? '-' : `${documents.length} Berkas`}
             </span>
           </div>
         </div>
       </div>
 
-      {/* 
-        2. STATUS BANNER (CONDITIONAL STRIP)
-        Tampil mepet lurus di bawah header apabila terjadi kendala koneksi backend.
-      */}
+      {/* STATUS BANNER (CONDITIONAL ALERT STRIP) */}
       {loadError && (
-        <div className="flex items-center justify-between bg-amber-50/80 border-b border-amber-300 px-6 py-3.5 text-amber-900 text-xs font-semibold">
+        <div className="flex items-center justify-between bg-amber-50 border border-amber-300 px-6 py-3.5 text-amber-900 text-xs font-semibold rounded-none">
           <div className="flex items-center gap-2">
-            <AlertCircle size={14} className="shrink-0 text-amber-600" />
+            <AlertCircle size={15} className="shrink-0 text-amber-600" />
             <span>{loadError}</span>
             {isUsingMock && (
               <span className="ml-1.5 px-2 py-0.5 bg-amber-200 text-amber-900 font-bold text-[9px] uppercase tracking-wider">
@@ -131,19 +113,12 @@ export const KnowledgeHubView: React.FC = () => {
         </div>
       )}
 
-      {/* 
-        3. UPLOAD DROPZONE
-        Komponen ini akan menempel langsung di bawah header/status banner.
-        Styling internal upload-dropzone akan ditata tanpa menyisakan border luar.
-      */}
+      {/* SECTION 2. UPLOAD DROPZONE INGESTION DOCK */}
       <UploadDropzone onUploadSuccess={handleUploadSuccess} />
 
-      {/* 
-        4. DOCUMENT TABLE WAREHOUSE
-        Tampil rapat penuh di bawah dropzone.
-      */}
+      {/* SECTION 3. DOCUMENT TABLE WAREHOUSE */}
       {isLoading ? (
-        <div className="flex items-center gap-2.5 py-16 justify-center text-slate-600 border-t border-slate-300 bg-slate-50/50">
+        <div className="flex items-center gap-2.5 py-16 justify-center text-slate-600 border border-slate-300 bg-white rounded-none">
           <Loader2 size={18} className="animate-spin text-teal-700" />
           <span className="text-xs font-bold uppercase tracking-wider">Menghubungkan dengan Vektor database...</span>
         </div>
@@ -154,6 +129,8 @@ export const KnowledgeHubView: React.FC = () => {
           onDeleteDocument={(doc) => setDeleteConfirmDoc(doc)}
         />
       )}
+
+
 
       {/* 
         5. DETAIL VISUALIZER MODAL

@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { PdfExportService } from '../../../services/pdf-export.service';
 import { DocumentService } from '../../../services/document.service';
 import type { DocumentRecord } from '../../../services/document.service';
 import { ReportService } from '../../../services/report.service';
 import type { GeneratedReportDetail, CheckCacheResponse } from '../../../services/report.service';
+import { CategorizedDocumentSelector } from '../../../components/common/categorized-document-selector.component';
 import {
   ArrowLeft,
   Download,
@@ -25,11 +26,8 @@ import {
   Eye,
   Search,
   UploadCloud,
-  ChevronDown,
   X,
-  Plus,
   FileUp,
-  Check,
 } from 'lucide-react';
 
 interface ReportsViewProps {
@@ -46,11 +44,6 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
   const [selectedDocIds, setSelectedDocIds] = useState<string[]>([]);
   const [isLoadingDocs, setIsLoadingDocs] = useState<boolean>(true);
 
-  // Dropdown & Search state
-  const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
-  const [searchQuery, setSearchQuery] = useState<string>('');
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
   // Direct Upload Modal State
   const [isUploadModalOpen, setIsUploadModalOpen] = useState<boolean>(false);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
@@ -58,9 +51,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
   const [uploadCategory, setUploadCategory] = useState<string>('Laporan Strategis');
   const [isUploading, setIsUploading] = useState<boolean>(false);
 
-  // Cache & Generation State
-  const [cacheStatus, setCacheStatus] = useState<CheckCacheResponse | null>(null);
-  const [isCheckingCache, setIsCheckingCache] = useState<boolean>(false);
+  // Generation State
   const [forceRegenerate, setForceRegenerate] = useState<boolean>(false);
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
 
@@ -78,6 +69,31 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
   const [savedReports, setSavedReports] = useState<GeneratedReportDetail[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState<boolean>(false);
 
+  // Live filter states for saved reports history (Calendar Datepicker & Text Search)
+  const [historySearchQuery, setHistorySearchQuery] = useState('');
+  const [historyCalendarDate, setHistoryCalendarDate] = useState('');
+
+  const filteredSavedReports = savedReports.filter((report) => {
+    // 1. Text Search Filter
+    const q = historySearchQuery.toLowerCase();
+    const matchesText =
+      report.title.toLowerCase().includes(q) ||
+      (report.executiveSummary && report.executiveSummary.toLowerCase().includes(q));
+
+    if (!matchesText) return false;
+
+    // 2. Calendar Date Filter (YYYY-MM-DD)
+    if (historyCalendarDate) {
+      const reportDate = new Date(report.createdAt);
+      if (!isNaN(reportDate.getTime())) {
+        const reportDateIso = reportDate.toISOString().split('T')[0];
+        if (reportDateIso !== historyCalendarDate) return false;
+      }
+    }
+
+    return true;
+  });
+
   // Toast & Export
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
@@ -87,31 +103,11 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
     setTimeout(() => setToastMessage(null), 4000);
   };
 
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsDropdownOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
   // Initial Load: Fetch ingested documents & saved reports history
   useEffect(() => {
     loadDocuments();
     loadHistory();
   }, []);
-
-  // Live Cache Status Check when selection changes
-  useEffect(() => {
-    if (selectedDocIds.length > 0) {
-      checkCacheStatus(selectedDocIds);
-    } else {
-      setCacheStatus(null);
-    }
-  }, [selectedDocIds]);
 
   const loadDocuments = async () => {
     setIsLoadingDocs(true);
@@ -149,18 +145,6 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
     }
   };
 
-  const checkCacheStatus = async (docIds: string[]) => {
-    setIsCheckingCache(true);
-    try {
-      const res = await ReportService.checkCache(docIds);
-      setCacheStatus(res);
-    } catch (err) {
-      setCacheStatus(null);
-    } finally {
-      setIsCheckingCache(false);
-    }
-  };
-
   const toggleSelectDocument = (docId: string) => {
     setSelectedDocIds((prev) => {
       if (prev.includes(docId)) {
@@ -172,7 +156,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
   };
 
   const handleSelectAll = () => {
-    setSelectedDocIds(filteredDocuments.map((d) => d.id));
+    setSelectedDocIds(documents.map((d) => d.id));
   };
 
   const handleClearAll = () => {
@@ -333,18 +317,8 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
     }
   };
 
-  // Filtered documents for live text search in dropdown
-  const filteredDocuments = documents.filter((doc) => {
-    const q = searchQuery.toLowerCase();
-    const titleMatch = doc.title.toLowerCase().includes(q);
-    const catMatch = (doc.metadata?.category || '').toLowerCase().includes(q);
-    return titleMatch || catMatch;
-  });
-
-  const selectedDocObjects = documents.filter((d) => selectedDocIds.includes(d.id));
-
   return (
-    <div className="space-y-6 pb-12">
+    <div className="flex flex-col w-full min-h-full bg-slate-100/70 p-6 space-y-6 font-roboto">
       {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-5 py-3 border border-slate-700 shadow-xl flex items-center gap-3 rounded-none no-print">
@@ -353,26 +327,24 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
         </div>
       )}
 
-      {/* Top Header & Navigation */}
-      <div className="flex flex-wrap items-center justify-between gap-4 no-print border-b border-slate-200 pb-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-xl font-bold text-slate-900 tracking-tight">
-              Modul Laporan Eksekutif &amp; Acuan Multidokumen
-            </h1>
-            <span className="px-2 py-0.5 bg-teal-50 text-teal-800 text-xs font-semibold rounded-none">
-              Token Efficiency Mode
-            </span>
-          </div>
+      {/* SECTION 1. HERO COMMAND STRIP HEADER */}
+      <div className="w-full bg-white border border-slate-300 px-6 py-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4 rounded-none shadow-2xs no-print">
+        <div className="flex flex-col">
+          <span className="text-[10px] font-bold tracking-widest text-teal-800 uppercase mb-1">
+            Beranda / Laporan Eksekutif
+          </span>
+          <h1 className="text-xl font-bold uppercase text-slate-900 tracking-tight">
+            Laporan Strategis &amp; Nota Dinas Bupati
+          </h1>
           <p className="text-xs text-slate-500 font-normal mt-1">
-            Cari &amp; pilih dokumen acuan dari dropdown. Jika belum tersedia di database, Anda dapat langsung mengunggah file TXT/PDF.
+            Penyusunan dan generasi laporan eksekutif multidokumen untuk bahan rekomendasi pengambilan keputusan Bupati Mimika.
           </p>
         </div>
 
         <div className="flex items-center gap-2">
           <button
             onClick={() => setIsUploadModalOpen(true)}
-            className="px-3.5 py-1.5 bg-teal-700 hover:bg-teal-800 text-white text-xs font-bold rounded-none flex items-center gap-2 shadow-2xs cursor-pointer"
+            className="px-3.5 py-2 bg-teal-700 hover:bg-teal-800 text-white text-xs font-bold rounded-none flex items-center gap-2 cursor-pointer transition-colors"
           >
             <UploadCloud size={14} />
             <span>+ Unggah Dokumen Acuan Baru</span>
@@ -381,7 +353,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
           {onNavigateToDashboard && (
             <button
               onClick={onNavigateToDashboard}
-              className="px-3.5 py-1.5 bg-white hover:bg-slate-100 text-slate-700 text-xs font-semibold rounded-none border border-slate-300 flex items-center gap-2 shadow-2xs cursor-pointer"
+              className="px-3.5 py-2 bg-white hover:bg-slate-100 text-slate-700 text-xs font-semibold rounded-none border border-slate-300 flex items-center gap-2 cursor-pointer transition-colors"
             >
               <ArrowLeft size={14} />
               <span>Dashboard</span>
@@ -390,204 +362,21 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
         </div>
       </div>
 
-      {/* SECTION 1: Searchable Combobox / Multi-Select Dropdown & Cache Alert */}
-      <div className="bg-white border border-slate-200 p-5 rounded-none shadow-2xs space-y-4 no-print">
-
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
-          <div className="flex items-center gap-2">
-            <FileText size={18} className="text-teal-700" />
-            <h2 className="text-sm font-bold text-slate-900 tracking-wide">
-              Pilihan Dokumen Acuan Laporan ({selectedDocIds.length} Dipilih)
-            </h2>
-          </div>
-
-          {/* Live Cache Status Badge */}
-          {isCheckingCache ? (
-            <span className="text-xs text-slate-500 font-semibold flex items-center gap-1.5">
-              <Loader2 size={13} className="animate-spin text-teal-600" />
-              <span>Memeriksa Cache Database...</span>
-            </span>
-          ) : cacheStatus?.isCached ? (
-            <span className="px-2.5 py-1 bg-emerald-50 text-emerald-800 text-xs font-semibold flex items-center gap-1.5">
-              <Zap size={14} className="text-emerald-600" />
-              <span>Tersedia di DB Cache (Hemat 100% Token!)</span>
-            </span>
-          ) : selectedDocIds.length > 0 ? (
-            <span className="px-2.5 py-1 bg-sky-50 text-sky-800 text-xs font-semibold flex items-center gap-1.5">
-              <Sparkles size={14} className="text-sky-600" />
-              <span>Kombinasi Baru (Diperlukan Generasi AI)</span>
-            </span>
-          ) : null}
-        </div>
-
-        {/* Searchable Dropdown Control */}
-        <div className="space-y-3">
-          <div className="relative" ref={dropdownRef}>
-            <label className="block text-sm font-bold text-slate-800 mb-1.5">
-              Cari & Pilih Dokumen Acuan (Dropdown Interaktif)
-            </label>
-
-            {/* Dropdown Input / Trigger */}
-            <div
-              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-              className="w-full bg-slate-50 hover:bg-slate-100/80 border border-slate-300 p-2.5 cursor-pointer flex items-center justify-between gap-2 rounded-none min-h-[42px] transition-colors"
-            >
-              <div className="flex items-center gap-2 min-w-0 flex-1">
-                <Search size={16} className="text-slate-500 shrink-0" />
-                {selectedDocIds.length === 0 ? (
-                  <span className="text-xs text-slate-400 font-medium">
-                    -- Pilih atau cari dokumen acuan di database --
-                  </span>
-                ) : (
-                  <span className="text-xs text-slate-900 font-semibold truncate">
-                    {selectedDocObjects.map((d) => d.title).join(', ')}
-                  </span>
-                )}
-              </div>
-
-              <div className="flex items-center gap-1 text-slate-500 shrink-0">
-                <span className="text-[11px] font-semibold bg-slate-200 px-1.5 py-0.5 text-slate-800">
-                  {selectedDocIds.length} Terpilih
-                </span>
-                <ChevronDown size={16} className={`transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
-              </div>
-            </div>
-
-            {/* Dropdown Menu (Open Overlay) */}
-            {isDropdownOpen && (
-              <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-300 shadow-xl z-40 max-h-80 overflow-y-auto rounded-none p-3 space-y-3">
-                {/* Search Typing Bar inside Dropdown */}
-                <div className="relative">
-                  <Search size={14} className="absolute left-3 top-2.5 text-slate-400" />
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Ketik untuk mencari judul dokumen atau kategori..."
-                    className="w-full pl-9 pr-3 py-1.5 border border-slate-300 text-xs rounded-none focus:outline-none focus:border-teal-700"
-                    onClick={(e) => e.stopPropagation()}
-                    autoFocus
-                  />
-                  {searchQuery && (
-                    <button
-                      type="button"
-                      onClick={() => setSearchQuery('')}
-                      className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600"
-                    >
-                      <X size={13} />
-                    </button>
-                  )}
-                </div>
-
-                {/* Quick Selection Actions */}
-                <div className="flex items-center justify-between text-xs text-slate-500 border-b border-slate-200 pb-2">
-                  <span>Daftar Dokumen Pengetahuan ({filteredDocuments.length})</span>
-                  <div className="flex items-center gap-3">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleSelectAll();
-                      }}
-                      className="text-teal-700 hover:underline font-semibold"
-                    >
-                      Pilih Semua
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleClearAll();
-                      }}
-                      className="text-slate-500 hover:underline font-medium"
-                    >
-                      Kosongkan
-                    </button>
-                  </div>
-                </div>
-
-                {/* List of Filtered Items */}
-                {isLoadingDocs ? (
-                  <div className="py-6 text-center text-xs text-slate-500 flex items-center justify-center gap-2">
-                    <Loader2 size={15} className="animate-spin text-teal-600" />
-                    <span>Memuat dokumen dari database...</span>
-                  </div>
-                ) : filteredDocuments.length === 0 ? (
-                  <div className="py-6 text-center space-y-2 text-slate-500">
-                    <p className="text-xs font-semibold">Tidak ditemukan dokumen acuan yang cocok.</p>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsDropdownOpen(false);
-                        setIsUploadModalOpen(true);
-                      }}
-                      className="px-3 py-1.5 bg-teal-700 text-white text-xs font-bold uppercase rounded-none inline-flex items-center gap-1.5"
-                    >
-                      <Plus size={13} />
-                      <span>Unggah Dokumen Baru Sekarang</span>
-                    </button>
-                  </div>
-                ) : (
-                  <div className="space-y-1 max-h-56 overflow-y-auto pr-1">
-                    {filteredDocuments.map((doc) => {
-                      const isSelected = selectedDocIds.includes(doc.id);
-                      return (
-                        <div
-                          key={doc.id}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleSelectDocument(doc.id);
-                          }}
-                          className={`p-2.5 border cursor-pointer transition-colors flex items-center justify-between gap-3 text-xs rounded-none ${
-                            isSelected
-                              ? 'bg-teal-50 border-teal-600 text-teal-900 font-bold'
-                              : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-800'
-                          }`}
-                        >
-                          <div className="min-w-0 flex-1 space-y-0.5">
-                            <div className="truncate">{doc.title}</div>
-                            <div className="text-[10px] text-slate-500 font-medium">
-                              {doc.metadata?.category || 'Umum'} &bull; {doc.metadata?.totalTokenCount ? `${doc.metadata.totalTokenCount.toLocaleString()} Token` : 'Ready'}
-                            </div>
-                          </div>
-                          <div className={`w-4 h-4 border flex items-center justify-center shrink-0 ${isSelected ? 'bg-teal-700 border-teal-700 text-white' : 'border-slate-400'}`}>
-                            {isSelected && <Check size={12} />}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Selected Document Tags / Pills (Flat Badge Style - No Box Borders) */}
-          {selectedDocObjects.length > 0 && (
-            <div className="flex flex-wrap gap-2 pt-1">
-              {selectedDocObjects.map((doc) => (
-                <span
-                  key={doc.id}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-teal-50 text-teal-900 text-xs font-semibold rounded-none"
-                >
-                  <FileText size={12} className="text-teal-700" />
-                  <span className="max-w-xs truncate">{doc.title}</span>
-                  <button
-                    type="button"
-                    onClick={() => toggleSelectDocument(doc.id)}
-                    className="hover:text-red-700 ml-1 text-slate-400"
-                    title="Hapus acuan ini"
-                  >
-                    <X size={13} />
-                  </button>
-                </span>
-              ))}
-            </div>
-          )}
-        </div>
+      {/* SECTION 1: Categorized Multi-Document Selector Hub (Flat, Categorized, Compact Scroll) */}
+      <div className="no-print space-y-4">
+        <CategorizedDocumentSelector
+          documents={documents}
+          selectedDocIds={selectedDocIds}
+          onToggleDoc={toggleSelectDocument}
+          onSelectAll={handleSelectAll}
+          onClearAll={handleClearAll}
+          isLoading={isLoadingDocs}
+          onUploadNew={() => setIsUploadModalOpen(true)}
+          title="Pilihan Dokumen Acuan Laporan"
+        />
 
         {/* Generation Action Toolbar */}
-        <div className="flex flex-wrap items-center justify-between gap-4 pt-3 border-t border-slate-200">
+        <div className="bg-white border border-slate-300 p-4 rounded-none shadow-2xs flex flex-wrap items-center justify-between gap-4 font-roboto">
           <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer">
             <input
               type="checkbox"
@@ -595,7 +384,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
               onChange={(e) => setForceRegenerate(e.target.checked)}
               className="rounded-none border-slate-300 text-teal-700 focus:ring-teal-500"
             />
-            <span className="flex items-center gap-1">
+            <span className="flex items-center gap-1.5">
               <RefreshCw size={13} className={forceRegenerate ? 'text-teal-700 animate-spin' : 'text-slate-500'} />
               <span>Paksa Generate Ulang AI (Bypass DB Cache)</span>
             </span>
@@ -604,21 +393,12 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
           <button
             onClick={handleGenerateReport}
             disabled={isGenerating || selectedDocIds.length === 0}
-            className={`px-5 py-2.5 font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-2 border shadow-xs transition-all ${
-              cacheStatus?.isCached && !forceRegenerate
-                ? 'bg-emerald-700 hover:bg-emerald-800 text-white border-emerald-800'
-                : 'bg-teal-700 hover:bg-teal-800 text-white border-teal-800'
-            } disabled:opacity-50`}
+            className="px-5 py-2.5 bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-2 border border-teal-800 shadow-xs transition-all cursor-pointer disabled:opacity-50"
           >
             {isGenerating ? (
               <>
                 <Loader2 size={15} className="animate-spin" />
                 <span>Memproses Laporan AI...</span>
-              </>
-            ) : cacheStatus?.isCached && !forceRegenerate ? (
-              <>
-                <Zap size={15} />
-                <span>Muat Laporan dari DB (0 Token)</span>
               </>
             ) : (
               <>
@@ -682,26 +462,26 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
             )}
           </div>
         ) : (
-          <div className="bg-white border border-slate-300 border-l-4 border-l-slate-900 p-6 lg:p-10 rounded-none shadow-xs space-y-6">
-            {/* Token & Cache Metadata Banner */}
-            <div className="bg-slate-100 border border-slate-300 p-3 text-xs flex flex-wrap items-center justify-between gap-2 no-print font-semibold text-slate-700">
+          <div className="bg-white border border-slate-300 p-6 lg:p-10 rounded-none shadow-xs space-y-6">
+            {/* Token & Cache Metadata Telemetry Header (Borderless) */}
+            <div className="border-b border-slate-200 pb-3 text-xs flex flex-wrap items-center justify-between gap-2 no-print font-medium text-slate-600">
               <div className="flex items-center gap-2">
                 <Database size={15} className="text-teal-700" />
-                <span>Sumber Data: <strong>{reportMetadata.llmProvider}</strong></span>
+                <span>Sumber Data: <strong className="text-slate-900">{reportMetadata.llmProvider}</strong></span>
               </div>
               <div className="flex items-center gap-3">
-                <span className="px-2 py-0.5 bg-slate-200 text-slate-800 text-[11px] font-bold">
+                <span className="text-slate-700 font-bold">
                   Token Digunakan: {reportMetadata.tokenCount?.toLocaleString() || 0}
                 </span>
                 {reportMetadata.createdAt && (
-                  <span>Tersimpan: {new Date(reportMetadata.createdAt).toLocaleString('id-ID')}</span>
+                  <span>&bull; Tersimpan: {new Date(reportMetadata.createdAt).toLocaleString('id-ID')}</span>
                 )}
               </div>
             </div>
 
             {/* Kop Header Laporan Resmi */}
             <div className="border-b-2 border-slate-900 pb-4">
-              <div className="flex justify-between items-start mb-2">
+              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 mb-2">
                 <div>
                   <span className="text-xs font-bold text-teal-800 uppercase tracking-widest block mb-1 flex items-center gap-1.5">
                     <Building2 size={14} className="text-teal-700" />
@@ -711,16 +491,17 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                     {currentReport.title}
                   </h1>
                 </div>
-                <span className="px-3 py-1 bg-red-100 border border-red-300 text-red-800 text-xs font-bold uppercase rounded-none flex items-center gap-1">
-                  <ShieldAlert size={14} />
+                <span className="px-3 py-1 bg-red-50 text-red-800 text-xs font-bold uppercase rounded-none flex items-center gap-1 shrink-0 self-start">
+                  <ShieldAlert size={14} className="text-red-700" />
                   <span>SIFAT: {currentReport.urgency}</span>
                 </span>
               </div>
 
-              <div className="text-xs text-slate-700 space-y-1 font-semibold bg-slate-50 p-4 border border-slate-200 mt-3">
+              {/* Penerima/Pengirim Details (Left Border Accent - Zero Nested Box) */}
+              <div className="text-xs text-slate-700 space-y-1 font-medium border-l-2 border-teal-700 pl-4 py-1.5 mt-3">
                 <div><strong>Penerima:</strong> {currentReport.recipient}</div>
                 <div><strong>Pengirim:</strong> {currentReport.sender}</div>
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-3 text-slate-600">
                   <span className="flex items-center gap-1">
                     <Calendar size={12} className="text-slate-500" />
                     <span>Periode Data: {currentReport.period}</span>
@@ -731,55 +512,55 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
               </div>
             </div>
 
-            {/* Ringkasan Eksekutif (Executive Summary) */}
-            <div className="bg-sky-50 border border-sky-200 p-5 rounded-none text-slate-900 font-medium leading-relaxed italic text-sm">
-              <strong className="block text-xs uppercase tracking-wider text-sky-900 font-bold mb-2 not-italic flex items-center gap-1.5">
-                <FileText size={14} className="text-sky-700" />
+            {/* Ringkasan Eksekutif (Executive Summary - Clean Left Accent - Zero Nested Box) */}
+            <div className="border-l-4 border-teal-700 pl-4 py-2.5 bg-slate-50/70 text-slate-900 font-normal leading-relaxed italic text-sm">
+              <strong className="block text-xs uppercase tracking-wider text-teal-900 font-bold mb-1.5 not-italic flex items-center gap-1.5">
+                <FileText size={14} className="text-teal-700" />
                 <span>RINGKASAN EKSEKUTIF</span>
               </strong>
               {currentReport.executiveSummary}
             </div>
 
-            {/* Kumpulan Indikator Deviasi Signifikan */}
+            {/* Kumpulan Indikator Deviasi Signifikan (Flat Modular Section) */}
             {currentReport.deviations && currentReport.deviations.length > 0 && (
-              <div>
-                <h3 className="text-h3 text-slate-900 mb-4 pb-2 border-b border-slate-200 flex items-center gap-2">
-                  <AlertTriangle size={18} className="text-amber-600" />
+              <div className="space-y-3 pt-2">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 pb-2 border-b border-slate-200 flex items-center gap-2">
+                  <AlertTriangle size={16} className="text-amber-600" />
                   <span>KUMPULAN INDIKATOR DEVIASI SIGNIFIKAN</span>
                 </h3>
 
-                <div className="space-y-4">
+                <div className="space-y-3 divide-y divide-slate-100">
                   {currentReport.deviations.map((d: any, idx: number) => (
-                    <div key={idx} className="bg-slate-50 border border-slate-300 p-4 rounded-none">
-                      <strong className="block text-sm font-bold text-slate-900 mb-1">{d.title}</strong>
-                      <p className="text-xs text-slate-700 font-semibold mb-2">
-                        Baseline Target: <strong>{d.baseline}</strong> | Realisasi Aktual: <strong>{d.realization}</strong> | Deviasi: <span className={d.severityColor || 'text-red-700 font-bold'}>{d.deviationText}</span>
+                    <div key={idx} className="pt-3 first:pt-0 space-y-1 text-xs">
+                      <strong className="block font-bold text-slate-900 text-sm">{d.title}</strong>
+                      <p className="text-slate-700 font-medium">
+                        Baseline Target: <span className="font-bold text-slate-900">{d.baseline}</span> &bull; Realisasi Aktual: <span className="font-bold text-slate-900">{d.realization}</span> &bull; Deviasi: <span className={d.severityColor || 'text-red-700 font-bold'}>{d.deviationText}</span>
                       </p>
-                      <div className="text-xs text-slate-600 bg-white p-2.5 border border-slate-200">
-                        <strong>Penyebab Utama:</strong> {d.causes}
-                      </div>
+                      <p className="text-slate-600 font-normal pt-0.5">
+                        <strong className="text-slate-800">Penyebab Utama:</strong> {d.causes}
+                      </p>
                     </div>
                   ))}
                 </div>
               </div>
             )}
 
-            {/* Analisis Dampak Kebijakan Eksternal / Nasional */}
+            {/* Analisis Dampak Kebijakan Eksternal / Nasional (Flat Modular Section) */}
             {currentReport.nationalPolicyImpact && (
-              <div>
-                <h3 className="text-h3 text-slate-900 mb-4 pb-2 border-b border-slate-200 flex items-center gap-2">
-                  <FileText size={18} className="text-teal-700" />
+              <div className="space-y-3 pt-2">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 pb-2 border-b border-slate-200 flex items-center gap-2">
+                  <FileText size={16} className="text-teal-700" />
                   <span>ANALISIS DAMPAK KEBIJAKAN EKSTERNAL / NASIONAL</span>
                 </h3>
 
-                <div className="bg-slate-50 border border-slate-300 p-4 rounded-none">
-                  <strong className="block text-sm font-bold text-slate-900 mb-2">
+                <div className="border-l-2 border-slate-300 pl-4 py-1 space-y-2 text-xs">
+                  <strong className="block text-sm font-bold text-slate-900">
                     Kebijakan Makro: {currentReport.nationalPolicyImpact.policyName}
                   </strong>
-                  <p className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                  <p className="font-bold text-slate-700 uppercase tracking-wider text-[11px]">
                     Hasil Simulasi AI Engine:
                   </p>
-                  <ul className="list-disc pl-5 space-y-1 text-xs text-slate-800 font-semibold">
+                  <ul className="list-disc pl-5 space-y-1 text-slate-800 font-medium">
                     {currentReport.nationalPolicyImpact.simulationResults?.map((r: string, idx: number) => (
                       <li key={idx}>{r}</li>
                     ))}
@@ -788,21 +569,21 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
               </div>
             )}
 
-            {/* Rekomendasi Respon Berbasis Prioritas */}
+            {/* Rekomendasi Respon Berbasis Prioritas (Action Plan - Flat Modular Section) */}
             {currentReport.actionPriorities && currentReport.actionPriorities.length > 0 && (
-              <div>
-                <h3 className="text-h3 text-slate-900 mb-4 pb-2 border-b border-slate-200 flex items-center gap-2">
-                  <CheckCircle2 size={18} className="text-emerald-700" />
+              <div className="space-y-3 pt-2">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 pb-2 border-b border-slate-200 flex items-center gap-2">
+                  <CheckCircle2 size={16} className="text-emerald-700" />
                   <span>REKOMENDASI RESPON BERBASIS PRIORITAS (ACTION PLAN)</span>
                 </h3>
 
-                <div className="bg-amber-50 border border-amber-300 p-5 rounded-none space-y-3">
-                  <strong className="block text-xs uppercase tracking-wider text-amber-900 font-bold mb-2">
+                <div className="space-y-2">
+                  <span className="block text-[11px] uppercase tracking-wider text-amber-900 font-bold mb-1">
                     INSTRUKSI PRIORITAS (Harus Dieksekusi Sebelum Tenggat Waktu)
-                  </strong>
+                  </span>
                   <div className="space-y-2">
                     {currentReport.actionPriorities.map((act: string, idx: number) => (
-                      <div key={idx} className="text-xs text-slate-900 font-semibold bg-white p-3 border border-amber-200">
+                      <div key={idx} className="text-xs text-slate-800 font-medium border-l-3 border-amber-600 pl-3 py-1">
                         {act}
                       </div>
                     ))}
@@ -842,21 +623,72 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
         )
       )}
 
-      {/* TAB CONTENT 2: Saved Reports History in Database */}
+      {/* TAB CONTENT 2: History Database List */}
       {activeTab === 'history' && (
-        <div className="bg-white border border-slate-300 p-6 rounded-none shadow-xs space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-200 pb-3">
-            <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wide flex items-center gap-2">
-              <Database size={16} className="text-teal-700" />
-              <span>Daftar Laporan AI Tersimpan di Database PostgreSQL</span>
-            </h2>
-            <button
-              onClick={loadHistory}
-              className="px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold uppercase rounded-none border border-slate-300 inline-flex items-center gap-1.5"
-            >
-              <RefreshCw size={13} />
-              <span>Refresh</span>
-            </button>
+        <div className="bg-white border border-slate-300 p-6 rounded-none shadow-xs space-y-4 font-roboto">
+          {/* Header & Filter Controls Bar */}
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 border-b border-slate-200 pb-3">
+            <div className="flex items-center gap-2">
+              <Database size={16} className="text-teal-700 shrink-0" />
+              <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wide">
+                Daftar Laporan AI Tersimpan di Database ({filteredSavedReports.length} dari {savedReports.length})
+              </h2>
+            </div>
+
+            {/* Filter Controls: Calendar Datepicker + Search Box */}
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Calendar Datepicker Input */}
+              <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-300 px-2 py-1 text-xs">
+                <Calendar size={13} className="text-teal-700 shrink-0" />
+                <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wider hidden sm:inline">
+                  Pilih Kalender:
+                </span>
+                <input
+                  type="date"
+                  value={historyCalendarDate}
+                  onChange={(e) => setHistoryCalendarDate(e.target.value)}
+                  className="bg-transparent text-slate-900 text-xs font-semibold focus:outline-none cursor-pointer rounded-none"
+                />
+                {historyCalendarDate && (
+                  <button
+                    onClick={() => setHistoryCalendarDate('')}
+                    className="p-0.5 text-slate-400 hover:text-red-600 cursor-pointer"
+                    title="Hapus tanggal kalender"
+                  >
+                    <X size={12} />
+                  </button>
+                )}
+              </div>
+
+              {/* Text Search Input */}
+              <div className="relative w-full sm:w-56">
+                <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  value={historySearchQuery}
+                  onChange={(e) => setHistorySearchQuery(e.target.value)}
+                  placeholder="Cari judul / ringkasan..."
+                  className="w-full bg-slate-50 border border-slate-300 pl-8 pr-7 py-1 text-xs text-slate-900 focus:outline-none focus:border-teal-700 rounded-none font-medium"
+                />
+                {historySearchQuery && (
+                  <button
+                    onClick={() => setHistorySearchQuery('')}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer"
+                    title="Hapus kata kunci filter"
+                  >
+                    <X size={12} />
+                  </button>
+                )}
+              </div>
+
+              <button
+                onClick={loadHistory}
+                className="px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold uppercase rounded-none border border-slate-300 inline-flex items-center gap-1.5 cursor-pointer"
+              >
+                <RefreshCw size={13} />
+                <span>Refresh</span>
+              </button>
+            </div>
           </div>
 
           {isLoadingHistory ? (
@@ -864,15 +696,15 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
               <Loader2 size={18} className="animate-spin text-teal-600" />
               <span>Memuat riwayat laporan tersimpan...</span>
             </div>
-          ) : savedReports.length === 0 ? (
+          ) : filteredSavedReports.length === 0 ? (
             <div className="py-12 text-center text-slate-500 space-y-2">
               <Database size={32} className="mx-auto text-slate-400" />
-              <p className="text-sm font-semibold">Belum ada laporan yang tersimpan di database.</p>
-              <p className="text-xs text-slate-400">Pilih dokumen acuan dari dropdown dan klik 'Generate Laporan AI Acuan' untuk menyimpan laporan baru.</p>
+              <p className="text-sm font-semibold">Tidak ditemukan laporan yang cocok dengan filter.</p>
+              <p className="text-xs text-slate-400">Coba ubah tanggal kalender atau kata kunci pencarian Anda.</p>
             </div>
           ) : (
             <div className="divide-y divide-slate-200 border border-slate-200">
-              {savedReports.map((report) => (
+              {filteredSavedReports.map((report) => (
                 <div
                   key={report.id}
                   onClick={() => handleSelectFromHistory(report.id)}
@@ -1013,11 +845,6 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
           </div>
         </div>
       )}
-
-      {/* Footer Note */}
-      <div className="text-center text-xs text-slate-500 font-medium pt-4">
-        BRIDA SMART Analysis &bull; Terintegrasi Database Caching PostgreSQL & Engine Generative AI Kabupaten Mimika
-      </div>
     </div>
   );
 };

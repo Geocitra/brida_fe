@@ -1,15 +1,14 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { DocumentService } from '../../../services/document.service';
 import type { DocumentRecord } from '../../../services/document.service';
 import { AiAssistantService } from '../../../services/ai-assistant.service';
 import type { ArticleSessionDetail } from '../../../services/ai-assistant.service';
+import { CategorizedDocumentSelector } from '../../../components/common/categorized-document-selector.component';
 import {
   MessageSquareCode,
   Sparkles,
   Search,
-  ChevronDown,
   X,
-  Check,
   FileText,
   PenTool,
   Loader2,
@@ -18,9 +17,10 @@ import {
   History,
   Trash2,
   Send,
-  Database,
-  Layers,
   Clock,
+  Calendar,
+  Layers,
+  Database,
   RefreshCw,
 } from 'lucide-react';
 
@@ -38,15 +38,10 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
   const [selectedDocIds, setSelectedDocIds] = useState<string[]>([]);
   const [isLoadingDocs, setIsLoadingDocs] = useState<boolean>(true);
 
-  // Searchable Dropdown state
-  const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
-  const [searchQuery, setSearchQuery] = useState<string>('');
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
-  // User Article Generation Parameters
+  // Form Generator Configuration
   const [articleTitle, setArticleTitle] = useState<string>('');
-  const [targetLength, setTargetLength] = useState<'SHORT' | 'MEDIUM' | 'LONG'>('MEDIUM');
   const [tone, setTone] = useState<string>('solutif');
+  const [targetLength, setTargetLength] = useState<'SHORT' | 'MEDIUM' | 'LONG'>('MEDIUM');
   const [userInstruction, _setUserInstruction] = useState<string>(initialPrompt || '');
 
   // Session & Interaction State
@@ -55,6 +50,31 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [followUpQuery, setFollowUpQuery] = useState<string>('');
   const [isSendingFollowUp, setIsSendingFollowUp] = useState<boolean>(false);
+
+  // Live filter states for saved article sessions history (Calendar Datepicker & Text Search)
+  const [historySearchQuery, setHistorySearchQuery] = useState('');
+  const [historyCalendarDate, setHistoryCalendarDate] = useState('');
+
+  const filteredArticleSessions = articleSessionsHistory.filter((session) => {
+    // 1. Text Search Filter
+    const q = historySearchQuery.toLowerCase();
+    const titleText = session.articleTitle || session.title || '';
+    const lastMsgText = (session as any).lastMessage || '';
+    const matchesText = titleText.toLowerCase().includes(q) || lastMsgText.toLowerCase().includes(q);
+
+    if (!matchesText) return false;
+
+    // 2. Calendar Date Filter (YYYY-MM-DD)
+    if (historyCalendarDate) {
+      const sessionDate = new Date(session.updatedAt || session.createdAt);
+      if (!isNaN(sessionDate.getTime())) {
+        const sessionDateIso = sessionDate.toISOString().split('T')[0];
+        if (sessionDateIso !== historyCalendarDate) return false;
+      }
+    }
+
+    return true;
+  });
 
   // Active Tab for Sidebar (Editor vs History)
   const [activeTab, setActiveTab] = useState<'editor' | 'history'>('editor');
@@ -66,17 +86,6 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 4000);
   };
-
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsDropdownOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
 
   // Initial Data Fetch
   useEffect(() => {
@@ -121,6 +130,14 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
         return [...prev, docId];
       }
     });
+  };
+
+  const handleSelectAll = () => {
+    setSelectedDocIds(documents.map((d) => d.id));
+  };
+
+  const handleClearAll = () => {
+    setSelectedDocIds([]);
   };
 
   const handleGenerateNewArticle = async (e: React.FormEvent) => {
@@ -213,16 +230,8 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
     showToast('Teks artikel berhasil disalin ke papan klip.');
   };
 
-  // Filtered documents for live search
-  const filteredDocuments = documents.filter((doc) => {
-    const q = searchQuery.toLowerCase();
-    return doc.title.toLowerCase().includes(q) || (doc.metadata?.category || '').toLowerCase().includes(q);
-  });
-
-  const selectedDocObjects = documents.filter((d) => selectedDocIds.includes(d.id));
-
   return (
-    <div className="space-y-6 pb-12">
+    <div className="flex flex-col w-full min-h-full bg-slate-100/70 p-6 space-y-6 font-roboto">
       {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-5 py-3 border border-slate-700 shadow-xl flex items-center gap-3 rounded-none">
@@ -231,21 +240,26 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
         </div>
       )}
 
-      {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-200 pb-4">
-        <div>
-          <h1 className="text-h1 mb-1">Article Generator & Public Drafting (CoT Chain-of-Thought)</h1>
-          <p className="text-body">
-            Fasilitas perakitan artikel publikasi & rilis media berbasis multi-dokumen acuan dengan kustomisasi judul, panjang teks, dan penyimpanan sesi di database.
+      {/* SECTION 1. HERO COMMAND STRIP HEADER */}
+      <div className="w-full bg-white border border-slate-300 px-6 py-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4 rounded-none shadow-2xs">
+        <div className="flex flex-col">
+          <span className="text-[10px] font-bold tracking-widest text-teal-800 uppercase mb-1">
+            Beranda / Penulis Artikel Publikasi
+          </span>
+          <h1 className="text-xl font-bold uppercase text-slate-900 tracking-tight">
+            Penulis Artikel &amp; Rilis Media BRIDA
+          </h1>
+          <p className="text-xs text-slate-500 font-normal mt-1">
+            Perakitan artikel publikasi dan naskah siaran pers berbasis sintesis multidokumen acuan resmi BRIDA.
           </p>
         </div>
 
         <button
           onClick={onNavigateToQa}
-          className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-2 border border-slate-900 shadow-xs shrink-0"
+          className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-2 transition-colors shrink-0 cursor-pointer"
         >
           <MessageSquareCode size={14} />
-          <span>Kembali ke Q&A Chat</span>
+          <span>Kembali ke Q&amp;A Chat</span>
         </button>
       </div>
 
@@ -271,119 +285,34 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
           </span>
         </div>
 
-        <form onSubmit={handleGenerateNewArticle} className="space-y-4">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {/* Left: Searchable Multi-Select Combobox Dokumen Acuan */}
-            <div className="space-y-2">
-              <label className="block text-xs font-bold text-slate-700 uppercase">
-                Pilih Dokumen Acuan ({selectedDocIds.length} Dipilih)
-              </label>
+        <form onSubmit={handleGenerateNewArticle} className="space-y-4 font-roboto">
+          {/* Categorized Multi-Document Selector Hub */}
+          <CategorizedDocumentSelector
+            documents={documents}
+            selectedDocIds={selectedDocIds}
+            onToggleDoc={toggleSelectDocument}
+            onSelectAll={handleSelectAll}
+            onClearAll={handleClearAll}
+            isLoading={isLoadingDocs}
+            title="Pilih Dokumen Acuan Artikel"
+          />
 
-              <div className="relative" ref={dropdownRef}>
-                <div
-                  onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                  className="w-full bg-slate-50 hover:bg-slate-100 border border-slate-300 p-2.5 cursor-pointer flex items-center justify-between gap-2 rounded-none min-h-[42px]"
-                >
-                  <div className="flex items-center gap-2 min-w-0 flex-1">
-                    <Search size={15} className="text-slate-500 shrink-0" />
-                    {selectedDocIds.length === 0 ? (
-                      <span className="text-xs text-slate-400 font-medium">-- Cari & pilih dokumen acuan di DB --</span>
-                    ) : (
-                      <span className="text-xs text-slate-900 font-bold truncate">
-                        {selectedDocObjects.map((d) => d.title).join(', ')}
-                      </span>
-                    )}
-                  </div>
-                  <ChevronDown size={16} className={`text-slate-500 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
-                </div>
-
-                {isDropdownOpen && (
-                  <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-300 shadow-xl z-40 max-h-72 overflow-y-auto rounded-none p-3 space-y-3">
-                    <div className="relative">
-                      <Search size={14} className="absolute left-3 top-2.5 text-slate-400" />
-                      <input
-                        type="text"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        placeholder="Ketik untuk mencari dokumen acuan..."
-                        className="w-full pl-9 pr-3 py-1.5 border border-slate-300 text-xs rounded-none focus:outline-none focus:border-teal-700"
-                        autoFocus
-                        onClick={(e) => e.stopPropagation()}
-                      />
-                    </div>
-
-                    {isLoadingDocs ? (
-                      <div className="py-4 text-center text-xs text-slate-500 flex items-center justify-center gap-2">
-                        <Loader2 size={14} className="animate-spin text-teal-600" />
-                        <span>Memuat dokumen...</span>
-                      </div>
-                    ) : filteredDocuments.length === 0 ? (
-                      <div className="py-4 text-center text-xs text-slate-500">
-                        Tidak ditemukan dokumen acuan di database.
-                      </div>
-                    ) : (
-                      <div className="space-y-1 max-h-48 overflow-y-auto pr-1">
-                        {filteredDocuments.map((doc) => {
-                          const isSelected = selectedDocIds.includes(doc.id);
-                          return (
-                            <div
-                              key={doc.id}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                toggleSelectDocument(doc.id);
-                              }}
-                              className={`p-2 border cursor-pointer transition-colors flex items-center justify-between text-xs rounded-none ${
-                                isSelected
-                                  ? 'bg-teal-50 border-teal-600 text-teal-900 font-bold'
-                                  : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-800'
-                              }`}
-                            >
-                              <div className="truncate min-w-0">{doc.title}</div>
-                              <div className={`w-4 h-4 border flex items-center justify-center shrink-0 ${isSelected ? 'bg-teal-700 border-teal-700 text-white' : 'border-slate-400'}`}>
-                                {isSelected && <Check size={12} />}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* Selected Pills */}
-              {selectedDocObjects.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 pt-1">
-                  {selectedDocObjects.map((doc) => (
-                    <span key={doc.id} className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-teal-100 border border-teal-300 text-teal-900 text-[11px] font-bold">
-                      <FileText size={11} className="text-teal-700" />
-                      <span className="max-w-[180px] truncate">{doc.title}</span>
-                      <button type="button" onClick={() => toggleSelectDocument(doc.id)} className="hover:text-red-700 text-slate-500">
-                        <X size={12} />
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Right: Judul Artikel Input */}
-            <div className="space-y-2">
-              <label className="block text-xs font-bold text-slate-700 uppercase">
-                Judul / Topik Artikel (Input Pengguna)
-              </label>
-              <input
-                type="text"
-                value={articleTitle}
-                onChange={(e) => setArticleTitle(e.target.value)}
-                placeholder="Contoh: Strategi Percepatan Perekonomian & Infrastruktur Mimika 2025"
-                required
-                className="w-full text-xs p-2.5 border border-slate-300 bg-white focus:outline-none focus:border-teal-700"
-              />
-              <p className="text-[11px] text-slate-500">
-                Judul akan menjadi fokus utama analisis dan perakitan narasi artikel oleh AI.
-              </p>
-            </div>
+          {/* Judul Artikel Input */}
+          <div className="bg-white border border-slate-300 p-4 rounded-none shadow-2xs space-y-2">
+            <label className="block text-xs font-bold text-slate-800 uppercase tracking-wide">
+              Judul / Topik Utama Artikel (Input Pengguna)
+            </label>
+            <input
+              type="text"
+              value={articleTitle}
+              onChange={(e) => setArticleTitle(e.target.value)}
+              placeholder="Contoh: Strategi Percepatan Perekonomian & Infrastruktur Kabupaten Mimika 2025"
+              required
+              className="w-full text-xs p-2.5 border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:border-teal-700 rounded-none font-medium"
+            />
+            <p className="text-[11px] text-slate-500">
+              Judul ini akan menjadi panduan fokus utama AI Engine dalam mensintesis artikel berbasis bukti data dokumen.
+            </p>
           </div>
 
           {/* Row 2: Target Length & Tone Options (FLAT DIVIDED ROW, NO NESTED BOXES) */}
@@ -589,30 +518,81 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
 
       {/* TAB CONTENT 2: Saved Article Sessions History */}
       {activeTab === 'history' && (
-        <div className="bg-white border border-slate-300 p-6 rounded-none shadow-xs space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-200 pb-3">
-            <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wide flex items-center gap-2">
-              <Database size={16} className="text-teal-700" />
-              <span>Daftar Sesi Artikel & Percakapan Tersimpan di Database</span>
-            </h2>
-            <button
-              onClick={loadHistory}
-              className="px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold uppercase rounded-none border border-slate-300 inline-flex items-center gap-1.5"
-            >
-              <RefreshCw size={13} />
-              <span>Refresh</span>
-            </button>
+        <div className="bg-white border border-slate-300 p-6 rounded-none shadow-xs space-y-4 font-roboto">
+          {/* Header & Filter Controls Bar */}
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 border-b border-slate-200 pb-3">
+            <div className="flex items-center gap-2">
+              <Database size={16} className="text-teal-700 shrink-0" />
+              <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wide">
+                Daftar Sesi Artikel &amp; Percakapan Tersimpan ({filteredArticleSessions.length} dari {articleSessionsHistory.length})
+              </h2>
+            </div>
+
+            {/* Filter Controls: Calendar Datepicker + Search Box */}
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Calendar Datepicker Input */}
+              <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-300 px-2 py-1 text-xs">
+                <Calendar size={13} className="text-teal-700 shrink-0" />
+                <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wider hidden sm:inline">
+                  Pilih Kalender:
+                </span>
+                <input
+                  type="date"
+                  value={historyCalendarDate}
+                  onChange={(e) => setHistoryCalendarDate(e.target.value)}
+                  className="bg-transparent text-slate-900 text-xs font-semibold focus:outline-none cursor-pointer rounded-none"
+                />
+                {historyCalendarDate && (
+                  <button
+                    onClick={() => setHistoryCalendarDate('')}
+                    className="p-0.5 text-slate-400 hover:text-red-600 cursor-pointer"
+                    title="Hapus tanggal kalender"
+                  >
+                    <X size={12} />
+                  </button>
+                )}
+              </div>
+
+              {/* Text Search Input */}
+              <div className="relative w-full sm:w-56">
+                <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  value={historySearchQuery}
+                  onChange={(e) => setHistorySearchQuery(e.target.value)}
+                  placeholder="Cari judul / instruksi..."
+                  className="w-full bg-slate-50 border border-slate-300 pl-8 pr-7 py-1 text-xs text-slate-900 focus:outline-none focus:border-teal-700 rounded-none font-medium"
+                />
+                {historySearchQuery && (
+                  <button
+                    onClick={() => setHistorySearchQuery('')}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer"
+                    title="Hapus kata kunci filter"
+                  >
+                    <X size={12} />
+                  </button>
+                )}
+              </div>
+
+              <button
+                onClick={loadHistory}
+                className="px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold uppercase rounded-none border border-slate-300 inline-flex items-center gap-1.5 cursor-pointer"
+              >
+                <RefreshCw size={13} />
+                <span>Refresh</span>
+              </button>
+            </div>
           </div>
 
-          {articleSessionsHistory.length === 0 ? (
+          {filteredArticleSessions.length === 0 ? (
             <div className="py-12 text-center text-slate-500 space-y-2">
               <Clock size={36} className="mx-auto text-slate-400" />
-              <p className="text-sm font-semibold">Belum ada riwayat sesi artikel di database.</p>
-              <p className="text-xs text-slate-400">Buat draf artikel baru di atas untuk mulai menyimpan sesi.</p>
+              <p className="text-sm font-semibold">Tidak ditemukan riwayat sesi artikel yang cocok dengan filter.</p>
+              <p className="text-xs text-slate-400">Coba ubah tanggal kalender atau kata kunci pencarian Anda.</p>
             </div>
           ) : (
             <div className="divide-y divide-slate-200 border border-slate-200">
-              {articleSessionsHistory.map((session) => (
+              {filteredArticleSessions.map((session) => (
                 <div
                   key={session.id}
                   onClick={() => handleOpenSessionFromHistory(session.id)}

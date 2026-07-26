@@ -12,12 +12,33 @@ export const DashboardView: React.FC = () => {
   }, []);
 
   return (
-    <div className="space-y-6 pb-12">
-      <div>
-        <h1 className="text-h1 mb-1">Dashboard Spasial & Analitik Eksekutif</h1>
-        <p className="text-body">
-          Pemantauan real-time wilayah Kabupaten Mimika berbasis data deterministik arsip dokumen dan kueri analitis terstruktur.
-        </p>
+    <div className="flex flex-col w-full min-h-full bg-slate-100/70 p-6 space-y-6 font-roboto">
+      {/* SECTION 1. HERO COMMAND STRIP HEADER */}
+      <div className="w-full bg-white border border-slate-300 px-6 py-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4 rounded-none shadow-2xs">
+        <div className="flex flex-col">
+          <span className="text-[10px] font-bold tracking-widest text-teal-800 uppercase mb-1">
+            Beranda / Dashboard Eksekutif
+          </span>
+          <h1 className="text-xl font-bold uppercase text-slate-900 tracking-tight">
+            Dashboard Spasial &amp; Analitik Eksekutif
+          </h1>
+          <p className="text-xs text-slate-500 font-normal mt-1">
+            Pemantauan real-time wilayah Kabupaten Mimika berbasis data deterministik arsip dokumen dan kueri analitis terstruktur.
+          </p>
+        </div>
+
+        {/* Sisi Kanan: Status System Badge */}
+        <div className="flex items-center md:border-l md:border-slate-300 md:pl-6">
+          <div className="px-1 py-2 flex flex-col justify-center rounded-none">
+            <span className="text-[9px] uppercase font-bold text-slate-500 tracking-wider">
+              Status Operasional
+            </span>
+            <span className="text-xs font-bold text-emerald-700 flex items-center gap-1.5 mt-0.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              ONLINE (Optimal)
+            </span>
+          </div>
+        </div>
       </div>
 
       {/* Kartu Metrik Deterministik */}

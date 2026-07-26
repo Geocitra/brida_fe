@@ -1,0 +1,43 @@
+import React from 'react';
+import { Database, ShieldCheck, Cpu } from 'lucide-react';
+
+export const AppFooter: React.FC = () => {
+  const currentYear = new Date().getFullYear();
+
+  return (
+    <footer className="w-full bg-white border-t border-slate-300 px-6 py-4 font-roboto text-slate-600 rounded-none shrink-0">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        {/* Left Side: BRIDA Organization & Copyright Metadata */}
+        <div className="flex flex-col">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-slate-900 tracking-wide uppercase">
+              Badan Riset dan Inovasi Daerah (BRIDA)
+            </span>
+            <span className="text-[10px] bg-teal-100 text-teal-800 font-semibold px-1.5 py-0.5 rounded-none uppercase">
+              Kabupaten Mimika
+            </span>
+          </div>
+          <p className="text-[11px] text-slate-500 font-normal mt-1">
+            Sistem Data Analisis &amp; Infrastructure Knowledge Warehouse — © {currentYear} BRIDA Mimika. All rights reserved.
+          </p>
+        </div>
+
+        {/* Right Side: System Telemetry & Operational Health Status */}
+        <div className="flex items-center gap-4 divide-x divide-slate-200 text-[11px]">
+          <div className="flex items-center gap-1.5 text-slate-600">
+            <ShieldCheck size={14} className="text-teal-700" />
+            <span className="font-semibold text-slate-700">ISO 27001 Secured</span>
+          </div>
+          <div className="pl-4 flex items-center gap-1.5 text-slate-600">
+            <Database size={14} className="text-emerald-600" />
+            <span className="font-semibold text-slate-700">PostgreSQL Vector DB</span>
+          </div>
+          <div className="pl-4 flex items-center gap-1.5 text-slate-600">
+            <Cpu size={14} className="text-teal-600" />
+            <span className="font-semibold text-slate-700">v2.4.0-prod</span>
+          </div>
+        </div>
+      </div>
+    </footer>
+  );
+};
