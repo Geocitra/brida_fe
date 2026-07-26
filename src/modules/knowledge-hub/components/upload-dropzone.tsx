@@ -56,8 +56,10 @@ export const UploadDropzone: React.FC<UploadDropzoneProps> = ({ onUploadSuccess 
   };
 
   return (
-    <div className="bg-white border border-slate-300 p-6 rounded-none shadow-xs font-roboto">
-      <h2 className="text-h2 mb-4 text-slate-900">Unggah Dokumen Laporan / Acuan Baru</h2>
+    <div className="bg-white border border-slate-200 p-6 rounded-none shadow-xs font-roboto">
+      <h2 className="text-base font-bold text-slate-900 mb-5 pb-3 border-b border-slate-100">
+        Unggah Dokumen Laporan / Acuan Baru
+      </h2>
       
       {errorMessage && (
         <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 text-sm flex items-center gap-2 rounded-none">
@@ -66,29 +68,29 @@ export const UploadDropzone: React.FC<UploadDropzoneProps> = ({ onUploadSuccess 
         </div>
       )}
 
-      {/* Classification Selector Tabs (BASELINE, REALIZATION, GENERAL_REFERENCE) */}
-      <div className="mb-5 space-y-1.5">
-        <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+      {/* Classification Selector Tabs (Flat Segmented Row - Zero Boxed Cards) */}
+      <div className="mb-6 space-y-2">
+        <label className="block text-sm font-bold text-slate-800">
           Pilih Klasifikasi Jenis Dokumen Acuan:
         </label>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-slate-200 border-y border-slate-200">
           <button
             type="button"
             onClick={() => {
               setDocType('BASELINE');
               setCategory('Perencanaan & Baseline Target');
             }}
-            className={`p-3 border text-left rounded-none transition-colors ${
+            className={`p-3 text-left transition-all cursor-pointer ${
               docType === 'BASELINE'
-                ? 'bg-teal-50 border-teal-700 text-teal-950 font-bold shadow-xs'
-                : 'bg-slate-50 hover:bg-slate-100 border-slate-300 text-slate-700'
+                ? 'bg-teal-50/80 border-b-2 border-teal-700 text-teal-950 font-bold'
+                : 'hover:bg-slate-50 text-slate-700 border-b-2 border-transparent'
             }`}
           >
-            <div className="text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5 text-teal-800 mb-1">
-              <Target size={14} className="text-teal-700 shrink-0" />
-              <span>1. TARGET (BASELINE)</span>
+            <div className="text-sm font-bold flex items-center gap-1.5 text-teal-800 mb-0.5">
+              <Target size={15} className="text-teal-600 shrink-0" />
+              <span>1. Target (Baseline)</span>
             </div>
-            <p className="text-[10px] text-slate-600 font-normal">
+            <p className="text-xs text-slate-500 font-normal">
               RPJMD, Renstra OPD, Dokumen Target Indikator Makro.
             </p>
           </button>
@@ -99,17 +101,17 @@ export const UploadDropzone: React.FC<UploadDropzoneProps> = ({ onUploadSuccess 
               setDocType('REALIZATION');
               setCategory('Laporan Realisasi Capaian');
             }}
-            className={`p-3 border text-left rounded-none transition-colors ${
+            className={`p-3 text-left transition-all cursor-pointer ${
               docType === 'REALIZATION'
-                ? 'bg-teal-50 border-teal-700 text-teal-950 font-bold shadow-xs'
-                : 'bg-slate-50 hover:bg-slate-100 border-slate-300 text-slate-700'
+                ? 'bg-teal-50/80 border-b-2 border-teal-700 text-teal-950 font-bold'
+                : 'hover:bg-slate-50 text-slate-700 border-b-2 border-transparent'
             }`}
           >
-            <div className="text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5 text-teal-800 mb-1">
-              <BarChart3 size={14} className="text-teal-700 shrink-0" />
-              <span>2. CAPAIAN (REALIZATION)</span>
+            <div className="text-sm font-bold flex items-center gap-1.5 text-teal-800 mb-0.5">
+              <BarChart3 size={15} className="text-teal-600 shrink-0" />
+              <span>2. Capaian (Realisasi)</span>
             </div>
-            <p className="text-[10px] text-slate-600 font-normal">
+            <p className="text-xs text-slate-500 font-normal">
               Laporan Fisik Bulanan, Capaian Triwulan, Laporan OPD.
             </p>
           </button>
@@ -120,17 +122,17 @@ export const UploadDropzone: React.FC<UploadDropzoneProps> = ({ onUploadSuccess 
               setDocType('GENERAL_REFERENCE');
               setCategory('Referensi Umum & Kliping');
             }}
-            className={`p-3 border text-left rounded-none transition-colors ${
+            className={`p-3 text-left transition-all cursor-pointer ${
               docType === 'GENERAL_REFERENCE'
-                ? 'bg-teal-50 border-teal-700 text-teal-950 font-bold shadow-xs'
-                : 'bg-slate-50 hover:bg-slate-100 border-slate-300 text-slate-700'
+                ? 'bg-teal-50/80 border-b-2 border-teal-700 text-teal-950 font-bold'
+                : 'hover:bg-slate-50 text-slate-700 border-b-2 border-transparent'
             }`}
           >
-            <div className="text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5 text-teal-800 mb-1">
-              <Newspaper size={14} className="text-teal-700 shrink-0" />
-              <span>3. UMUM / REFERENSI</span>
+            <div className="text-sm font-bold flex items-center gap-1.5 text-teal-800 mb-0.5">
+              <Newspaper size={15} className="text-teal-600 shrink-0" />
+              <span>3. Umum / Referensi</span>
             </div>
-            <p className="text-[10px] text-slate-600 font-normal">
+            <p className="text-xs text-slate-500 font-normal">
               Berita, Regulasi/Inpres, Kliping Media, Artikel Riset.
             </p>
           </button>
@@ -143,7 +145,7 @@ export const UploadDropzone: React.FC<UploadDropzoneProps> = ({ onUploadSuccess 
           onDragOver={(e) => e.preventDefault()}
           onDrop={handleDrop}
           onClick={() => fileInputRef.current?.click()}
-          className="border-2 border-dashed border-slate-300 hover:border-teal-600 bg-slate-50 p-8 text-center cursor-pointer transition-colors rounded-none flex flex-col items-center justify-center gap-2"
+          className="border border-dashed border-slate-300 hover:border-teal-600 bg-slate-50/50 p-6 text-center cursor-pointer transition-colors rounded-none flex flex-col items-center justify-center gap-2"
         >
           <input 
             type="file" 
@@ -152,7 +154,7 @@ export const UploadDropzone: React.FC<UploadDropzoneProps> = ({ onUploadSuccess 
             accept=".pdf,.docx,.txt"
             className="hidden" 
           />
-          <UploadCloud size={36} className="text-teal-600 mb-1" />
+          <UploadCloud size={32} className="text-teal-600 mb-1" />
           {file ? (
             <div className="flex items-center gap-2 text-slate-800 font-medium text-sm">
               <FileText size={16} className="text-teal-600" />
@@ -173,7 +175,7 @@ export const UploadDropzone: React.FC<UploadDropzoneProps> = ({ onUploadSuccess 
         {/* Form Inputs */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block font-roboto text-xs font-semibold text-slate-600 mb-1 uppercase tracking-wider">
+            <label className="block font-roboto text-sm font-bold text-slate-800 mb-1.5">
               Judul Dokumen / Laporan
             </label>
             <input 
@@ -182,12 +184,12 @@ export const UploadDropzone: React.FC<UploadDropzoneProps> = ({ onUploadSuccess 
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Contoh: RPJMD Kabupaten Mimika 2026"
               required
-              className="w-full bg-white border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:border-teal-600 rounded-none shadow-xs"
+              className="w-full bg-white border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:border-teal-600 rounded-none shadow-2xs"
             />
           </div>
           <div>
-            <label className="block font-roboto text-xs font-semibold text-slate-600 mb-1 uppercase tracking-wider">
-              Kategori Dokumen (Terkunci Sesuai Klasifikasi)
+            <label className="block font-roboto text-sm font-bold text-slate-800 mb-1.5">
+              Kategori Dokumen (Sesuai Klasifikasi)
             </label>
             <select 
               value={category} 
@@ -202,14 +204,15 @@ export const UploadDropzone: React.FC<UploadDropzoneProps> = ({ onUploadSuccess 
                   setDocType('GENERAL_REFERENCE');
                 }
               }}
-              className="w-full bg-slate-50 border border-slate-300 px-3 py-2 text-sm text-slate-900 font-bold focus:outline-none focus:border-teal-600 rounded-none shadow-xs"
+              className="w-full bg-slate-50 border border-slate-300 px-3 py-2 text-sm text-slate-900 font-medium focus:outline-none focus:border-teal-600 rounded-none shadow-2xs"
             >
-              <option value="Perencanaan & Baseline Target">Perencanaan & Baseline Target (BASELINE)</option>
-              <option value="Laporan Realisasi Capaian">Laporan Realisasi Capaian (REALIZATION)</option>
-              <option value="Referensi Umum & Kliping">Referensi Umum & Kliping (GENERAL_REFERENCE)</option>
+              <option value="Perencanaan & Baseline Target">Perencanaan &amp; Baseline Target (Baseline)</option>
+              <option value="Laporan Realisasi Capaian">Laporan Realisasi Capaian (Realisasi)</option>
+              <option value="Referensi Umum & Kliping">Referensi Umum &amp; Kliping (Umum)</option>
             </select>
           </div>
         </div>
+
 
         {/* Submit Action */}
         <div className="flex justify-end pt-2">

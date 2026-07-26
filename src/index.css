@@ -2,27 +2,122 @@
 
 :root {
   /* Skema Warna High-Contrast Executive Palette */
-  --color-bg-base: #f1f5f9;        /* Slate 100 - Latar Belakang Kontras Tinggi */
-  --color-bg-surface: #ffffff;     /* Pure White Card */
-  --color-border: #cbd5e1;         /* Slate 300 - Garis Batas Jelas & Tegas */
-  --color-text-main: #0f172a;      /* Slate 900 - Teks Hitam Kontras Tinggi */
-  --color-text-muted: #475569;     /* Slate 600 - Teks Sekunder Tegas */
-  --color-accent-teal: #0d9488;    /* Vibrant Teal */
-  --color-accent-blue: #2563eb;    /* Vibrant Blue */
-  --color-accent-indigo: #4f46e5;  /* Deep Indigo */
-  
+  --color-bg-base: #f1f5f9;
+  /* Slate 100 - Latar Belakang Kontras Tinggi */
+  --color-bg-surface: #ffffff;
+  /* Pure White Card */
+  --color-border: #cbd5e1;
+  /* Slate 300 - Garis Batas Jelas & Tegas */
+  --color-text-main: #0f172a;
+  /* Slate 900 - Teks Hitam Kontras Tinggi */
+  --color-text-muted: #475569;
+  /* Slate 600 - Teks Sekunder Tegas */
+  --color-accent-teal: #0d9488;
+  /* Vibrant Teal */
+  --color-accent-blue: #2563eb;
+  /* Vibrant Blue */
+  --color-accent-indigo: #4f46e5;
+  /* Deep Indigo */
+
   /* Aturan Sudut Tegas Enterprise */
   --radius-none: 0px;
 }
 
-/* Enforsemen Global Rounded-None & Font Roboto */
+/* 1. ENFORSEMEN GLOBAL ROUNDED-NONE & FONT ROBOTO */
+/* Menjamin kepatuhan total terhadap tata letak bersudut siku tajam di seluruh elemen UI */
 * {
   border-radius: var(--radius-none) !important;
   font-family: 'Roboto', sans-serif;
   box-sizing: border-box;
 }
 
-/* Leaflet UI Exception — restore natural border-radius so markers & controls render correctly */
+/* Eksplisit reset untuk mencegah pustaka eksternal merusak aturan rounded-none */
+button,
+input,
+select,
+textarea,
+div,
+span,
+table,
+th,
+td,
+tr,
+thead,
+tbody,
+a,
+section,
+header,
+footer,
+aside,
+main,
+dialog {
+  border-radius: 0px !important;
+}
+
+/* 2. PENONAKTIFAN BROWSER-DEFAULT FOCUS OUTLINES & DOUBLE BORDERS */
+/* Menghilangkan visual ganda atau outline kotak bawaan browser saat elemen difokuskan */
+input:focus,
+select:focus,
+textarea:focus,
+button:focus,
+[contenteditable="true"]:focus {
+  outline: none !important;
+  box-shadow: none !important;
+  /* Mengganti outline kaku browser dengan penegasan warna border datar */
+  border-color: var(--color-accent-teal) !important;
+}
+
+body {
+  background-color: var(--color-bg-base);
+  color: var(--color-text-main);
+  margin: 0;
+  padding: 0;
+  font-size: 0.875rem;
+  /* 14px Standard Enterprise Body */
+  line-height: 1.5;
+}
+
+/* Hirarki Tipografi Berani & Kontras Tinggi */
+h1,
+.text-h1 {
+  font-size: 1.5rem;
+  /* 24px */
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.025em;
+  color: #0f172a;
+}
+
+h2,
+.text-h2 {
+  font-size: 1.25rem;
+  /* 20px */
+  font-weight: 700;
+  line-height: 1.3;
+  color: #0f172a;
+}
+
+h3,
+.text-h3 {
+  font-size: 1rem;
+  /* 16px */
+  font-weight: 600;
+  line-height: 1.4;
+  color: #1e293b;
+}
+
+p,
+.text-body {
+  font-size: 0.875rem;
+  /* 14px */
+  font-weight: 400;
+  line-height: 1.6;
+  text-align: left;
+  color: #334155;
+}
+
+/* 3. EXCEPTION: LEAFLET UI ONLY */
+/* Pengecualian khusus Leaflet untuk memastikan penanda peta merender koordinat lingkaran dengan benar */
 .leaflet-marker-icon,
 .leaflet-marker-shadow,
 .leaflet-div-icon,
@@ -33,12 +128,13 @@
 .leaflet-control a {
   border-radius: unset !important;
 }
-/* Custom circular dot markers */
+
+/* Menjaga penanda titik geospasial lingkaran murni */
 .leaflet-marker-icon div {
   border-radius: 50% !important;
 }
 
-/* Remove focus bounding box / rectangle outline when clicking Leaflet map paths or SVGs */
+/* Menghilangkan kotak fokus kaku Leaflet saat mengklik jalur interaktif peta */
 .leaflet-container *:focus,
 .leaflet-container path:focus,
 .leaflet-container svg:focus,
@@ -51,49 +147,13 @@ path.leaflet-interactive:focus-visible {
   box-shadow: none !important;
 }
 
-body {
-  background-color: var(--color-bg-base);
-  color: var(--color-text-main);
-  margin: 0;
-  padding: 0;
-  font-size: 0.875rem; /* 14px Standard Enterprise Body */
-  line-height: 1.5;
-}
-
-/* Hirarki Tipografi Berani & Kontras Tinggi */
-h1, .text-h1 {
-  font-size: 1.5rem;     /* 24px */
-  font-weight: 700;
-  line-height: 1.25;
-  letter-spacing: -0.025em;
-  color: #0f172a;
-}
-
-h2, .text-h2 {
-  font-size: 1.25rem;    /* 20px */
-  font-weight: 700;
-  line-height: 1.3;
-  color: #0f172a;
-}
-
-h3, .text-h3 {
-  font-size: 1rem;       /* 16px */
-  font-weight: 600;
-  line-height: 1.4;
-  color: #1e293b;
-}
-
-p, .text-body {
-  font-size: 0.875rem;   /* 14px */
-  font-weight: 400;
-  line-height: 1.6;
-  text-align: left;
-  color: #334155;
-}
-
-/* Print & PDF Export Rules */
+/* 4. PRINT & PDF EXPORT RULES */
 @media print {
-  aside, header, button, .no-print {
+
+  aside,
+  header,
+  button,
+  .no-print {
     display: none !important;
   }
 
@@ -110,7 +170,11 @@ p, .text-body {
     padding: 0 !important;
   }
 
-  .shadow-xs, .shadow-sm, .shadow-md, .shadow-lg, .shadow-xl {
+  .shadow-xs,
+  .shadow-sm,
+  .shadow-md,
+  .shadow-lg,
+  .shadow-xl {
     box-shadow: none !important;
   }
 

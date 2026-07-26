@@ -24,8 +24,12 @@ export const AppShell: React.FC<AppShellProps> = ({
         onLogout={onLogout}
       />
 
-      {/* Main Full-Width Content (Flush edge-to-edge, maximum width) */}
-      <main className="flex-1 w-full px-4 lg:px-6 py-4 overflow-y-auto">
+      {/* 
+        Main Full-Width Content (Flush edge-to-edge, maximum width)
+        Mengeliminasi padding bawaan (px-4 lg:px-6 py-4) menjadi p-0 
+        agar seluruh elemen anak menyatu secara solid dalam satu kesatuan grid.
+      */}
+      <main className="flex-1 w-full p-0 overflow-y-auto flex flex-col">
         {children}
       </main>
     </div>

@@ -257,18 +257,19 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
         </div>
       )}
 
-      {/* ===================== MULTI-DOCUMENT SELECTOR HUB ===================== */}
-      <div className="bg-white border border-slate-300 p-6 rounded-none shadow-xs space-y-4">
+      {/* ===================== MULTI-DOCUMENT SELECTOR HUB (FLAT & UN-NESTED) ===================== */}
+      <div className="bg-white border border-slate-200 p-6 rounded-none shadow-xs space-y-4 font-roboto">
         <div className="flex items-center justify-between border-b border-slate-200 pb-3">
           <div className="flex items-center gap-2">
             <BarChart3 size={18} className="text-teal-700 shrink-0" />
-            <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-              Pilih Dokumen Acuan yang Akan Dianalisis:
+            <h2 className="text-sm font-bold text-slate-900 tracking-wide">
+              Pilih Dokumen Acuan yang Akan Dianalisis
             </h2>
           </div>
-          <span className="text-[11px] font-bold text-teal-800 bg-teal-50 border border-teal-200 px-2 py-0.5 rounded-none">
+          <span className="text-xs font-bold text-teal-800 bg-teal-50 px-2.5 py-0.5 rounded-none">
             {selectedDocIds.length} Dokumen Terpilih
           </span>
+
         </div>
 
         {isLoadingDocs ? (
@@ -277,32 +278,32 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
             <span>Memuat daftar dokumen dari database...</span>
           </div>
         ) : documents.length === 0 ? (
-          <div className="p-6 bg-slate-50 border border-slate-300 text-center space-y-2">
-            <AlertCircle size={28} className="mx-auto text-slate-400" />
-            <p className="text-xs font-bold text-slate-700">
+          <div className="p-6 bg-slate-50 border border-slate-200 text-center space-y-2">
+            <AlertCircle size={24} className="mx-auto text-slate-400" />
+            <p className="text-xs font-semibold text-slate-700">
               Belum ada dokumen diunggah di Knowledge Hub.
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Group 1: BASELINE */}
-            <div className="bg-slate-50 border border-slate-300 p-4 space-y-3">
-              <div className="flex items-center justify-between border-b border-slate-200 pb-2">
-                <span className="text-xs font-bold text-teal-900 uppercase tracking-wider flex items-center gap-1.5">
-                  <Target size={14} className="text-teal-700 shrink-0" />
+          <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-slate-200 border-y border-slate-200 py-2">
+            {/* Group 1: Baseline */}
+            <div className="p-3 space-y-2.5">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                <span className="text-xs font-semibold text-slate-800 flex items-center gap-1.5">
+                  <Target size={14} className="text-teal-600 shrink-0" />
                   1. Target (Baseline)
                 </span>
                 <button
                   type="button"
                   onClick={() => selectAllCategoryDocs('BASELINE')}
-                  className="text-[10px] font-bold text-teal-700 hover:underline"
+                  className="text-[11px] font-medium text-teal-700 hover:underline cursor-pointer"
                 >
                   Pilih Semua
                 </button>
               </div>
-              <div className="space-y-2 max-h-48 overflow-y-auto">
+              <div className="space-y-1 max-h-52 overflow-y-auto pr-1">
                 {baselineDocs.length === 0 ? (
-                  <p className="text-[11px] text-slate-500 italic">Tidak ada dokumen Baseline.</p>
+                  <p className="text-xs text-slate-400 italic py-1">Tidak ada dokumen Target Baseline.</p>
                 ) : (
                   baselineDocs.map((doc) => {
                     const isSelected = selectedDocIds.includes(doc.id);
@@ -310,11 +311,11 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
                       <div
                         key={doc.id}
                         onClick={() => toggleDocumentSelection(doc.id)}
-                        className={`p-2 border text-xs cursor-pointer flex items-start gap-2 rounded-none transition-colors ${
-                          isSelected ? 'bg-teal-50 border-teal-600 font-semibold text-slate-900' : 'bg-white border-slate-300 text-slate-600'
+                        className={`p-2 text-xs cursor-pointer flex items-start gap-2 transition-colors ${
+                          isSelected ? 'bg-teal-50/80 font-semibold text-slate-900' : 'hover:bg-slate-50 text-slate-600'
                         }`}
                       >
-                        {isSelected ? <CheckSquare size={14} className="text-teal-700 shrink-0 mt-0.5" /> : <Square size={14} className="text-slate-400 shrink-0 mt-0.5" />}
+                        {isSelected ? <CheckSquare size={15} className="text-teal-700 shrink-0 mt-0.5" /> : <Square size={15} className="text-slate-400 shrink-0 mt-0.5" />}
                         <span className="truncate">{doc.title}</span>
                       </div>
                     );
@@ -323,24 +324,24 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
               </div>
             </div>
 
-            {/* Group 2: REALIZATION */}
-            <div className="bg-slate-50 border border-slate-300 p-4 space-y-3">
-              <div className="flex items-center justify-between border-b border-slate-200 pb-2">
-                <span className="text-xs font-bold text-teal-900 uppercase tracking-wider flex items-center gap-1.5">
-                  <BarChart3 size={14} className="text-teal-700 shrink-0" />
-                  2. Capaian (Realisasi)
+            {/* Group 2: Realisasi */}
+            <div className="p-3 space-y-2.5">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                <span className="text-xs font-semibold text-slate-800 flex items-center gap-1.5">
+                  <BarChart3 size={14} className="text-teal-600 shrink-0" />
+                  2. Realisasi (Capaian)
                 </span>
                 <button
                   type="button"
                   onClick={() => selectAllCategoryDocs('REALIZATION')}
-                  className="text-[10px] font-bold text-teal-700 hover:underline"
+                  className="text-[11px] font-medium text-teal-700 hover:underline cursor-pointer"
                 >
                   Pilih Semua
                 </button>
               </div>
-              <div className="space-y-2 max-h-48 overflow-y-auto">
+              <div className="space-y-1 max-h-52 overflow-y-auto pr-1">
                 {realizationDocs.length === 0 ? (
-                  <p className="text-[11px] text-slate-500 italic">Tidak ada dokumen Realisasi.</p>
+                  <p className="text-xs text-slate-400 italic py-1">Tidak ada dokumen Realisasi.</p>
                 ) : (
                   realizationDocs.map((doc) => {
                     const isSelected = selectedDocIds.includes(doc.id);
@@ -348,11 +349,11 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
                       <div
                         key={doc.id}
                         onClick={() => toggleDocumentSelection(doc.id)}
-                        className={`p-2 border text-xs cursor-pointer flex items-start gap-2 rounded-none transition-colors ${
-                          isSelected ? 'bg-teal-50 border-teal-600 font-semibold text-slate-900' : 'bg-white border-slate-300 text-slate-600'
+                        className={`p-2 text-xs cursor-pointer flex items-start gap-2 transition-colors ${
+                          isSelected ? 'bg-teal-50/80 font-semibold text-slate-900' : 'hover:bg-slate-50 text-slate-600'
                         }`}
                       >
-                        {isSelected ? <CheckSquare size={14} className="text-teal-700 shrink-0 mt-0.5" /> : <Square size={14} className="text-slate-400 shrink-0 mt-0.5" />}
+                        {isSelected ? <CheckSquare size={15} className="text-teal-700 shrink-0 mt-0.5" /> : <Square size={15} className="text-slate-400 shrink-0 mt-0.5" />}
                         <span className="truncate">{doc.title}</span>
                       </div>
                     );
@@ -361,24 +362,24 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
               </div>
             </div>
 
-            {/* Group 3: GENERAL REFERENCE */}
-            <div className="bg-slate-50 border border-slate-300 p-4 space-y-3">
-              <div className="flex items-center justify-between border-b border-slate-200 pb-2">
-                <span className="text-xs font-bold text-teal-900 uppercase tracking-wider flex items-center gap-1.5">
-                  <Newspaper size={14} className="text-teal-700 shrink-0" />
-                  3. Referensi Umum
+            {/* Group 3: Referensi Umum */}
+            <div className="p-3 space-y-2.5">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                <span className="text-xs font-semibold text-slate-800 flex items-center gap-1.5">
+                  <Newspaper size={14} className="text-teal-600 shrink-0" />
+                  3. Referensi (Umum)
                 </span>
                 <button
                   type="button"
                   onClick={() => selectAllCategoryDocs('GENERAL_REFERENCE')}
-                  className="text-[10px] font-bold text-teal-700 hover:underline"
+                  className="text-[11px] font-medium text-teal-700 hover:underline cursor-pointer"
                 >
                   Pilih Semua
                 </button>
               </div>
-              <div className="space-y-2 max-h-48 overflow-y-auto">
+              <div className="space-y-1 max-h-52 overflow-y-auto pr-1">
                 {generalDocs.length === 0 ? (
-                  <p className="text-[11px] text-slate-500 italic">Tidak ada dokumen Referensi Umum.</p>
+                  <p className="text-xs text-slate-400 italic py-1">Tidak ada dokumen Referensi Umum.</p>
                 ) : (
                   generalDocs.map((doc) => {
                     const isSelected = selectedDocIds.includes(doc.id);
@@ -386,11 +387,11 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
                       <div
                         key={doc.id}
                         onClick={() => toggleDocumentSelection(doc.id)}
-                        className={`p-2 border text-xs cursor-pointer flex items-start gap-2 rounded-none transition-colors ${
-                          isSelected ? 'bg-teal-50 border-teal-600 font-semibold text-slate-900' : 'bg-white border-slate-300 text-slate-600'
+                        className={`p-2 text-xs cursor-pointer flex items-start gap-2 transition-colors ${
+                          isSelected ? 'bg-teal-50/80 font-semibold text-slate-900' : 'hover:bg-slate-50 text-slate-600'
                         }`}
                       >
-                        {isSelected ? <CheckSquare size={14} className="text-teal-700 shrink-0 mt-0.5" /> : <Square size={14} className="text-slate-400 shrink-0 mt-0.5" />}
+                        {isSelected ? <CheckSquare size={15} className="text-teal-700 shrink-0 mt-0.5" /> : <Square size={15} className="text-slate-400 shrink-0 mt-0.5" />}
                         <span className="truncate">{doc.title}</span>
                       </div>
                     );

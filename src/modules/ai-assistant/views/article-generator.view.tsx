@@ -386,14 +386,14 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
             </div>
           </div>
 
-          {/* Row 2: Target Length & Tone Options */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-slate-200">
+          {/* Row 2: Target Length & Tone Options (FLAT DIVIDED ROW, NO NESTED BOXES) */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2 border-t border-slate-200">
             {/* Length Selector */}
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase mb-2">
+              <label className="block text-xs font-bold text-slate-700 uppercase mb-2 tracking-wider">
                 Panjang Teks Keluaran Artikel
               </label>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-3 divide-x divide-slate-200 border-y border-slate-200">
                 {[
                   { key: 'SHORT', label: 'Ringkas (~300 Kata)' },
                   { key: 'MEDIUM', label: 'Sedang (~700 Kata)' },
@@ -403,10 +403,10 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
                     key={item.key}
                     type="button"
                     onClick={() => setTargetLength(item.key as any)}
-                    className={`py-2 px-2 text-xs font-bold uppercase border transition-all rounded-none ${
+                    className={`py-2 px-2 text-xs font-bold uppercase transition-all cursor-pointer text-center ${
                       targetLength === item.key
-                        ? 'bg-teal-700 border-teal-800 text-white shadow-2xs'
-                        : 'bg-slate-50 border-slate-300 text-slate-700 hover:bg-slate-100'
+                        ? 'bg-teal-700 text-white font-extrabold'
+                        : 'hover:bg-slate-50 text-slate-700'
                     }`}
                   >
                     {item.label}
@@ -417,19 +417,19 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
 
             {/* Tone Selector */}
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase mb-2">
+              <label className="block text-xs font-bold text-slate-700 uppercase mb-2 tracking-wider">
                 Gaya Bahasa / Tone Publikasi
               </label>
-              <div className="grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-4 divide-x divide-slate-200 border-y border-slate-200">
                 {['solutif', 'kritis', 'akademis', 'populer'].map((t) => (
                   <button
                     key={t}
                     type="button"
                     onClick={() => setTone(t)}
-                    className={`py-2 px-2 text-xs font-bold uppercase border transition-all rounded-none ${
+                    className={`py-2 px-2 text-xs font-bold uppercase transition-all cursor-pointer text-center ${
                       tone === t
-                        ? 'bg-teal-700 border-teal-800 text-white shadow-2xs'
-                        : 'bg-slate-50 border-slate-300 text-slate-700 hover:bg-slate-100'
+                        ? 'bg-teal-700 text-white font-extrabold'
+                        : 'hover:bg-slate-50 text-slate-700'
                     }`}
                   >
                     {t}
@@ -438,6 +438,7 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
               </div>
             </div>
           </div>
+
 
           {/* Submit Action */}
           <div className="flex justify-end pt-2">

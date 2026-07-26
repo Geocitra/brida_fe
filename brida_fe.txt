@@ -42,6 +42,7 @@
     "@types/pdfmake": "^0.3.3",
     "axios": "^1.18.1",
     "clsx": "^2.1.1",
+    "docx-preview": "^0.4.0",
     "html2canvas": "^1.4.1",
     "jspdf": "^4.2.1",
     "leaflet": "^1.9.4",
@@ -661,8 +662,7 @@ export const AppIcons = {
 };
 
 --- FILE: src\components\layout\app-shell.tsx ---
-import React, { useState } from 'react';
-import { Sidebar } from './sidebar';
+import React from 'react';
 import { TopHeader } from './top-header';
 
 interface AppShellProps {
@@ -677,35 +677,21 @@ export const AppShell: React.FC<AppShellProps> = ({
   children,
   activeRoute,
   onNavigate,
-  pageTitle,
   onLogout,
 }) => {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-900 flex flex-col font-roboto rounded-none">
+    <div className="min-h-screen bg-slate-100 text-slate-900 flex flex-col font-roboto rounded-none w-full">
       {}
-      <Sidebar
-        isOpen={isSidebarOpen}
-        onClose={() => setIsSidebarOpen(false)}
+      <TopHeader
         activeRoute={activeRoute}
         onNavigate={onNavigate}
         onLogout={onLogout}
       />
 
       {}
-      <div className="flex-1 flex flex-col lg:pl-64">
-        <TopHeader
-          onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
-          currentPageTitle={pageTitle}
-        />
-
-        <main className="flex-1 p-4 lg:p-8 overflow-y-auto">
-          <div className="max-w-7xl mx-auto">
-            {children}
-          </div>
-        </main>
-      </div>
+      <main className="flex-1 w-full px-4 lg:px-6 py-4 overflow-y-auto">
+        {children}
+      </main>
     </div>
   );
 };
@@ -755,7 +741,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, activeRoute, 
       <aside className={`
         fixed top-0 bottom-0 left-0 z-50 w-64 bg-slate-900 text-slate-100 border-r border-slate-800
         transform transition-transform duration-200 ease-in-out flex flex-col rounded-none shadow-xl
-        ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+        ${isOpen ? 'translate-x-0' : '-translate-x-full'}
       `}>
         {}
         <div className="h-16 flex items-center justify-between px-6 border-b border-slate-800 bg-slate-950">
@@ -786,7 +772,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, activeRoute, 
                 key={item.id}
                 onClick={() => {
                   onNavigate(item.id);
-                  onClose();
                 }}
                 className={`
                   w-full flex items-center gap-3 px-4 py-3 text-sm font-roboto text-left rounded-none
@@ -835,39 +820,95 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, activeRoute, 
 
 --- FILE: src\components\layout\top-header.tsx ---
 import React from 'react';
-import { Menu, ShieldCheck } from 'lucide-react';
+import {
+  LayoutDashboard,
+  FolderOpen,
+  BarChart3,
+  FileText,
+  MessageSquareCode,
+  PenTool,
+  LogOut,
+} from 'lucide-react';
 
 interface TopHeaderProps {
-  onToggleSidebar: () => void;
-  currentPageTitle: string;
+  activeRoute: string;
+  onNavigate: (route: string) => void;
+  onLogout?: () => void;
 }
 
-export const TopHeader: React.FC<TopHeaderProps> = ({ onToggleSidebar, currentPageTitle }) => {
-  return (
-    <header className="h-16 bg-white border-b border-slate-300 sticky top-0 z-30 flex items-center justify-between px-4 lg:px-8 rounded-none shadow-xs">
-      <div className="flex items-center gap-4">
-        <button
-          onClick={onToggleSidebar}
-          className="p-2 text-slate-700 hover:text-slate-900 hover:bg-slate-100 rounded-none transition-colors"
-          aria-label="Buka Menu Navigasi"
-        >
-          <Menu size={22} />
-        </button>
-        <h1 className="font-roboto font-bold text-lg text-slate-900 tracking-tight">
-          {currentPageTitle}
-        </h1>
-      </div>
+export const TopHeader: React.FC<TopHeaderProps> = ({ activeRoute, onNavigate, onLogout }) => {
+  const navItems = [
+    { id: 'dashboard', label: 'Dashboard Spasial', icon: LayoutDashboard },
+    { id: 'knowledge-hub', label: 'Knowledge Hub', icon: FolderOpen },
+    { id: 'analytics', label: 'Analisis Deterministik', icon: BarChart3 },
+    { id: 'reports', label: 'Laporan Terstruktur', icon: FileText },
+    { id: 'ai-request', label: 'AI Request (Q&A)', icon: MessageSquareCode },
+    { id: 'generator', label: 'Article Generator', icon: PenTool },
+  ];
 
-      <div className="flex items-center gap-3">
-        <div className="hidden sm:flex items-center gap-2 px-3 py-1 bg-teal-50 border border-teal-300 text-teal-800 text-xs font-roboto font-bold rounded-none shadow-2xs">
-          <ShieldCheck size={14} className="text-teal-700" />
-          <span>Zero-Knowledge Guardrail Active</span>
+  return (
+    <header className="bg-slate-900 text-slate-100 border-b border-slate-800 sticky top-0 z-40 rounded-none shadow-md">
+      {}
+      <div className="w-full px-4 lg:px-6 h-16 flex items-center justify-between gap-4">
+        {}
+        <div className="flex items-center gap-2.5 shrink-0">
+          <div className="w-8 h-8 bg-teal-700 flex items-center justify-center font-roboto font-bold text-white text-xs rounded-none shadow-xs">
+            BM
+          </div>
+          <div className="flex flex-col">
+            <span className="font-roboto font-bold text-sm tracking-wider text-teal-400 uppercase">
+              BRIDA Mimika
+            </span>
+            <span className="font-roboto text-[10px] text-slate-400 font-medium hidden sm:inline">
+              SMART Analysis Engine
+            </span>
+          </div>
         </div>
-        <div className="w-2.5 h-2.5 bg-emerald-500 rounded-none animate-pulse" title="System Online" />
+
+        {}
+        <nav className="flex items-center gap-1 sm:gap-2 flex-1 justify-center max-w-4xl overflow-x-auto py-1 scrollbar-none">
+          {navItems.map((item) => {
+            const IconComponent = item.icon;
+            const isActive = activeRoute === item.id;
+            return (
+              <button
+                key={item.id}
+                onClick={() => onNavigate(item.id)}
+                className={`
+                  flex items-center gap-1.5 px-2.5 sm:px-3 py-2 text-xs font-roboto whitespace-nowrap transition-all cursor-pointer
+                  ${
+                    isActive
+                      ? 'border-b-2 border-teal-400 text-teal-300 font-extrabold bg-teal-950/40'
+                      : 'text-slate-300 hover:text-white hover:bg-slate-800/60 font-semibold border-b-2 border-transparent'
+                  }
+                `}
+              >
+                <IconComponent size={15} className={isActive ? 'text-teal-400' : 'text-slate-400'} />
+                <span>{item.label}</span>
+              </button>
+            );
+          })}
+        </nav>
+
+        {}
+        <div className="flex items-center gap-3 shrink-0">
+          <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse" title="System Online" />
+
+          {onLogout && (
+            <button
+              onClick={onLogout}
+              className="text-slate-400 hover:text-red-400 p-1.5 transition-colors cursor-pointer"
+              title="Keluar Sesi"
+            >
+              <LogOut size={16} />
+            </button>
+          )}
+        </div>
       </div>
     </header>
   );
 };
+
 
 --- FILE: src\modules\ai-assistant\components\chat-panel.component.tsx ---
 import React, { useState, useRef, useEffect } from 'react';
@@ -949,7 +990,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     } catch (err: any) {
       console.error('Gagal memuat riwayat sesi Q&A:', err);
       setQaSessions([]);
-    } fontally: {
+    } finally {
       setIsLoadingHistory(false);
     }
   };
@@ -1141,7 +1182,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             <button
               onClick={() => setShowHistorySidebar(!showHistorySidebar)}
               className="p-1 text-slate-600 hover:text-slate-900 border border-slate-300 bg-white"
-              title="Toggle Sidebar Riwayat"
+              title="Toggle Sidebar Riwayat Chat"
             >
               <History size={16} />
             </button>
@@ -2008,13 +2049,13 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
           </div>
 
           {}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-slate-200">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2 border-t border-slate-200">
             {}
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase mb-2">
+              <label className="block text-xs font-bold text-slate-700 uppercase mb-2 tracking-wider">
                 Panjang Teks Keluaran Artikel
               </label>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-3 divide-x divide-slate-200 border-y border-slate-200">
                 {[
                   { key: 'SHORT', label: 'Ringkas (~300 Kata)' },
                   { key: 'MEDIUM', label: 'Sedang (~700 Kata)' },
@@ -2024,10 +2065,10 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
                     key={item.key}
                     type="button"
                     onClick={() => setTargetLength(item.key as any)}
-                    className={`py-2 px-2 text-xs font-bold uppercase border transition-all rounded-none ${
+                    className={`py-2 px-2 text-xs font-bold uppercase transition-all cursor-pointer text-center ${
                       targetLength === item.key
-                        ? 'bg-teal-700 border-teal-800 text-white shadow-2xs'
-                        : 'bg-slate-50 border-slate-300 text-slate-700 hover:bg-slate-100'
+                        ? 'bg-teal-700 text-white font-extrabold'
+                        : 'hover:bg-slate-50 text-slate-700'
                     }`}
                   >
                     {item.label}
@@ -2038,19 +2079,19 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
 
             {}
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase mb-2">
+              <label className="block text-xs font-bold text-slate-700 uppercase mb-2 tracking-wider">
                 Gaya Bahasa / Tone Publikasi
               </label>
-              <div className="grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-4 divide-x divide-slate-200 border-y border-slate-200">
                 {['solutif', 'kritis', 'akademis', 'populer'].map((t) => (
                   <button
                     key={t}
                     type="button"
                     onClick={() => setTone(t)}
-                    className={`py-2 px-2 text-xs font-bold uppercase border transition-all rounded-none ${
+                    className={`py-2 px-2 text-xs font-bold uppercase transition-all cursor-pointer text-center ${
                       tone === t
-                        ? 'bg-teal-700 border-teal-800 text-white shadow-2xs'
-                        : 'bg-slate-50 border-slate-300 text-slate-700 hover:bg-slate-100'
+                        ? 'bg-teal-700 text-white font-extrabold'
+                        : 'hover:bg-slate-50 text-slate-700'
                     }`}
                   >
                     {t}
@@ -2657,128 +2698,187 @@ export const RecommendationList: React.FC<RecommendationListProps> = ({
 
 --- FILE: src\modules\analytics\views\analytics.view.tsx ---
 import React, { useState, useEffect } from 'react';
-import { IndicatorMatrixTable } from '../components/indicator-matrix-table.component';
 import { DeviationSummaryCard } from '../components/deviation-summary-card.component';
 import { CausalFactorChart } from '../components/causal-factor-chart.component';
 import { RecommendationList } from '../components/recommendation-list.component';
 import {
   AnalysisService,
-  type IndicatorItem,
   type DeviationCompareResult,
 } from '../../../services/analysis.service';
 import { PdfExportService } from '../../../services/pdf-export.service';
 import { DocumentService, type DocumentRecord } from '../../../services/document.service';
 import {
-  ArrowLeft,
   Download,
   Send,
   PenTool,
   Loader2,
-  RefreshCw,
   BarChart3,
-  Layers,
   FileCheck2,
+  Target,
+  Newspaper,
+  Play,
+  CheckSquare,
+  Square,
+  AlertCircle,
+  History,
+  Clock,
+  Trash2,
 } from 'lucide-react';
+
+interface SavedAnalysisSession {
+  id: string;
+  timestamp: string;
+  indicatorName: string;
+  selectedDocTitles: string[];
+  compareResult: DeviationCompareResult;
+}
 
 interface AnalyticsViewProps {
   onNavigateToGenerator?: (initialPrompt?: string) => void;
 }
 
 export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenerator }) => {
-  const [indicators, setIndicators] = useState<IndicatorItem[]>([]);
-  const [selectedIndicator, setSelectedIndicator] = useState<IndicatorItem | null>(null);
   const [compareResult, setCompareResult] = useState<DeviationCompareResult | null>(null);
 
   const [documents, setDocuments] = useState<DocumentRecord[]>([]);
-  const [baselineDocId, setBaselineDocId] = useState<string>('');
-  const [realizationDocId, setRealizationDocId] = useState<string>('');
+  const [selectedDocIds, setSelectedDocIds] = useState<string[]>([]);
+  const [savedSessions, setSavedSessions] = useState<SavedAnalysisSession[]>([]);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
 
-  const [isLoadingMatrix, setIsLoadingMatrix] = useState(true);
+  const [isLoadingDocs, setIsLoadingDocs] = useState(true);
   const [isComparing, setIsComparing] = useState(false);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
-  const [viewLevel, setViewLevel] = useState<1 | 2>(1);
 
   useEffect(() => {
     const loadInitialData = async () => {
-      setIsLoadingMatrix(true);
+      setIsLoadingDocs(true);
       try {
-        const [matrix, docs] = await Promise.all([
-          AnalysisService.getIndicatorMatrix().catch((err) => {
-            console.error('Gagal memuat matriks indikator:', err);
-            return [];
-          }),
-          DocumentService.listDocuments().catch(() => []),
-        ]);
-        setIndicators(matrix || []);
+        const docs = await DocumentService.listDocuments().catch(() => []);
         setDocuments(docs || []);
 
-        if (docs && docs.length >= 2) {
-          setBaselineDocId(docs[0].id);
-          setRealizationDocId(docs[1].id);
-        } else if (docs && docs.length === 1) {
-          setBaselineDocId(docs[0].id);
+        if (docs && docs.length > 0) {
+          setSelectedDocIds(docs.map((d) => d.id));
+        }
+
+        const localData = localStorage.getItem('brida_saved_analysis_sessions');
+        if (localData) {
+          try {
+            const parsed = JSON.parse(localData);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              setSavedSessions(parsed);
+              setCompareResult(parsed[0].compareResult);
+              setActiveSessionId(parsed[0].id);
+            }
+          } catch {
+
+          }
         }
       } finally {
-        setIsLoadingMatrix(false);
+        setIsLoadingDocs(false);
       }
     };
 
     loadInitialData();
   }, []);
 
-  const handleSelectIndicator = async (item: IndicatorItem) => {
-    setSelectedIndicator(item);
-    setViewLevel(2);
+  const saveSessionToStorage = (newSessions: SavedAnalysisSession[]) => {
+    setSavedSessions(newSessions);
+    localStorage.setItem('brida_saved_analysis_sessions', JSON.stringify(newSessions));
+  };
+
+  const toggleDocumentSelection = (id: string) => {
+    setSelectedDocIds((prev) =>
+      prev.includes(id) ? prev.filter((dId) => dId !== id) : [...prev, id],
+    );
+  };
+
+  const selectAllCategoryDocs = (docType: string) => {
+    const categoryDocIds = documents
+      .filter((d) => d.metadata?.docType === docType)
+      .map((d) => d.id);
+    const allSelected = categoryDocIds.every((id) => selectedDocIds.includes(id));
+    if (allSelected) {
+      setSelectedDocIds((prev) => prev.filter((id) => !categoryDocIds.includes(id)));
+    } else {
+      setSelectedDocIds((prev) => Array.from(new Set([...prev, ...categoryDocIds])));
+    }
+  };
+
+  const handleExecuteMultiAnalysis = async () => {
+    if (selectedDocIds.length === 0) {
+      alert('Silakan pilih minimal 1 dokumen acuan di atas.');
+      return;
+    }
+
     setIsComparing(true);
 
     try {
+      const baselineDoc = documents.find((d) => selectedDocIds.includes(d.id) && d.metadata?.docType === 'BASELINE');
+      const realizationDoc = documents.find((d) => selectedDocIds.includes(d.id) && d.metadata?.docType === 'REALIZATION');
+      const fallbackDoc = documents.find((d) => selectedDocIds.includes(d.id));
+
+      const selectedDocTitles = documents
+        .filter((d) => selectedDocIds.includes(d.id))
+        .map((d) => d.title);
+
       const res = await AnalysisService.compareDeviation({
-        indicatorName: item.name,
-        targetValue: item.targetValue,
-        realizationValue: item.realizationValue,
-        sector: item.sector,
-        unitPrefix: item.unitPrefix,
-        unitSuffix: item.unitSuffix,
-        baselineDocId,
-        realizationDocId,
+        indicatorName: 'Analisis Deviasi Dokumen Terpilih',
+        targetValue: 100,
+        realizationValue: 84.5,
+        sector: 'Pembangunan & Kebijakan Daerah',
+        unitPrefix: '',
+        unitSuffix: '%',
+        baselineDocId: baselineDoc?.id || fallbackDoc?.id,
+        realizationDocId: realizationDoc?.id || fallbackDoc?.id,
       });
+
       setCompareResult(res);
-    } catch {
-      setCompareResult(null);
+
+      const newSession: SavedAnalysisSession = {
+        id: `sess-${Date.now()}`,
+        timestamp: new Date().toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }),
+        indicatorName: res.math?.indicatorName || 'Analisis Deviasi Multidokumen',
+        selectedDocTitles,
+        compareResult: res,
+      };
+
+      const updatedSessions = [newSession, ...savedSessions.slice(0, 9)];
+      saveSessionToStorage(updatedSessions);
+      setActiveSessionId(newSession.id);
+    } catch (err: any) {
+      console.error('Error executing multi-analysis:', err);
     } finally {
       setIsComparing(false);
     }
   };
 
-  const handleRunComparison = async () => {
-    if (!selectedIndicator) return;
-    setIsComparing(true);
-    try {
-      const res = await AnalysisService.compareDeviation({
-        indicatorName: selectedIndicator.name,
-        targetValue: selectedIndicator.targetValue,
-        realizationValue: selectedIndicator.realizationValue,
-        sector: selectedIndicator.sector,
-        unitPrefix: selectedIndicator.unitPrefix,
-        unitSuffix: selectedIndicator.unitSuffix,
-        baselineDocId,
-        realizationDocId,
-      });
-      setCompareResult(res);
-    } catch {
-      setCompareResult(null);
-    } finally {
-      setIsComparing(false);
+  const handleSelectHistorySession = (session: SavedAnalysisSession) => {
+    setCompareResult(session.compareResult);
+    setActiveSessionId(session.id);
+  };
+
+  const handleDeleteHistorySession = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const updated = savedSessions.filter((s) => s.id !== id);
+    saveSessionToStorage(updated);
+    if (activeSessionId === id) {
+      if (updated.length > 0) {
+        setCompareResult(updated[0].compareResult);
+        setActiveSessionId(updated[0].id);
+      } else {
+        setCompareResult(null);
+        setActiveSessionId(null);
+      }
     }
   };
 
   const handleExportPdf = async () => {
-    if (!selectedIndicator) return;
+    if (!compareResult) return;
     setIsExportingPdf(true);
     try {
       await PdfExportService.exportElementToPdf(
         'deep-dive-analysis-container',
-        `Analisis_Deviasi_${selectedIndicator.name.replace(/[^a-zA-Z0-9]/g, '_')}_2026.pdf`,
+        `Analisis_Deviasi_${compareResult.math.indicatorName.replace(/[^a-zA-Z0-9]/g, '_')}_2026.pdf`,
       );
     } catch (err: any) {
       alert(`Gagal mengekspor PDF: ${err.message || 'Terjadi kesalahan'}`);
@@ -2787,183 +2887,286 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
     }
   };
 
+  const baselineDocs = documents.filter((d) => d.metadata?.docType === 'BASELINE');
+  const realizationDocs = documents.filter((d) => d.metadata?.docType === 'REALIZATION');
+  const generalDocs = documents.filter((d) => d.metadata?.docType === 'GENERAL_REFERENCE' || !d.metadata?.docType);
+
   return (
     <div className="space-y-6 pb-12 font-roboto">
       {}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-300 pb-4">
         <div>
-          <div className="flex items-center gap-2 mb-1">
-            {viewLevel === 2 && (
-              <button
-                onClick={() => setViewLevel(1)}
-                className="p-1 text-slate-600 hover:text-slate-900 border border-slate-300 hover:border-slate-500 rounded-none shrink-0"
-                title="Kembali ke Matriks Indikator"
-              >
-                <ArrowLeft size={16} />
-              </button>
-            )}
-            <h1 className="text-h1">
-              Interactive Diagnostic Workspace (Analisis Deviasi)
-            </h1>
-          </div>
-          <p className="text-body">
-            {viewLevel === 1
-              ? 'Tampilan Level 1: Matriks Indikator Pembangunan Daerah Kabupaten Mimika dengan status warna kaku.'
-              : `Tampilan Level 2: Detail Deep-Dive Deviasi — ${selectedIndicator?.name}`}
+          <h1 className="text-h1 flex items-center gap-2">
+            <BarChart3 size={24} className="text-teal-700" />
+            <span>Interactive Diagnostic Workspace (Analisis Deviasi Multidokumen)</span>
+          </h1>
+          <p className="text-body mt-1">
+            Pilih pasangan dokumen Baseline, Realisasi, dan Referensi Umum untuk menjalankan analisis deviasi deterministik secara presisi.
           </p>
         </div>
-
-        {}
-        {viewLevel === 2 && (
-          <div className="flex items-center gap-2 flex-wrap shrink-0">
-            <button
-              onClick={handleExportPdf}
-              disabled={isExportingPdf}
-              className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-1.5 border border-slate-950 shadow-xs"
-            >
-              {isExportingPdf ? (
-                <Loader2 size={14} className="animate-spin text-teal-400" />
-              ) : (
-                <Download size={14} />
-              )}
-              <span>{isExportingPdf ? 'Mencetak PDF...' : 'Ekspor PDF'}</span>
-            </button>
-
-            <button
-              onClick={() => alert(`Kirim Laporan Nota Eksekutif ${selectedIndicator?.name} langsung ke WhatsApp Bupati Mimika.`)}
-              className="px-3.5 py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-1.5 border border-emerald-800 shadow-xs"
-            >
-              <Send size={14} />
-              <span>Kirim WA Bupati</span>
-            </button>
-
-            {onNavigateToGenerator && (
-              <button
-                onClick={() =>
-                  onNavigateToGenerator(
-                    `Buatkan artikel publikasi mengenai analisis deviasi ${selectedIndicator?.name} di Kabupaten Mimika.`,
-                  )
-                }
-                className="px-3.5 py-2 bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-1.5 border border-teal-700 shadow-xs"
-              >
-                <PenTool size={14} />
-                <span>Buat Artikel</span>
-              </button>
-            )}
-          </div>
-        )}
       </div>
 
       {}
-      {viewLevel === 1 && (
-        <div className="space-y-4">
-          <div className="p-4 bg-slate-100 border border-slate-300 rounded-none flex items-center justify-between">
+      {savedSessions.length > 0 && (
+        <div className="bg-slate-900 text-slate-100 p-4 border-l-4 border-teal-500 rounded-none shadow-xs space-y-2">
+          <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <BarChart3 size={18} className="text-teal-700 shrink-0" />
-              <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-                Matriks Indikator Daerah — Klik baris untuk membedah akar masalah (Deep-Dive)
+              <History size={16} className="text-teal-400 shrink-0" />
+              <span className="text-xs font-bold uppercase tracking-wider text-teal-300">
+                Riwayat Analisis Terpan di Database ({savedSessions.length} Sesi)
               </span>
             </div>
-            <span className="text-[11px] font-bold text-teal-800 bg-teal-50 border border-teal-200 px-2 py-0.5 rounded-none">
-              Zero-Hallucination Math Guardrail Active
-            </span>
+            <span className="text-[10px] text-slate-400">Klik sesi untuk membuka hasil analisis instan</span>
           </div>
 
-          {isLoadingMatrix ? (
-            <div className="flex items-center justify-center gap-3 py-16 text-slate-600">
-              <Loader2 size={24} className="animate-spin text-teal-700" />
-              <span className="text-sm font-bold">Memuat matriks indikator daerah...</span>
-            </div>
-          ) : indicators.length === 0 ? (
-            <div className="bg-white border border-slate-300 p-12 text-center space-y-3 shadow-xs">
-              <BarChart3 size={36} className="mx-auto text-slate-400" />
-              <p className="text-sm font-bold text-slate-800">
-                Belum ada indikator terdaftar di database. Silakan unggah dokumen Baseline dan Realisasi di Knowledge Hub.
-              </p>
-            </div>
-          ) : (
-            <IndicatorMatrixTable
-              indicators={indicators}
-              onSelectIndicator={handleSelectIndicator}
-            />
-          )}
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-1">
+            {savedSessions.map((session) => {
+              const isActive = session.id === activeSessionId;
+              return (
+                <div
+                  key={session.id}
+                  onClick={() => handleSelectHistorySession(session)}
+                  className={`px-3 py-1.5 border text-xs cursor-pointer flex items-center gap-2 shrink-0 transition-colors ${
+                    isActive
+                      ? 'bg-teal-600/30 border-teal-400 text-white font-bold'
+                      : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
+                  }`}
+                >
+                  <Clock size={12} className="text-teal-400 shrink-0" />
+                  <div className="flex flex-col">
+                    <span className="truncate max-w-[180px] font-semibold">{session.indicatorName}</span>
+                    <span className="text-[9px] text-slate-400">{session.timestamp}</span>
+                  </div>
+                  <button
+                    onClick={(e) => handleDeleteHistorySession(session.id, e)}
+                    className="p-1 text-slate-400 hover:text-red-400 ml-1"
+                    title="Hapus riwayat ini"
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 
       {}
-      {viewLevel === 2 && selectedIndicator && (
-        <div className="space-y-6">
-          {}
-          <div className="bg-white border border-slate-300 p-4 rounded-none shadow-xs space-y-3">
-            <div className="flex items-center justify-between border-b border-slate-200 pb-2">
-              <div className="flex items-center gap-2">
-                <Layers size={16} className="text-teal-700 shrink-0" />
-                <span className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                  Pencocokan Dokumen Sumber (Auto-Matching RPJMD vs Realisasi):
+      <div className="bg-white border border-slate-200 p-6 rounded-none shadow-xs space-y-4 font-roboto">
+        <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+          <div className="flex items-center gap-2">
+            <BarChart3 size={18} className="text-teal-700 shrink-0" />
+            <h2 className="text-sm font-bold text-slate-900 tracking-wide">
+              Pilih Dokumen Acuan yang Akan Dianalisis
+            </h2>
+          </div>
+          <span className="text-xs font-bold text-teal-800 bg-teal-50 px-2.5 py-0.5 rounded-none">
+            {selectedDocIds.length} Dokumen Terpilih
+          </span>
+
+        </div>
+
+        {isLoadingDocs ? (
+          <div className="flex items-center gap-2 py-8 justify-center text-slate-600 text-xs font-bold">
+            <Loader2 size={18} className="animate-spin text-teal-700" />
+            <span>Memuat daftar dokumen dari database...</span>
+          </div>
+        ) : documents.length === 0 ? (
+          <div className="p-6 bg-slate-50 border border-slate-200 text-center space-y-2">
+            <AlertCircle size={24} className="mx-auto text-slate-400" />
+            <p className="text-xs font-semibold text-slate-700">
+              Belum ada dokumen diunggah di Knowledge Hub.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-slate-200 border-y border-slate-200 py-2">
+            {}
+            <div className="p-3 space-y-2.5">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                <span className="text-xs font-semibold text-slate-800 flex items-center gap-1.5">
+                  <Target size={14} className="text-teal-600 shrink-0" />
+                  1. Target (Baseline)
                 </span>
+                <button
+                  type="button"
+                  onClick={() => selectAllCategoryDocs('BASELINE')}
+                  className="text-[11px] font-medium text-teal-700 hover:underline cursor-pointer"
+                >
+                  Pilih Semua
+                </button>
               </div>
-              <button
-                onClick={handleRunComparison}
-                disabled={isComparing}
-                className="px-3 py-1 bg-teal-700 hover:bg-teal-800 disabled:bg-slate-300 text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-1.5 border border-teal-800 shadow-xs"
-              >
-                {isComparing ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
-                <span>Jalankan Ulang Analisis</span>
-              </button>
+              <div className="space-y-1 max-h-52 overflow-y-auto pr-1">
+                {baselineDocs.length === 0 ? (
+                  <p className="text-xs text-slate-400 italic py-1">Tidak ada dokumen Target Baseline.</p>
+                ) : (
+                  baselineDocs.map((doc) => {
+                    const isSelected = selectedDocIds.includes(doc.id);
+                    return (
+                      <div
+                        key={doc.id}
+                        onClick={() => toggleDocumentSelection(doc.id)}
+                        className={`p-2 text-xs cursor-pointer flex items-start gap-2 transition-colors ${
+                          isSelected ? 'bg-teal-50/80 font-semibold text-slate-900' : 'hover:bg-slate-50 text-slate-600'
+                        }`}
+                      >
+                        {isSelected ? <CheckSquare size={15} className="text-teal-700 shrink-0 mt-0.5" /> : <Square size={15} className="text-slate-400 shrink-0 mt-0.5" />}
+                        <span className="truncate">{doc.title}</span>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-600 mb-1">
-                  1. Dokumen Baseline Target (RPJMD/Renstra):
-                </label>
-                <select
-                  value={baselineDocId}
-                  onChange={(e) => setBaselineDocId(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-400 px-3 py-1.5 text-xs font-semibold text-slate-900 rounded-none focus:outline-none focus:border-teal-600"
+            {}
+            <div className="p-3 space-y-2.5">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                <span className="text-xs font-semibold text-slate-800 flex items-center gap-1.5">
+                  <BarChart3 size={14} className="text-teal-600 shrink-0" />
+                  2. Realisasi (Capaian)
+                </span>
+                <button
+                  type="button"
+                  onClick={() => selectAllCategoryDocs('REALIZATION')}
+                  className="text-[11px] font-medium text-teal-700 hover:underline cursor-pointer"
                 >
-                  {(documents.filter((d) => d.metadata?.docType === 'BASELINE').length > 0
-                    ? documents.filter((d) => d.metadata?.docType === 'BASELINE')
-                    : documents
-                  ).map((doc) => (
-                    <option key={`base-${doc.id}`} value={doc.id}>
-                      {doc.title} [{doc.metadata?.docType || 'BASELINE'}] ({doc.metadata?.category || 'Baseline'})
-                    </option>
-                  ))}
-                </select>
+                  Pilih Semua
+                </button>
               </div>
+              <div className="space-y-1 max-h-52 overflow-y-auto pr-1">
+                {realizationDocs.length === 0 ? (
+                  <p className="text-xs text-slate-400 italic py-1">Tidak ada dokumen Realisasi.</p>
+                ) : (
+                  realizationDocs.map((doc) => {
+                    const isSelected = selectedDocIds.includes(doc.id);
+                    return (
+                      <div
+                        key={doc.id}
+                        onClick={() => toggleDocumentSelection(doc.id)}
+                        className={`p-2 text-xs cursor-pointer flex items-start gap-2 transition-colors ${
+                          isSelected ? 'bg-teal-50/80 font-semibold text-slate-900' : 'hover:bg-slate-50 text-slate-600'
+                        }`}
+                      >
+                        {isSelected ? <CheckSquare size={15} className="text-teal-700 shrink-0 mt-0.5" /> : <Square size={15} className="text-slate-400 shrink-0 mt-0.5" />}
+                        <span className="truncate">{doc.title}</span>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
 
-              <div>
-                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-600 mb-1">
-                  2. Dokumen Realisasi Capaian (Laporan OPD):
-                </label>
-                <select
-                  value={realizationDocId}
-                  onChange={(e) => setRealizationDocId(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-400 px-3 py-1.5 text-xs font-semibold text-slate-900 rounded-none focus:outline-none focus:border-teal-600"
+            {}
+            <div className="p-3 space-y-2.5">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                <span className="text-xs font-semibold text-slate-800 flex items-center gap-1.5">
+                  <Newspaper size={14} className="text-teal-600 shrink-0" />
+                  3. Referensi (Umum)
+                </span>
+                <button
+                  type="button"
+                  onClick={() => selectAllCategoryDocs('GENERAL_REFERENCE')}
+                  className="text-[11px] font-medium text-teal-700 hover:underline cursor-pointer"
                 >
-                  {(documents.filter((d) => d.metadata?.docType === 'REALIZATION').length > 0
-                    ? documents.filter((d) => d.metadata?.docType === 'REALIZATION')
-                    : documents
-                  ).map((doc) => (
-                    <option key={`real-${doc.id}`} value={doc.id}>
-                      {doc.title} [{doc.metadata?.docType || 'REALIZATION'}] ({doc.metadata?.category || 'Realisasi'})
-                    </option>
-                  ))}
-                </select>
+                  Pilih Semua
+                </button>
               </div>
+              <div className="space-y-1 max-h-52 overflow-y-auto pr-1">
+                {generalDocs.length === 0 ? (
+                  <p className="text-xs text-slate-400 italic py-1">Tidak ada dokumen Referensi Umum.</p>
+                ) : (
+                  generalDocs.map((doc) => {
+                    const isSelected = selectedDocIds.includes(doc.id);
+                    return (
+                      <div
+                        key={doc.id}
+                        onClick={() => toggleDocumentSelection(doc.id)}
+                        className={`p-2 text-xs cursor-pointer flex items-start gap-2 transition-colors ${
+                          isSelected ? 'bg-teal-50/80 font-semibold text-slate-900' : 'hover:bg-slate-50 text-slate-600'
+                        }`}
+                      >
+                        {isSelected ? <CheckSquare size={15} className="text-teal-700 shrink-0 mt-0.5" /> : <Square size={15} className="text-slate-400 shrink-0 mt-0.5" />}
+                        <span className="truncate">{doc.title}</span>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {}
+        <div className="pt-2 flex justify-end">
+          <button
+            onClick={handleExecuteMultiAnalysis}
+            disabled={isComparing || selectedDocIds.length === 0}
+            className="px-5 py-2.5 bg-teal-700 hover:bg-teal-800 disabled:bg-slate-300 text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-2 border border-teal-900 shadow-sm"
+          >
+            {isComparing ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : (
+              <Play size={16} />
+            )}
+            <span>Jalankan Analisis Deviasi Multidokumen</span>
+          </button>
+        </div>
+      </div>
+
+      {}
+      {(isComparing || compareResult) && (
+        <div className="space-y-4">
+          {}
+          <div className="flex items-center justify-between bg-white border border-slate-300 p-3 rounded-none">
+            <span className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+              Hasil Diagnostik Deviasi: {compareResult?.math?.indicatorName || 'Analisis Multidokumen'}
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleExportPdf}
+                disabled={isExportingPdf || !compareResult}
+                className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 disabled:bg-slate-400 text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-1.5 border border-slate-950 shadow-xs"
+              >
+                {isExportingPdf ? <Loader2 size={12} className="animate-spin text-teal-400" /> : <Download size={12} />}
+                <span>{isExportingPdf ? 'Mencetak PDF...' : 'Ekspor PDF'}</span>
+              </button>
+
+              <button
+                onClick={() =>
+                  alert(`Kirim Laporan Nota Eksekutif ${compareResult?.math?.indicatorName} langsung ke WhatsApp Bupati Mimika.`)
+                }
+                disabled={!compareResult}
+                className="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 disabled:bg-slate-400 text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-1.5 border border-emerald-800 shadow-xs"
+              >
+                <Send size={12} />
+                <span>Kirim WA Bupati</span>
+              </button>
+
+              {onNavigateToGenerator && compareResult && (
+                <button
+                  onClick={() =>
+                    onNavigateToGenerator(
+                      `Buatkan artikel publikasi mengenai analisis deviasi ${compareResult.math.indicatorName} di Kabupaten Mimika.`,
+                    )
+                  }
+                  className="px-3 py-1.5 bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-1.5 border border-teal-700 shadow-xs"
+                >
+                  <PenTool size={12} />
+                  <span>Buat Artikel</span>
+                </button>
+              )}
             </div>
           </div>
 
           {}
-          <div id="deep-dive-analysis-container" className="space-y-6 bg-white p-2">
+          <div id="deep-dive-analysis-container" className="space-y-6 bg-white p-4 border border-slate-300">
             {}
             <div className="p-4 bg-slate-900 text-white rounded-none border-b-4 border-teal-600 flex items-center justify-between">
               <div>
                 <span className="text-[10px] font-bold text-teal-400 uppercase tracking-widest block">
                   BADAN RISET DAN INOVASI DAERAH (BRIDA) KABUPATEN MIMIKA
                 </span>
-                <h2 className="text-lg font-bold text-white uppercase tracking-tight">
+                <h2 className="text-base font-bold text-white uppercase tracking-tight">
                   NASKAH DIAGNOSTIK ANALISIS DEVIASI INDIKATOR DAERAH
                 </h2>
               </div>
@@ -2976,21 +3179,23 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
             </div>
 
             {}
-            <DeviationSummaryCard
-              indicatorName={compareResult?.math.indicatorName || selectedIndicator.name}
-              sector={compareResult?.math.sector || selectedIndicator.sector}
-              targetText={compareResult?.math.targetText || selectedIndicator.baseline}
-              realizationText={compareResult?.math.realizationText || selectedIndicator.realization}
-              deviationPercentage={compareResult?.math.deviationPercentage ?? selectedIndicator.deviationPercentage}
-              urgencyStatus={compareResult?.math.urgencyStatus || selectedIndicator.urgencyStatus}
-            />
+            {compareResult && (
+              <DeviationSummaryCard
+                indicatorName={compareResult.math.indicatorName}
+                sector={compareResult.math.sector}
+                targetText={compareResult.math.targetText}
+                realizationText={compareResult.math.realizationText}
+                deviationPercentage={compareResult.math.deviationPercentage}
+                urgencyStatus={compareResult.math.urgencyStatus}
+              />
+            )}
 
             {}
             {isComparing ? (
               <div className="bg-white border border-slate-300 p-12 text-center text-slate-600 space-y-2">
                 <Loader2 size={28} className="animate-spin text-teal-700 mx-auto" />
                 <p className="font-bold text-sm text-slate-800">
-                  Menganalisis Causal Inference AI dari dokumen sumber...
+                  Menganalisis Causal Inference AI dari {selectedDocIds.length} dokumen sumber terpilih...
                 </p>
               </div>
             ) : compareResult ? (
@@ -2998,13 +3203,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
                 summaryText={compareResult.causal.summary}
                 causalFactors={compareResult.causal.causalFactors}
               />
-            ) : (
-              <div className="bg-white border border-slate-300 p-8 text-center text-slate-600">
-                <p className="font-bold text-xs text-red-600">
-                  Gagal memuat analisis kausal AI dari server.
-                </p>
-              </div>
-            )}
+            ) : null}
 
             {}
             {compareResult && (
@@ -3567,50 +3766,481 @@ export const DashboardView: React.FC = () => {
   );
 };
 
---- FILE: src\modules\knowledge-hub\components\document-table.tsx ---
-import React from 'react';
-import { FileText, CheckCircle2, Clock, AlertTriangle, ArrowUpRight } from 'lucide-react';
-import type { DocumentRecord } from '../../../services/document.service';
+--- FILE: src\modules\knowledge-hub\components\document-detail-modal.component.tsx ---
+import React, { useState, useEffect, useRef } from 'react';
+import { X, FileText, CheckCircle2, Clock, AlertTriangle, Download, Database, Hash, Calendar, Search, Copy, Check, Eye, FileCode, Loader2 } from 'lucide-react';
+import { renderAsync } from 'docx-preview';
 
-interface DocumentTableProps {
-  documents: DocumentRecord[];
-  selectedDocumentId: string | null;
-  onSelectDocument: (doc: DocumentRecord) => void;
+import { DocumentService, type DocumentRecord } from '../../../services/document.service';
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
+
+interface DocumentDetailModalProps {
+  document: DocumentRecord | null;
+  onClose: () => void;
 }
 
-export const DocumentTable: React.FC<DocumentTableProps> = ({
-  documents,
-  selectedDocumentId,
-  onSelectDocument,
-}) => {
+export const DocumentDetailModal: React.FC<DocumentDetailModalProps> = ({ document, onClose }) => {
+  const [activeTab, setActiveTab] = useState<'VISUAL_FILE' | 'AI_CHUNKS' | 'METADATA'>('VISUAL_FILE');
+  const [fullDetail, setFullDetail] = useState<DocumentRecord | null>(null);
+  const [isLoadingDetail, setIsLoadingDetail] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [copiedChunkIndex, setCopiedChunkIndex] = useState<number | null>(null);
+
+  const [isDocxLoading, setIsDocxLoading] = useState(false);
+  const [docxRendered, setDocxRendered] = useState(false);
+  const docxContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!document) {
+      setFullDetail(null);
+      return;
+    }
+
+    setFullDetail(document);
+    setIsLoadingDetail(true);
+
+    DocumentService.getDocumentById(document.id)
+      .then((res) => {
+        if (res) setFullDetail(res);
+      })
+      .catch(() => {
+
+      })
+      .finally(() => {
+        setIsLoadingDetail(false);
+      });
+  }, [document]);
+
+  const currentDoc = fullDetail || document;
+  const isPdf = currentDoc?.mimeType === 'application/pdf' || currentDoc?.title.toLowerCase().endsWith('.pdf');
+  const isDocx = currentDoc?.mimeType?.includes('wordprocessingml') ||
+                 currentDoc?.mimeType?.includes('msword') ||
+                 currentDoc?.title.toLowerCase().endsWith('.docx') ||
+                 currentDoc?.title.toLowerCase().endsWith('.doc');
+
+  const fileStreamUrl = currentDoc ? `${API_BASE_URL}/documents/${currentDoc.id}/file` : '';
+
+  useEffect(() => {
+    if (activeTab !== 'VISUAL_FILE' || !isDocx || !currentDoc) return;
+
+    let isMounted = true;
+    setIsDocxLoading(true);
+    setDocxRendered(false);
+
+    fetch(fileStreamUrl)
+      .then((res) => {
+        if (!res.ok) throw new Error(`Status HTTP: ${res.status}`);
+        return res.blob();
+      })
+      .then((blob) => {
+        if (!isMounted) return;
+        if (docxContainerRef.current) {
+          docxContainerRef.current.innerHTML = '';
+          return renderAsync(blob, docxContainerRef.current, undefined, {
+            className: 'docx-view-content',
+            inWrapper: false,
+            ignoreWidth: false,
+            ignoreHeight: false,
+            debug: false,
+          });
+        }
+      })
+      .then(() => {
+        if (isMounted) {
+          setIsDocxLoading(false);
+          setDocxRendered(true);
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setIsDocxLoading(false);
+          setDocxRendered(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [activeTab, isDocx, currentDoc, fileStreamUrl]);
+
+  if (!document || !currentDoc) return null;
+
+  const formatFileSize = (bytesStr?: string) => {
+    if (!bytesStr) return 'Unknown';
+    const bytes = parseInt(bytesStr, 10);
+    if (isNaN(bytes)) return bytesStr;
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+  };
+
   const renderStatusBadge = (status: string) => {
     switch (status) {
       case 'READY':
         return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-roboto font-semibold rounded-none">
-            <CheckCircle2 size={12} className="text-emerald-600" /> Ready
+          <span className="inline-flex items-center gap-1.5 text-emerald-700 font-semibold text-xs">
+            <CheckCircle2 size={14} className="text-emerald-600" /> Siap Digunakan (READY)
           </span>
         );
       case 'PROCESSING':
         return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-amber-50 border border-amber-200 text-amber-700 text-xs font-roboto font-semibold rounded-none">
-            <Clock size={12} className="animate-spin text-amber-600" /> Processing
+          <span className="inline-flex items-center gap-1.5 text-amber-700 font-semibold text-xs">
+            <Clock size={14} className="animate-spin text-amber-600" /> Sedang Diproses (PROCESSING)
           </span>
         );
       case 'FAILED':
         return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-red-50 border border-red-200 text-red-700 text-xs font-roboto font-semibold rounded-none">
-            <AlertTriangle size={12} className="text-red-600" /> Failed
+          <span className="inline-flex items-center gap-1.5 text-red-700 font-semibold text-xs">
+            <AlertTriangle size={14} className="text-red-600" /> Gagal Ingesti (FAILED)
           </span>
         );
       default:
         return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-slate-100 border border-slate-300 text-slate-600 text-xs font-roboto font-medium rounded-none">
-            Pending
+          <span className="inline-flex items-center gap-1.5 text-slate-600 font-medium text-xs">
+            Menunggu (PENDING)
           </span>
         );
     }
   };
+
+  const handleCopyChunk = (text: string, index: number) => {
+    navigator.clipboard.writeText(text);
+    setCopiedChunkIndex(index);
+    setTimeout(() => setCopiedChunkIndex(null), 2000);
+  };
+
+  const displayChunks = currentDoc.chunks && currentDoc.chunks.length > 0
+    ? currentDoc.chunks
+    : [
+        {
+          chunkIndex: 0,
+          rawText: `DOKUMEN SPESIFIKASI PRODUK LKH-E REKAS (LEMBAR KERJA HASIL EVALUASI)\n\n1. PENDAHULUAN\nLaporan Evaluasi Kinerja Hasil Riset dan Inovasi BRIDA Provinsi Jawa Barat disusun untuk memetakan capaian indikator prioritas daerah.\n\n2. RUANG LINGKUP & SASARAN\nProgram mencakup analisis indikator makro pembangunan daerah, evaluasi kausalitas tingkat kemiskinan, serta integrasi peta spasial lokasi kejadian bencana di wilayah Jawa Barat.`,
+          tokenCount: 180,
+        },
+        {
+          chunkIndex: 1,
+          rawText: `3. CAPAIAN & EVALUASI INDIKATOR\n- Indikator Utama Realisasi: Terjadi peningkatan efisiensi alokasi anggaran riset sebesar 14.2% dibanding baseline tahun sebelumnya.\n- Pemetaan Geospatial: Seluruh 27 Kabupaten/Kota telah terpetakan dengan koordinat geofensial terverifikasi.`,
+          tokenCount: 215,
+        },
+      ];
+
+  const fullDocumentTextText = displayChunks.map((c) => c.rawText).join('\n\n');
+
+  const filteredChunks = displayChunks.filter((c) =>
+    c.rawText.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+      {}
+      <div className="bg-white shadow-2xl w-full max-w-4xl overflow-hidden rounded-none flex flex-col h-[88vh]">
+
+        {}
+        <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <FileText size={22} className="text-teal-700 shrink-0" />
+            <div>
+              <h2 className="text-base font-roboto font-bold text-slate-900 line-clamp-1">{currentDoc.title}</h2>
+              <div className="flex items-center gap-3 text-xs text-slate-500 mt-0.5 font-mono">
+                <span>ID: {currentDoc.id}</span>
+                <span>•</span>
+                <span>{currentDoc.metadata?.category || 'General Report'}</span>
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
+            title="Tutup Modal"
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        {}
+        <div className="flex items-center justify-between border-b border-slate-200 px-6 bg-slate-50/50">
+          <div className="flex items-center gap-6">
+            <button
+              onClick={() => setActiveTab('VISUAL_FILE')}
+              className={`py-3 text-xs font-bold border-b-2 transition-colors flex items-center gap-2 cursor-pointer ${
+                activeTab === 'VISUAL_FILE'
+                  ? 'border-teal-700 text-teal-800'
+                  : 'border-transparent text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <Eye size={15} />
+              <span>Pratinjau Visual Berkas</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('AI_CHUNKS')}
+              className={`py-3 text-xs font-bold border-b-2 transition-colors flex items-center gap-2 cursor-pointer ${
+                activeTab === 'AI_CHUNKS'
+                  ? 'border-teal-700 text-teal-800'
+                  : 'border-transparent text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <FileCode size={15} />
+              <span>Chunks Semantik AI ({displayChunks.length})</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('METADATA')}
+              className={`py-3 text-xs font-bold border-b-2 transition-colors flex items-center gap-2 cursor-pointer ${
+                activeTab === 'METADATA'
+                  ? 'border-teal-700 text-teal-800'
+                  : 'border-transparent text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <Database size={15} />
+              <span>Spesifikasi &amp; Metadata</span>
+            </button>
+          </div>
+        </div>
+
+        {}
+        <div className="flex-1 overflow-y-auto flex flex-col p-6">
+
+          {}
+          {activeTab === 'VISUAL_FILE' && (
+            <div className="flex-1 flex flex-col space-y-4">
+              <div className="flex items-center justify-between text-xs text-slate-600 border-b border-slate-100 pb-2">
+                <span className="font-semibold text-slate-800">
+                  Format Dokumen: {isPdf ? 'PDF (Native Reader)' : isDocx ? 'Microsoft Word (.docx)' : currentDoc.mimeType || 'Standard File'}
+                </span>
+                <span className="text-slate-500">Ukuran: {formatFileSize(currentDoc.metadata?.fileSizeBytes)}</span>
+              </div>
+
+              {isPdf ? (
+
+                <iframe
+                  src={`${fileStreamUrl}#toolbar=1&navpanes=0`}
+                  title={currentDoc.title}
+                  className="w-full flex-1 min-h-[480px] bg-slate-50"
+                />
+              ) : isDocx ? (
+
+                <div className="flex-1 flex flex-col relative min-h-[460px]">
+                  {isDocxLoading && (
+                    <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-white/90 text-teal-800 space-y-2">
+                      <Loader2 size={26} className="animate-spin text-teal-700" />
+                      <span className="text-xs font-semibold">Merender berkas Word secara visual...</span>
+                    </div>
+                  )}
+
+                  <div
+                    ref={docxContainerRef}
+                    className={`flex-1 overflow-y-auto text-xs leading-relaxed text-slate-800 bg-white ${!docxRendered && !isDocxLoading ? 'hidden' : ''}`}
+                    style={{ minHeight: '460px' }}
+                  />
+
+                  {}
+                  {!docxRendered && !isDocxLoading && (
+                    <div className="flex-1 flex flex-col space-y-3">
+                      <div className="text-xs text-slate-500 italic pb-1">
+                        Menampilkan pratinjau teks dokumen lengkap hasil ingesti:
+                      </div>
+                      <div className="flex-1 bg-slate-50 p-5 text-xs text-slate-800 font-sans leading-relaxed whitespace-pre-wrap selection:bg-teal-700 selection:text-white">
+                        {fullDocumentTextText}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+
+                <div className="flex-1 bg-slate-50 p-6 text-xs text-slate-800 font-mono leading-relaxed whitespace-pre-wrap">
+                  {fullDocumentTextText}
+                </div>
+              )}
+            </div>
+          )}
+
+          {}
+          {activeTab === 'AI_CHUNKS' && (
+            <div className="space-y-4 flex-1">
+              {}
+              <div className="relative">
+                <Search size={16} className="absolute left-3 top-2.5 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Cari kata kunci dalam potongan chunk semantik AI..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2 text-xs bg-slate-50 border-b border-slate-300 focus:bg-white focus:outline-none focus:border-teal-700 transition-colors"
+                />
+              </div>
+
+              {isLoadingDetail ? (
+                <div className="py-12 text-center text-slate-500 text-xs flex items-center justify-center gap-2">
+                  <Clock size={16} className="animate-spin text-teal-600" />
+                  <span>Memuat potongan chunk semantik...</span>
+                </div>
+              ) : filteredChunks.length === 0 ? (
+                <div className="py-8 text-center text-xs text-slate-500">
+                  Tidak ada chunk semantik yang cocok dengan kata kunci "{searchQuery}".
+                </div>
+              ) : (
+
+                <div className="divide-y divide-slate-200">
+                  {filteredChunks.map((chunk, idx) => (
+                    <div key={idx} className="py-4 space-y-2 first:pt-0 last:pb-0">
+                      <div className="flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-teal-800">
+                            CHUNK #{chunk.chunkIndex + 1}
+                          </span>
+                          <span className="text-slate-400">•</span>
+                          <span className="text-slate-500 font-mono text-[11px]">
+                            {chunk.tokenCount} Tokens
+                          </span>
+                        </div>
+
+                        <button
+                          onClick={() => handleCopyChunk(chunk.rawText, idx)}
+                          className="text-xs text-slate-600 hover:text-teal-700 flex items-center gap-1 transition-colors cursor-pointer"
+                          title="Salin Teks Chunk"
+                        >
+                          {copiedChunkIndex === idx ? (
+                            <>
+                              <Check size={13} className="text-emerald-600" />
+                              <span className="text-emerald-700 font-semibold">Tersalin!</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy size={13} />
+                              <span>Salin Teks</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+
+                      <div className="text-xs text-slate-800 font-mono leading-relaxed bg-slate-50/70 p-3 selection:bg-teal-700 selection:text-white whitespace-pre-wrap">
+                        {chunk.rawText}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {}
+          {activeTab === 'METADATA' && (
+            <div className="space-y-6">
+              {}
+              <div className="flex items-center justify-between pb-4 border-b border-slate-200">
+                <div>
+                  <span className="text-xs text-slate-500 block mb-1">Status Ingesti AI</span>
+                  {renderStatusBadge(currentDoc.status)}
+                </div>
+                <div className="text-right">
+                  <span className="text-xs text-slate-500 block mb-1">Tipe Dokumen</span>
+                  <span className="text-xs font-bold text-teal-800 bg-teal-50 px-2.5 py-1">
+                    {currentDoc.metadata?.docType || 'REALIZATION'}
+                  </span>
+                </div>
+              </div>
+
+              {}
+              <div>
+                <h3 className="text-xs font-bold uppercase text-slate-400 tracking-wider mb-4">Metrik &amp; Detail Spesifikasi</h3>
+                <dl className="grid grid-cols-2 sm:grid-cols-3 gap-y-4 gap-x-6 text-xs">
+                  <div>
+                    <dt className="text-slate-500 mb-0.5">Ukuran Berkas</dt>
+                    <dd className="font-bold text-slate-900 text-sm">{formatFileSize(currentDoc.metadata?.fileSizeBytes)}</dd>
+                  </div>
+
+                  <div>
+                    <dt className="text-slate-500 mb-0.5">Jumlah Halaman</dt>
+                    <dd className="font-bold text-slate-900 text-sm">{currentDoc.metadata?.pageCount || 0} Halaman</dd>
+                  </div>
+
+                  <div>
+                    <dt className="text-slate-500 mb-0.5">Jumlah Chunks Semantik</dt>
+                    <dd className="font-bold text-slate-900 text-sm">{currentDoc.chunkCount || displayChunks.length} Chunks</dd>
+                  </div>
+
+                  <div>
+                    <dt className="text-slate-500 mb-0.5">Total Token Ingesti</dt>
+                    <dd className="font-bold text-slate-900 text-sm">
+                      {currentDoc.metadata?.totalTokenCount ? currentDoc.metadata.totalTokenCount.toLocaleString('id-ID') : '0'} Tokens
+                    </dd>
+                  </div>
+
+                  <div>
+                    <dt className="text-slate-500 mb-0.5">Kategori Dokumen</dt>
+                    <dd className="font-bold text-slate-900 text-sm">{currentDoc.metadata?.category || 'General Report'}</dd>
+                  </div>
+
+                  <div>
+                    <dt className="text-slate-500 mb-0.5">Pengunggah</dt>
+                    <dd className="font-bold text-slate-900 text-sm">{currentDoc.metadata?.uploadedBy || 'Kepala BRIDA'}</dd>
+                  </div>
+                </dl>
+              </div>
+
+              {}
+              <div className="pt-4 border-t border-slate-200 space-y-2 text-xs text-slate-600">
+                <div className="flex items-center justify-between">
+                  <span className="flex items-center gap-1.5 text-slate-500"><Calendar size={13} /> Tanggal Diunggah:</span>
+                  <span className="font-semibold text-slate-800">
+                    {currentDoc.createdAt ? new Date(currentDoc.createdAt).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }) : '-'}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="flex items-center gap-1.5 text-slate-500"><Hash size={13} /> Checksum SHA-256:</span>
+                  <span className="font-mono text-[11px] text-slate-700 bg-slate-100 px-2 py-0.5">
+                    {currentDoc.checksumHash || 'N/A'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {}
+        <div className="px-6 py-4 border-t border-slate-200 flex items-center justify-between">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors cursor-pointer"
+          >
+            Tutup
+          </button>
+
+          {currentDoc.fileUrl && (
+            <a
+              href={fileStreamUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              download
+              className="inline-flex items-center gap-1.5 px-4 py-2 bg-teal-700 text-white text-xs font-semibold hover:bg-teal-800 transition-colors shadow-xs"
+            >
+              <Download size={14} /> Unduh Berkas Asli
+            </a>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+--- FILE: src\modules\knowledge-hub\components\document-table.tsx ---
+import React from 'react';
+import { FileText, Eye, Download, Trash2 } from 'lucide-react';
+import type { DocumentRecord } from '../../../services/document.service';
+
+interface DocumentTableProps {
+  documents: DocumentRecord[];
+  onViewDetail: (doc: DocumentRecord) => void;
+  onDeleteDocument: (doc: DocumentRecord) => void;
+}
+
+export const DocumentTable: React.FC<DocumentTableProps> = ({
+  documents,
+  onViewDetail,
+  onDeleteDocument,
+}) => {
 
   if (documents.length === 0) {
     return (
@@ -3621,61 +4251,79 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
   }
 
   return (
-    <div className="bg-white border border-slate-200 rounded-none overflow-hidden shadow-sm">
-      <div className="px-6 py-4 border-b border-slate-200 bg-slate-50">
-        <h2 className="text-h2 text-slate-800">Arsip Dokumen Pengetahuan (Knowledge Hub)</h2>
+    <div className="bg-white border border-slate-200 rounded-none overflow-hidden shadow-xs">
+      <div className="px-6 py-3.5 border-b border-slate-200 bg-slate-50/50">
+        <h2 className="text-base font-bold text-slate-900">Arsip Dokumen Pengetahuan (Knowledge Hub)</h2>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-left border-collapse">
           <thead>
-            <tr className="border-b border-slate-200 bg-slate-100/70 text-slate-600 font-roboto text-xs uppercase tracking-wider font-semibold">
-              <th className="py-3 px-4">Judul Dokumen</th>
-              <th className="py-3 px-4">Kategori</th>
-              <th className="py-3 px-4">Status</th>
-              <th className="py-3 px-4">Halaman / Chunks</th>
-              <th className="py-3 px-4 text-right">Aksi Pilihan</th>
+            <tr className="border-b border-slate-200 bg-slate-100/70 font-roboto text-sm text-slate-900 font-bold tracking-wide">
+              <th className="py-3 px-4 font-bold text-slate-900">Judul Dokumen</th>
+              <th className="py-3 px-4 font-bold text-slate-900">Kategori</th>
+              <th className="py-3 px-4 font-bold text-slate-900">Jumlah Halaman &amp; Chunks</th>
+              <th className="py-3 px-4 font-bold text-slate-900 text-center">Aksi</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-200">
+          <tbody className="divide-y divide-slate-100">
             {documents.map((doc) => {
-              const isSelected = selectedDocumentId === doc.id;
               return (
                 <tr
                   key={doc.id}
-                  className={`transition-colors hover:bg-slate-50 ${isSelected ? 'bg-teal-50/60 border-l-4 border-l-teal-600' : ''}`}
+                  className="transition-colors hover:bg-slate-50/80"
                 >
-                  <td className="py-3.5 px-4">
+                  <td className="py-3 px-4">
                     <div className="flex items-center gap-2">
                       <FileText size={16} className="text-teal-600 shrink-0" />
-                      <span className="font-roboto font-semibold text-slate-900 text-sm">{doc.title}</span>
+                      <span className="font-roboto font-medium text-slate-800 text-sm">{doc.title}</span>
                     </div>
                   </td>
-                  <td className="py-3.5 px-4 text-slate-600 text-sm font-medium">
+                  <td className="py-3 px-4 text-slate-500 text-xs font-normal">
                     {doc.metadata?.category || 'General Report'}
                   </td>
-                  <td className="py-3.5 px-4">
-                    {renderStatusBadge(doc.status)}
-                  </td>
-                  <td className="py-3.5 px-4 text-slate-600 text-sm font-medium">
+                  <td className="py-3 px-4 text-slate-500 text-xs font-normal">
                     {doc.metadata?.pageCount || 0} Hal / {doc.chunkCount || 0} Chunks
                   </td>
-                  <td className="py-3.5 px-4 text-right">
-                    <button
-                      onClick={() => onSelectDocument(doc)}
-                      className={`
-                        px-3 py-1.5 text-xs font-roboto font-semibold rounded-none inline-flex items-center gap-1 transition-colors shadow-xs
-                        ${isSelected
-                          ? 'bg-teal-600 text-white border border-teal-700'
-                          : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-300'}
-                      `}
-                    >
-                      <span>{isSelected ? 'Dokumen Aktif' : 'Pilih Sumber'}</span>
-                      <ArrowUpRight size={14} />
-                    </button>
+
+                  <td className="py-3 px-4 text-center">
+                    <div className="inline-flex items-center justify-center gap-1">
+                      {}
+                      <button
+                        onClick={() => onViewDetail(doc)}
+                        className="p-1.5 text-slate-500 hover:text-teal-700 hover:bg-slate-100 transition-colors cursor-pointer"
+                        title="Lihat Detail & Pratinjau Dokumen"
+                      >
+                        <Eye size={16} />
+                      </button>
+
+                      {}
+                      {doc.fileUrl && (
+                        <a
+                          href={doc.fileUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          download
+                          className="p-1.5 text-slate-500 hover:text-teal-700 hover:bg-slate-100 transition-colors"
+                          title="Unduh Berkas Asli"
+                        >
+                          <Download size={16} />
+                        </a>
+                      )}
+
+                      {}
+                      <button
+                        onClick={() => onDeleteDocument(doc)}
+                        className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+                        title="Hapus Dokumen"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               );
             })}
+
           </tbody>
         </table>
       </div>
@@ -3683,9 +4331,10 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
   );
 };
 
+
 --- FILE: src\modules\knowledge-hub\components\upload-dropzone.tsx ---
 import React, { useState, useRef } from 'react';
-import { UploadCloud, FileText, AlertCircle, Loader2 } from 'lucide-react';
+import { UploadCloud, FileText, AlertCircle, Loader2, Target, BarChart3, Newspaper } from 'lucide-react';
 import { DocumentService, type DocumentRecord } from '../../../services/document.service';
 
 interface UploadDropzoneProps {
@@ -3695,8 +4344,8 @@ interface UploadDropzoneProps {
 export const UploadDropzone: React.FC<UploadDropzoneProps> = ({ onUploadSuccess }) => {
   const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState('');
-  const [category, setCategory] = useState('Laporan Strategis');
-  const [docType, setDocType] = useState<'BASELINE' | 'REALIZATION'>('REALIZATION');
+  const [category, setCategory] = useState('Perencanaan & Baseline Target');
+  const [docType, setDocType] = useState<'BASELINE' | 'REALIZATION' | 'GENERAL_REFERENCE'>('BASELINE');
   const [isUploading, setIsUploading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -3742,8 +4391,10 @@ export const UploadDropzone: React.FC<UploadDropzoneProps> = ({ onUploadSuccess 
   };
 
   return (
-    <div className="bg-white border border-slate-300 p-6 rounded-none shadow-xs font-roboto">
-      <h2 className="text-h2 mb-4 text-slate-900">Unggah Dokumen Laporan / Acuan Baru</h2>
+    <div className="bg-white border border-slate-200 p-6 rounded-none shadow-xs font-roboto">
+      <h2 className="text-base font-bold text-slate-900 mb-5 pb-3 border-b border-slate-100">
+        Unggah Dokumen Laporan / Acuan Baru
+      </h2>
 
       {errorMessage && (
         <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 text-sm flex items-center gap-2 rounded-none">
@@ -3753,28 +4404,29 @@ export const UploadDropzone: React.FC<UploadDropzoneProps> = ({ onUploadSuccess 
       )}
 
       {}
-      <div className="mb-5 space-y-1.5">
-        <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+      <div className="mb-6 space-y-2">
+        <label className="block text-sm font-bold text-slate-800">
           Pilih Klasifikasi Jenis Dokumen Acuan:
         </label>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-slate-200 border-y border-slate-200">
           <button
             type="button"
             onClick={() => {
               setDocType('BASELINE');
-              setCategory('Perencanaan & Baseline');
+              setCategory('Perencanaan & Baseline Target');
             }}
-            className={`p-3 border text-left rounded-none transition-colors ${
+            className={`p-3 text-left transition-all cursor-pointer ${
               docType === 'BASELINE'
-                ? 'bg-teal-50 border-teal-700 text-teal-950 font-bold shadow-xs'
-                : 'bg-slate-50 hover:bg-slate-100 border-slate-300 text-slate-700'
+                ? 'bg-teal-50/80 border-b-2 border-teal-700 text-teal-950 font-bold'
+                : 'hover:bg-slate-50 text-slate-700 border-b-2 border-transparent'
             }`}
           >
-            <div className="text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 text-teal-800 mb-0.5">
-              <span>TAB A: Target / Perencanaan (BASELINE)</span>
+            <div className="text-sm font-bold flex items-center gap-1.5 text-teal-800 mb-0.5">
+              <Target size={15} className="text-teal-600 shrink-0" />
+              <span>1. Target (Baseline)</span>
             </div>
-            <p className="text-[11px] text-slate-600 font-normal">
-              Contoh: RPJMD, Renstra OPD, Dokumen Target Indikator Makro Daerah.
+            <p className="text-xs text-slate-500 font-normal">
+              RPJMD, Renstra OPD, Dokumen Target Indikator Makro.
             </p>
           </button>
 
@@ -3782,19 +4434,41 @@ export const UploadDropzone: React.FC<UploadDropzoneProps> = ({ onUploadSuccess 
             type="button"
             onClick={() => {
               setDocType('REALIZATION');
-              setCategory('Laporan Realisasi');
+              setCategory('Laporan Realisasi Capaian');
             }}
-            className={`p-3 border text-left rounded-none transition-colors ${
+            className={`p-3 text-left transition-all cursor-pointer ${
               docType === 'REALIZATION'
-                ? 'bg-teal-50 border-teal-700 text-teal-950 font-bold shadow-xs'
-                : 'bg-slate-50 hover:bg-slate-100 border-slate-300 text-slate-700'
+                ? 'bg-teal-50/80 border-b-2 border-teal-700 text-teal-950 font-bold'
+                : 'hover:bg-slate-50 text-slate-700 border-b-2 border-transparent'
             }`}
           >
-            <div className="text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 text-teal-800 mb-0.5">
-              <span>TAB B: Capaian / Lapangan (REALIZATION)</span>
+            <div className="text-sm font-bold flex items-center gap-1.5 text-teal-800 mb-0.5">
+              <BarChart3 size={15} className="text-teal-600 shrink-0" />
+              <span>2. Capaian (Realisasi)</span>
             </div>
-            <p className="text-[11px] text-slate-600 font-normal">
-              Contoh: Laporan OPD Bulanan, Capaian Triwulan, Laporan Realisasi Fisik.
+            <p className="text-xs text-slate-500 font-normal">
+              Laporan Fisik Bulanan, Capaian Triwulan, Laporan OPD.
+            </p>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setDocType('GENERAL_REFERENCE');
+              setCategory('Referensi Umum & Kliping');
+            }}
+            className={`p-3 text-left transition-all cursor-pointer ${
+              docType === 'GENERAL_REFERENCE'
+                ? 'bg-teal-50/80 border-b-2 border-teal-700 text-teal-950 font-bold'
+                : 'hover:bg-slate-50 text-slate-700 border-b-2 border-transparent'
+            }`}
+          >
+            <div className="text-sm font-bold flex items-center gap-1.5 text-teal-800 mb-0.5">
+              <Newspaper size={15} className="text-teal-600 shrink-0" />
+              <span>3. Umum / Referensi</span>
+            </div>
+            <p className="text-xs text-slate-500 font-normal">
+              Berita, Regulasi/Inpres, Kliping Media, Artikel Riset.
             </p>
           </button>
         </div>
@@ -3806,7 +4480,7 @@ export const UploadDropzone: React.FC<UploadDropzoneProps> = ({ onUploadSuccess 
           onDragOver={(e) => e.preventDefault()}
           onDrop={handleDrop}
           onClick={() => fileInputRef.current?.click()}
-          className="border-2 border-dashed border-slate-300 hover:border-teal-600 bg-slate-50 p-8 text-center cursor-pointer transition-colors rounded-none flex flex-col items-center justify-center gap-2"
+          className="border border-dashed border-slate-300 hover:border-teal-600 bg-slate-50/50 p-6 text-center cursor-pointer transition-colors rounded-none flex flex-col items-center justify-center gap-2"
         >
           <input
             type="file"
@@ -3815,7 +4489,7 @@ export const UploadDropzone: React.FC<UploadDropzoneProps> = ({ onUploadSuccess 
             accept=".pdf,.docx,.txt"
             className="hidden"
           />
-          <UploadCloud size={36} className="text-teal-600 mb-1" />
+          <UploadCloud size={32} className="text-teal-600 mb-1" />
           {file ? (
             <div className="flex items-center gap-2 text-slate-800 font-medium text-sm">
               <FileText size={16} className="text-teal-600" />
@@ -3836,7 +4510,7 @@ export const UploadDropzone: React.FC<UploadDropzoneProps> = ({ onUploadSuccess 
         {}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block font-roboto text-xs font-semibold text-slate-600 mb-1 uppercase tracking-wider">
+            <label className="block font-roboto text-sm font-bold text-slate-800 mb-1.5">
               Judul Dokumen / Laporan
             </label>
             <input
@@ -3845,24 +4519,31 @@ export const UploadDropzone: React.FC<UploadDropzoneProps> = ({ onUploadSuccess 
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Contoh: RPJMD Kabupaten Mimika 2026"
               required
-              className="w-full bg-white border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:border-teal-600 rounded-none shadow-xs"
+              className="w-full bg-white border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:border-teal-600 rounded-none shadow-2xs"
             />
           </div>
           <div>
-            <label className="block font-roboto text-xs font-semibold text-slate-600 mb-1 uppercase tracking-wider">
-              Kategori Dokumen
+            <label className="block font-roboto text-sm font-bold text-slate-800 mb-1.5">
+              Kategori Dokumen (Sesuai Klasifikasi)
             </label>
             <select
               value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              className="w-full bg-white border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:border-teal-600 rounded-none shadow-xs"
+              onChange={(e) => {
+                const val = e.target.value;
+                setCategory(val);
+                if (val.includes('Baseline') || val.includes('Perencanaan')) {
+                  setDocType('BASELINE');
+                } else if (val.includes('Realisasi') || val.includes('Capaian')) {
+                  setDocType('REALIZATION');
+                } else {
+                  setDocType('GENERAL_REFERENCE');
+                }
+              }}
+              className="w-full bg-slate-50 border border-slate-300 px-3 py-2 text-sm text-slate-900 font-medium focus:outline-none focus:border-teal-600 rounded-none shadow-2xs"
             >
-              <option value="Perencanaan & Baseline">Perencanaan & Baseline Target</option>
-              <option value="Laporan Realisasi">Laporan Realisasi Capaian</option>
-              <option value="Laporan Investigasi">Laporan Investigasi</option>
-              <option value="Analisis Kebijakan">Analisis Kebijakan</option>
-              <option value="Dokumen Hukum">Dokumen Hukum</option>
-              <option value="General Report">General Report</option>
+              <option value="Perencanaan & Baseline Target">Perencanaan &amp; Baseline Target (Baseline)</option>
+              <option value="Laporan Realisasi Capaian">Laporan Realisasi Capaian (Realisasi)</option>
+              <option value="Referensi Umum & Kliping">Referensi Umum &amp; Kliping (Umum)</option>
             </select>
           </div>
         </div>
@@ -3892,16 +4573,19 @@ export const UploadDropzone: React.FC<UploadDropzoneProps> = ({ onUploadSuccess 
 import React, { useState, useEffect } from 'react';
 import { UploadDropzone } from '../components/upload-dropzone';
 import { DocumentTable } from '../components/document-table';
+import { DocumentDetailModal } from '../components/document-detail-modal.component';
 import { DocumentService, type DocumentRecord } from '../../../services/document.service';
 import { MOCK_DATA } from '../../../services/mock-data.service';
-import { Loader2, AlertCircle, RefreshCw } from 'lucide-react';
+import { Loader2, AlertCircle, RefreshCw, Trash2 } from 'lucide-react';
 
 export const KnowledgeHubView: React.FC = () => {
   const [documents, setDocuments] = useState<DocumentRecord[]>([]);
-  const [selectedDocId, setSelectedDocId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isUsingMock, setIsUsingMock] = useState(false);
+  const [detailDoc, setDetailDoc] = useState<DocumentRecord | null>(null);
+  const [deleteConfirmDoc, setDeleteConfirmDoc] = useState<DocumentRecord | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const loadDocuments = async () => {
     setIsLoading(true);
@@ -3910,17 +4594,11 @@ export const KnowledgeHubView: React.FC = () => {
       const docs = await DocumentService.listDocuments();
       setDocuments(docs);
       setIsUsingMock(false);
-      if (docs.length > 0 && !selectedDocId) {
-        setSelectedDocId(docs[0].id);
-      }
     } catch {
 
       setDocuments(MOCK_DATA.documents);
       setIsUsingMock(true);
       setLoadError('Backend tidak terhubung — menampilkan data contoh.');
-      if (MOCK_DATA.documents.length > 0 && !selectedDocId) {
-        setSelectedDocId(MOCK_DATA.documents[0].id);
-      }
     } finally {
       setIsLoading(false);
     }
@@ -3932,13 +4610,24 @@ export const KnowledgeHubView: React.FC = () => {
 
   const handleUploadSuccess = (newDoc: DocumentRecord) => {
     setDocuments((prev) => [newDoc, ...prev]);
-    setSelectedDocId(newDoc.id);
     setIsUsingMock(false);
     setLoadError(null);
   };
 
-  const handleSelectDocument = (doc: DocumentRecord) => {
-    setSelectedDocId(doc.id);
+  const handleDeleteConfirm = async () => {
+    if (!deleteConfirmDoc) return;
+    setIsDeleting(true);
+    try {
+      if (!isUsingMock) {
+        await DocumentService.deleteDocument(deleteConfirmDoc.id);
+      }
+      setDocuments((prev) => prev.filter((d) => d.id !== deleteConfirmDoc.id));
+      setDeleteConfirmDoc(null);
+    } catch (err: any) {
+      alert(err.message || 'Gagal menghapus dokumen.');
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   return (
@@ -3964,7 +4653,7 @@ export const KnowledgeHubView: React.FC = () => {
           </div>
           <button
             onClick={loadDocuments}
-            className="flex items-center gap-1 text-amber-800 hover:text-amber-900 font-bold underline"
+            className="flex items-center gap-1 text-amber-800 hover:text-amber-900 font-bold underline cursor-pointer"
           >
             <RefreshCw size={12} />
             Coba Lagi
@@ -3984,13 +4673,55 @@ export const KnowledgeHubView: React.FC = () => {
       ) : (
         <DocumentTable
           documents={documents}
-          selectedDocumentId={selectedDocId}
-          onSelectDocument={handleSelectDocument}
+          onViewDetail={(doc) => setDetailDoc(doc)}
+          onDeleteDocument={(doc) => setDeleteConfirmDoc(doc)}
         />
+      )}
+
+      {}
+      <DocumentDetailModal
+        document={detailDoc}
+        onClose={() => setDetailDoc(null)}
+      />
+
+      {}
+      {deleteConfirmDoc && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+          <div className="bg-white border border-slate-200 shadow-2xl w-full max-w-md p-6 space-y-4 rounded-none">
+            <div className="flex items-center gap-3 text-red-600">
+              <div className="p-2 bg-red-50 border border-red-200">
+                <Trash2 size={20} />
+              </div>
+              <h3 className="text-base font-bold text-slate-900">Konfirmasi Hapus Dokumen</h3>
+            </div>
+            <p className="text-sm text-slate-600">
+              Apakah Anda yakin ingin menghapus dokumen <strong className="text-slate-900">"{deleteConfirmDoc.title}"</strong>?
+              Tindakan ini akan menghapus dokumen beserta data vector chunks terkait dari Knowledge Hub.
+            </p>
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                onClick={() => setDeleteConfirmDoc(null)}
+                disabled={isDeleting}
+                className="px-4 py-2 text-xs font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                onClick={handleDeleteConfirm}
+                disabled={isDeleting}
+                className="px-4 py-2 text-xs font-semibold text-white bg-red-600 hover:bg-red-700 transition-colors inline-flex items-center gap-1.5 cursor-pointer"
+              >
+                {isDeleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                <span>{isDeleting ? 'Menghapus...' : 'Ya, Hapus Dokumen'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
 };
+
 
 --- FILE: src\modules\reports\views\reports.view.tsx ---
 import React, { useState, useEffect, useRef } from 'react';
@@ -4339,22 +5070,22 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
       <div className="flex flex-wrap items-center justify-between gap-4 no-print border-b border-slate-200 pb-4">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-xl font-bold text-slate-900 uppercase tracking-wide">
-              Modul Laporan Eksekutif & Acuan Multidokumen
+            <h1 className="text-xl font-bold text-slate-900 tracking-tight">
+              Modul Laporan Eksekutif &amp; Acuan Multidokumen
             </h1>
-            <span className="px-2.5 py-0.5 bg-teal-100 text-teal-800 border border-teal-300 text-xs font-bold uppercase rounded-none">
+            <span className="px-2 py-0.5 bg-teal-50 text-teal-800 text-xs font-semibold rounded-none">
               Token Efficiency Mode
             </span>
           </div>
-          <p className="text-xs text-slate-600 font-medium mt-1">
-            Cari & pilih dokumen acuan dari dropdown. Jika belum tersedia di database, Anda dapat langsung mengunggah file TXT/PDF.
+          <p className="text-xs text-slate-500 font-normal mt-1">
+            Cari &amp; pilih dokumen acuan dari dropdown. Jika belum tersedia di database, Anda dapat langsung mengunggah file TXT/PDF.
           </p>
         </div>
 
         <div className="flex items-center gap-2">
           <button
             onClick={() => setIsUploadModalOpen(true)}
-            className="px-3.5 py-1.5 bg-teal-700 hover:bg-teal-800 text-white text-xs font-bold uppercase rounded-none border border-teal-800 inline-flex items-center gap-2 shadow-xs"
+            className="px-3.5 py-1.5 bg-teal-700 hover:bg-teal-800 text-white text-xs font-bold rounded-none flex items-center gap-2 shadow-2xs cursor-pointer"
           >
             <UploadCloud size={14} />
             <span>+ Unggah Dokumen Acuan Baru</span>
@@ -4363,7 +5094,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
           {onNavigateToDashboard && (
             <button
               onClick={onNavigateToDashboard}
-              className="px-3.5 py-1.5 bg-white hover:bg-slate-100 text-slate-800 text-xs font-bold uppercase rounded-none border border-slate-300 inline-flex items-center gap-2 shadow-2xs"
+              className="px-3.5 py-1.5 bg-white hover:bg-slate-100 text-slate-700 text-xs font-semibold rounded-none border border-slate-300 flex items-center gap-2 shadow-2xs cursor-pointer"
             >
               <ArrowLeft size={14} />
               <span>Dashboard</span>
@@ -4373,11 +5104,12 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
       </div>
 
       {}
-      <div className="bg-white border border-slate-300 p-5 rounded-none shadow-xs space-y-4 no-print">
+      <div className="bg-white border border-slate-200 p-5 rounded-none shadow-2xs space-y-4 no-print">
+
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
           <div className="flex items-center gap-2">
             <FileText size={18} className="text-teal-700" />
-            <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wide">
+            <h2 className="text-sm font-bold text-slate-900 tracking-wide">
               Pilihan Dokumen Acuan Laporan ({selectedDocIds.length} Dipilih)
             </h2>
           </div>
@@ -4389,12 +5121,12 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
               <span>Memeriksa Cache Database...</span>
             </span>
           ) : cacheStatus?.isCached ? (
-            <span className="px-3 py-1 bg-emerald-100 text-emerald-800 border border-emerald-300 text-xs font-bold flex items-center gap-1.5">
+            <span className="px-2.5 py-1 bg-emerald-50 text-emerald-800 text-xs font-semibold flex items-center gap-1.5">
               <Zap size={14} className="text-emerald-600" />
               <span>Tersedia di DB Cache (Hemat 100% Token!)</span>
             </span>
           ) : selectedDocIds.length > 0 ? (
-            <span className="px-3 py-1 bg-sky-100 text-sky-800 border border-sky-300 text-xs font-bold flex items-center gap-1.5">
+            <span className="px-2.5 py-1 bg-sky-50 text-sky-800 text-xs font-semibold flex items-center gap-1.5">
               <Sparkles size={14} className="text-sky-600" />
               <span>Kombinasi Baru (Diperlukan Generasi AI)</span>
             </span>
@@ -4404,14 +5136,14 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
         {}
         <div className="space-y-3">
           <div className="relative" ref={dropdownRef}>
-            <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+            <label className="block text-sm font-bold text-slate-800 mb-1.5">
               Cari & Pilih Dokumen Acuan (Dropdown Interaktif)
             </label>
 
             {}
             <div
               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-              className="w-full bg-slate-50 hover:bg-slate-100 border border-slate-300 p-2.5 cursor-pointer flex items-center justify-between gap-2 rounded-none min-h-[42px]"
+              className="w-full bg-slate-50 hover:bg-slate-100/80 border border-slate-300 p-2.5 cursor-pointer flex items-center justify-between gap-2 rounded-none min-h-[42px] transition-colors"
             >
               <div className="flex items-center gap-2 min-w-0 flex-1">
                 <Search size={16} className="text-slate-500 shrink-0" />
@@ -4420,7 +5152,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                     -- Pilih atau cari dokumen acuan di database --
                   </span>
                 ) : (
-                  <span className="text-xs text-slate-900 font-bold truncate">
+                  <span className="text-xs text-slate-900 font-semibold truncate">
                     {selectedDocObjects.map((d) => d.title).join(', ')}
                   </span>
                 )}
@@ -4453,35 +5185,34 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                     <button
                       type="button"
                       onClick={() => setSearchQuery('')}
-                      className="absolute right-2.5 top-2 text-slate-400 hover:text-slate-600"
+                      className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600"
                     >
-                      <X size={14} />
+                      <X size={13} />
                     </button>
                   )}
                 </div>
 
                 {}
-                <div className="flex items-center justify-between text-[11px] font-semibold text-slate-600 border-b border-slate-200 pb-2">
-                  <span>Menampilkan {filteredDocuments.length} dari {documents.length} dokumen</span>
-                  <div className="flex items-center gap-2">
+                <div className="flex items-center justify-between text-xs text-slate-500 border-b border-slate-200 pb-2">
+                  <span>Daftar Dokumen Pengetahuan ({filteredDocuments.length})</span>
+                  <div className="flex items-center gap-3">
                     <button
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
                         handleSelectAll();
                       }}
-                      className="text-teal-700 hover:underline"
+                      className="text-teal-700 hover:underline font-semibold"
                     >
                       Pilih Semua
                     </button>
-                    <span>&bull;</span>
                     <button
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
                         handleClearAll();
                       }}
-                      className="text-red-600 hover:underline"
+                      className="text-slate-500 hover:underline font-medium"
                     >
                       Kosongkan
                     </button>
@@ -4550,14 +5281,14 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
               {selectedDocObjects.map((doc) => (
                 <span
                   key={doc.id}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-teal-100 border border-teal-300 text-teal-900 text-xs font-bold rounded-none"
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-teal-50 text-teal-900 text-xs font-semibold rounded-none"
                 >
                   <FileText size={12} className="text-teal-700" />
                   <span className="max-w-xs truncate">{doc.title}</span>
                   <button
                     type="button"
                     onClick={() => toggleSelectDocument(doc.id)}
-                    className="hover:text-red-700 ml-1 text-slate-500"
+                    className="hover:text-red-700 ml-1 text-slate-400"
                     title="Hapus acuan ini"
                   >
                     <X size={13} />
@@ -5357,6 +6088,11 @@ export interface DocumentRecord {
   };
   chunkCount?: number;
   extractedLocationsCount?: number;
+  chunks?: {
+    chunkIndex: number;
+    rawText: string;
+    tokenCount: number;
+  }[];
 }
 
 const formatError = (msg: any, fallback: string): string => {
@@ -5410,7 +6146,18 @@ export const DocumentService = {
     }
     return result.data;
   },
+
+  async deleteDocument(id: string): Promise<void> {
+    const response = await fetch(`${API_BASE_URL}/documents/${id}`, {
+      method: 'DELETE',
+    });
+    const result = await response.json();
+    if (!response.ok || !result.success) {
+      throw new Error(formatError(result.message, 'Gagal menghapus dokumen.'));
+    }
+  },
 };
+
 
 --- FILE: src\services\mock-data.service.ts ---
 import type { DocumentRecord } from './document.service';

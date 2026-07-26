@@ -357,22 +357,22 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
       <div className="flex flex-wrap items-center justify-between gap-4 no-print border-b border-slate-200 pb-4">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-xl font-bold text-slate-900 uppercase tracking-wide">
-              Modul Laporan Eksekutif & Acuan Multidokumen
+            <h1 className="text-xl font-bold text-slate-900 tracking-tight">
+              Modul Laporan Eksekutif &amp; Acuan Multidokumen
             </h1>
-            <span className="px-2.5 py-0.5 bg-teal-100 text-teal-800 border border-teal-300 text-xs font-bold uppercase rounded-none">
+            <span className="px-2 py-0.5 bg-teal-50 text-teal-800 text-xs font-semibold rounded-none">
               Token Efficiency Mode
             </span>
           </div>
-          <p className="text-xs text-slate-600 font-medium mt-1">
-            Cari & pilih dokumen acuan dari dropdown. Jika belum tersedia di database, Anda dapat langsung mengunggah file TXT/PDF.
+          <p className="text-xs text-slate-500 font-normal mt-1">
+            Cari &amp; pilih dokumen acuan dari dropdown. Jika belum tersedia di database, Anda dapat langsung mengunggah file TXT/PDF.
           </p>
         </div>
 
         <div className="flex items-center gap-2">
           <button
             onClick={() => setIsUploadModalOpen(true)}
-            className="px-3.5 py-1.5 bg-teal-700 hover:bg-teal-800 text-white text-xs font-bold uppercase rounded-none border border-teal-800 inline-flex items-center gap-2 shadow-xs"
+            className="px-3.5 py-1.5 bg-teal-700 hover:bg-teal-800 text-white text-xs font-bold rounded-none flex items-center gap-2 shadow-2xs cursor-pointer"
           >
             <UploadCloud size={14} />
             <span>+ Unggah Dokumen Acuan Baru</span>
@@ -381,7 +381,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
           {onNavigateToDashboard && (
             <button
               onClick={onNavigateToDashboard}
-              className="px-3.5 py-1.5 bg-white hover:bg-slate-100 text-slate-800 text-xs font-bold uppercase rounded-none border border-slate-300 inline-flex items-center gap-2 shadow-2xs"
+              className="px-3.5 py-1.5 bg-white hover:bg-slate-100 text-slate-700 text-xs font-semibold rounded-none border border-slate-300 flex items-center gap-2 shadow-2xs cursor-pointer"
             >
               <ArrowLeft size={14} />
               <span>Dashboard</span>
@@ -391,11 +391,12 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
       </div>
 
       {/* SECTION 1: Searchable Combobox / Multi-Select Dropdown & Cache Alert */}
-      <div className="bg-white border border-slate-300 p-5 rounded-none shadow-xs space-y-4 no-print">
+      <div className="bg-white border border-slate-200 p-5 rounded-none shadow-2xs space-y-4 no-print">
+
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
           <div className="flex items-center gap-2">
             <FileText size={18} className="text-teal-700" />
-            <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wide">
+            <h2 className="text-sm font-bold text-slate-900 tracking-wide">
               Pilihan Dokumen Acuan Laporan ({selectedDocIds.length} Dipilih)
             </h2>
           </div>
@@ -407,12 +408,12 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
               <span>Memeriksa Cache Database...</span>
             </span>
           ) : cacheStatus?.isCached ? (
-            <span className="px-3 py-1 bg-emerald-100 text-emerald-800 border border-emerald-300 text-xs font-bold flex items-center gap-1.5">
+            <span className="px-2.5 py-1 bg-emerald-50 text-emerald-800 text-xs font-semibold flex items-center gap-1.5">
               <Zap size={14} className="text-emerald-600" />
               <span>Tersedia di DB Cache (Hemat 100% Token!)</span>
             </span>
           ) : selectedDocIds.length > 0 ? (
-            <span className="px-3 py-1 bg-sky-100 text-sky-800 border border-sky-300 text-xs font-bold flex items-center gap-1.5">
+            <span className="px-2.5 py-1 bg-sky-50 text-sky-800 text-xs font-semibold flex items-center gap-1.5">
               <Sparkles size={14} className="text-sky-600" />
               <span>Kombinasi Baru (Diperlukan Generasi AI)</span>
             </span>
@@ -422,14 +423,14 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
         {/* Searchable Dropdown Control */}
         <div className="space-y-3">
           <div className="relative" ref={dropdownRef}>
-            <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+            <label className="block text-sm font-bold text-slate-800 mb-1.5">
               Cari & Pilih Dokumen Acuan (Dropdown Interaktif)
             </label>
 
             {/* Dropdown Input / Trigger */}
             <div
               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-              className="w-full bg-slate-50 hover:bg-slate-100 border border-slate-300 p-2.5 cursor-pointer flex items-center justify-between gap-2 rounded-none min-h-[42px]"
+              className="w-full bg-slate-50 hover:bg-slate-100/80 border border-slate-300 p-2.5 cursor-pointer flex items-center justify-between gap-2 rounded-none min-h-[42px] transition-colors"
             >
               <div className="flex items-center gap-2 min-w-0 flex-1">
                 <Search size={16} className="text-slate-500 shrink-0" />
@@ -438,7 +439,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                     -- Pilih atau cari dokumen acuan di database --
                   </span>
                 ) : (
-                  <span className="text-xs text-slate-900 font-bold truncate">
+                  <span className="text-xs text-slate-900 font-semibold truncate">
                     {selectedDocObjects.map((d) => d.title).join(', ')}
                   </span>
                 )}
@@ -471,35 +472,34 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                     <button
                       type="button"
                       onClick={() => setSearchQuery('')}
-                      className="absolute right-2.5 top-2 text-slate-400 hover:text-slate-600"
+                      className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600"
                     >
-                      <X size={14} />
+                      <X size={13} />
                     </button>
                   )}
                 </div>
 
-                {/* Quick Selection Toolbar */}
-                <div className="flex items-center justify-between text-[11px] font-semibold text-slate-600 border-b border-slate-200 pb-2">
-                  <span>Menampilkan {filteredDocuments.length} dari {documents.length} dokumen</span>
-                  <div className="flex items-center gap-2">
+                {/* Quick Selection Actions */}
+                <div className="flex items-center justify-between text-xs text-slate-500 border-b border-slate-200 pb-2">
+                  <span>Daftar Dokumen Pengetahuan ({filteredDocuments.length})</span>
+                  <div className="flex items-center gap-3">
                     <button
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
                         handleSelectAll();
                       }}
-                      className="text-teal-700 hover:underline"
+                      className="text-teal-700 hover:underline font-semibold"
                     >
                       Pilih Semua
                     </button>
-                    <span>&bull;</span>
                     <button
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
                         handleClearAll();
                       }}
-                      className="text-red-600 hover:underline"
+                      className="text-slate-500 hover:underline font-medium"
                     >
                       Kosongkan
                     </button>
@@ -562,20 +562,20 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
             )}
           </div>
 
-          {/* Selected Document Tags / Pills */}
+          {/* Selected Document Tags / Pills (Flat Badge Style - No Box Borders) */}
           {selectedDocObjects.length > 0 && (
             <div className="flex flex-wrap gap-2 pt-1">
               {selectedDocObjects.map((doc) => (
                 <span
                   key={doc.id}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-teal-100 border border-teal-300 text-teal-900 text-xs font-bold rounded-none"
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-teal-50 text-teal-900 text-xs font-semibold rounded-none"
                 >
                   <FileText size={12} className="text-teal-700" />
                   <span className="max-w-xs truncate">{doc.title}</span>
                   <button
                     type="button"
                     onClick={() => toggleSelectDocument(doc.id)}
-                    className="hover:text-red-700 ml-1 text-slate-500"
+                    className="hover:text-red-700 ml-1 text-slate-400"
                     title="Hapus acuan ini"
                   >
                     <X size={13} />

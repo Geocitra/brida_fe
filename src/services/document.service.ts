@@ -18,7 +18,13 @@ export interface DocumentRecord {
   };
   chunkCount?: number;
   extractedLocationsCount?: number;
+  chunks?: {
+    chunkIndex: number;
+    rawText: string;
+    tokenCount: number;
+  }[];
 }
+
 
 const formatError = (msg: any, fallback: string): string => {
   if (!msg) return fallback;
@@ -71,4 +77,15 @@ export const DocumentService = {
     }
     return result.data;
   },
+
+  async deleteDocument(id: string): Promise<void> {
+    const response = await fetch(`${API_BASE_URL}/documents/${id}`, {
+      method: 'DELETE',
+    });
+    const result = await response.json();
+    if (!response.ok || !result.success) {
+      throw new Error(formatError(result.message, 'Gagal menghapus dokumen.'));
+    }
+  },
 };
+
