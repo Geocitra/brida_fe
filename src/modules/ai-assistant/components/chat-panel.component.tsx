@@ -116,11 +116,14 @@ const parseInlineStyles = (lineText: string): React.ReactNode[] => {
   return parts;
 };
 
-interface RichMessageRendererProps {
+export interface RichMessageRendererProps {
   text: string;
 }
 
-const RichMessageRenderer: React.FC<RichMessageRendererProps> = ({ text }) => {
+/**
+ * Komponen Perender Teks Markdown Terpadu (Eksport Publik untuk Reusability) [3].
+ */
+export const RichMessageRenderer: React.FC<RichMessageRendererProps> = ({ text }) => {
   const lines = text.split('\n');
   const elements: React.ReactNode[] = [];
 
@@ -807,7 +810,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             <button
               type="submit"
               disabled={!hasSelectedDoc || !inputQuery.trim() || isLoading}
-              className="px-5 py-3 bg-teal-700 hover:bg-teal-800 disabled:bg-slate-50 text-white disabled:text-slate-500 font-bold text-xs uppercase transition-colors flex items-center gap-2 cursor-pointer disabled:cursor-not-allowed shrink-0 h-full"
+              className="px-5 py-3 bg-teal-700 hover:bg-teal-800 disabled:bg-slate-55 text-white disabled:text-slate-500 font-bold text-xs uppercase transition-colors flex items-center gap-2 cursor-pointer disabled:cursor-not-allowed shrink-0 h-full"
             >
               <span>Kirim</span>
               <Send size={14} className="shrink-0" />

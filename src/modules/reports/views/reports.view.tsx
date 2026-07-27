@@ -242,7 +242,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
 
     setCurrentReport({
       title: reportDetail.title || payload.title || 'Laporan Eksekutif Resmi Bupati',
-      urgency: payload.urgency || 'SANGAT TINGGI (MEMERLUKAN DISPOSISI)',
+      urgency: payload.urgency || 'TINGGI',
       recipient: payload.recipient || 'Bupati Mimika',
       sender: payload.sender || 'Kepala Badan Riset dan Inovasi Daerah (BRIDA) Kabupaten Mimika',
       period: payload.period || 'Triwulan IV 2024 / Sintesis Multidokumen',
@@ -485,10 +485,30 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                     {currentReport.title}
                   </h1>
                 </div>
-                <span className="px-3 py-1 bg-red-50 text-red-800 text-xs font-bold uppercase rounded-none flex items-center gap-1 shrink-0 self-start">
-                  <ShieldAlert size={14} className="text-red-700" />
-                  <span>SIFAT: {currentReport.urgency}</span>
-                </span>
+                {(() => {
+                  const urgencyStr = (currentReport.urgency || '').toUpperCase();
+                  const isHigh = urgencyStr.includes('TINGGI') || urgencyStr.includes('UTAMA');
+                  const isMedium = urgencyStr.includes('SEDANG') || urgencyStr.includes('MENENGAH');
+                  
+                  const bgClass = isHigh
+                    ? 'bg-red-50 text-red-800 border border-red-200'
+                    : isMedium
+                    ? 'bg-amber-50 text-amber-800 border border-amber-200'
+                    : 'bg-emerald-50 text-emerald-800 border border-emerald-200';
+
+                  return (
+                    <span className={`px-3 py-1 text-xs font-bold uppercase rounded-none flex items-center gap-1.5 shrink-0 self-start ${bgClass}`}>
+                      {isHigh ? (
+                        <ShieldAlert size={14} className="text-red-750" />
+                      ) : isMedium ? (
+                        <AlertTriangle size={14} className="text-amber-750" />
+                      ) : (
+                        <CheckCircle2 size={14} className="text-emerald-750" />
+                      )}
+                      <span>PRIORITAS: {currentReport.urgency}</span>
+                    </span>
+                  );
+                })()}
               </div>
 
               {/* Penerima/Pengirim Details (Left Border Accent - Zero Nested Box) */}

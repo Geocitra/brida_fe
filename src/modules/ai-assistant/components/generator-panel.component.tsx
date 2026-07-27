@@ -37,7 +37,7 @@ export const GeneratorPanel: React.FC<GeneratorPanelProps> = ({ selectedDocument
   };
 
   return (
-    <div className="bg-white border border-slate-200 flex flex-col h-[600px] rounded-none shadow-sm">
+    <div className="bg-white border border-slate-200 flex flex-col h-150 rounded-none shadow-sm">
       <div className="px-6 py-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
         <div>
           <h2 className="text-h2 text-slate-800">Article & Release Generator (CoT)</h2>

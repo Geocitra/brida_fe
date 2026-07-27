@@ -185,6 +185,23 @@ export const AiAssistantService = {
     return result.data;
   },
 
+  /**
+   * Menyinkronkan konten hasil suntingan manual naskah draf artikel ke database (Two-Way Sync) [1].
+   * Menjamin kesalahan jaringan tertangkap secara terpadu oleh AiServiceException [5].
+   */
+  async updateArticleSessionContent(
+    sessionId: string,
+    articleTitle: string,
+    fullArticleText: string,
+  ): Promise<ArticleSessionDetail> {
+    const result = await safeFetch(`${API_BASE_URL}/assistant/article/sessions/${sessionId}/content`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ articleTitle, fullArticleText }),
+    });
+    return result.data;
+  },
+
   async listArticleSessions(): Promise<ArticleSessionDetail[]> {
     const result = await safeFetch(`${API_BASE_URL}/assistant/article/sessions`, {
       method: 'GET',

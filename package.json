@@ -16,10 +16,12 @@
     "axios": "^1.18.1",
     "clsx": "^2.1.1",
     "docx-preview": "^0.4.0",
+    "html-to-pdfmake": "^2.5.33",
     "html2canvas": "^1.4.1",
     "jspdf": "^4.2.1",
     "leaflet": "^1.9.4",
     "lucide-react": "^1.26.0",
+    "marked": "^18.0.7",
     "pdfmake": "^0.3.11",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
@@ -28,6 +30,7 @@
     "tailwindcss": "^4.3.3"
   },
   "devDependencies": {
+    "@types/marked": "^5.0.2",
     "@types/node": "^24.13.2",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",

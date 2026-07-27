@@ -1,5 +1,5 @@
 import React from 'react';
-import { Database, ShieldCheck, Cpu } from 'lucide-react';
+import { Cpu } from 'lucide-react';
 
 export const AppFooter: React.FC = () => {
   const currentYear = new Date().getFullYear();

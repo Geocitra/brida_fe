@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { DocumentService } from '../../../services/document.service';
 import type { DocumentRecord } from '../../../services/document.service';
-import { AiAssistantService } from '../../../services/ai-assistant.service';
+import { AiAssistantService, AiServiceException } from '../../../services/ai-assistant.service';
 import type { ArticleSessionDetail } from '../../../services/ai-assistant.service';
 import { CategorizedDocumentSelector } from '../../../components/common/categorized-document-selector.component';
+import { AiErrorMapper } from '../utils/error-mapper.util';
+import { RichMessageRenderer } from '../components/chat-panel.component'; // Mengimpor perender terpadu (DRY) [3]
 import {
   MessageSquareCode,
   Sparkles,
@@ -22,41 +24,164 @@ import {
   Layers,
   Database,
   RefreshCw,
+  // Ikon tambahan untuk perakitan kartu fallback draf
+  AlertCircle,
+  ShieldAlert,
+  WifiOff,
+  Plus,
+  LogOut,
 } from 'lucide-react';
 
-interface ArticleGeneratorViewProps {
+// --- SUB-KOMPONEN 1: KARTU GANGGUAN SINTESIS ARTIKEL (Polymorphic Drafting Error Card) [1, 5] ---
+
+const iconMap = {
+  AlertCircle,
+  Clock,
+  ShieldAlert,
+  WifiOff,
+  Database,
+};
+
+interface DraftingFallbackCardProps {
+  errorType: string;
+  rawErrorMsg: string;
+  onRetry: () => void;
+  onNewSession: () => void;
+}
+
+const DraftingFallbackCard: React.FC<DraftingFallbackCardProps> = ({
+  errorType,
+  rawErrorMsg,
+  onRetry,
+  onNewSession,
+}) => {
+  // Evaluasi kesalahan menggunakan mapper di bawah konteks kepenulisan (DRAFTING) [1, 5]
+  const mapped = AiErrorMapper.map(new AiServiceException(500, errorType, rawErrorMsg), 'DRAFTING');
+  const IconComponent = iconMap[mapped.iconName] || AlertCircle;
+
+  return (
+    <div className="bg-slate-50 border border-slate-300 p-6 my-4 font-roboto w-full text-slate-800 space-y-4 shadow-2xs">
+      <div className="flex items-start gap-4">
+        <div className="p-2 bg-white border border-slate-200 shrink-0 text-slate-600">
+          <IconComponent size={20} className="animate-pulse" />
+        </div>
+        <div className="space-y-1">
+          <h4 className="text-sm font-bold uppercase tracking-wider text-slate-900 leading-snug">
+            {mapped.title}
+          </h4>
+          <p className="text-xs font-semibold text-slate-600 leading-relaxed text-justify">
+            {mapped.description}
+          </p>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-slate-200/60 no-print">
+        {mapped.actionType === 'RETRY' && (
+          <button
+            type="button"
+            onClick={onRetry}
+            className="px-4 py-2 bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-1.5 cursor-pointer border border-teal-800 shadow-2xs"
+          >
+            <RefreshCw size={12} className="shrink-0" />
+            <span>Coba Sintesis Ulang</span>
+          </button>
+        )}
+
+        {mapped.actionType === 'NEW_SESSION' && (
+          <button
+            type="button"
+            onClick={onNewSession}
+            className="px-4 py-2 bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-1.5 cursor-pointer border border-teal-800 shadow-2xs"
+          >
+            <Plus size={12} className="shrink-0" />
+            <span>Mulai Sesi Baru</span>
+          </button>
+        )}
+
+        {mapped.actionType === 'LOGIN' && (
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-slate-900 hover:bg-slate-950 text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-1.5 cursor-pointer border border-slate-950 shadow-2xs"
+          >
+            <LogOut size={12} className="shrink-0" />
+            <span>Masuk Sesi Kembali</span>
+          </button>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export type DraftingStatus = 'IDLE' | 'SUCCESS' | 'ERROR';
+
+export interface ArticleGeneratorViewProps {
   initialPrompt?: string;
   onNavigateToQa: () => void;
+  onNavigateToEditor: (sessionId: string) => void;
 }
+
+// --- HELPERS ---
+
+const getAssistantMessageSummary = (content: string): string => {
+  if (!content) return '';
+  // Bersihkan markdown formatting untuk summary
+  let clean = content
+    .replace(/#+\s+.+/g, '') // Hapus header baris (# Judul)
+    .replace(/[*_`]/g, '')    // Hapus format bold/italic/code
+    .replace(/\s+/g, ' ')     // Ubah spasi berlebih menjadi spasi tunggal
+    .trim();
+  
+  if (clean.length > 180) {
+    return clean.substring(0, 180) + '...';
+  }
+  return clean;
+};
+
+// --- KOMPONEN UTAMA: ARTICLE GENERATOR VIEW ---
 
 export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
   initialPrompt,
   onNavigateToQa,
+  onNavigateToEditor,
 }) => {
-  // Document Selection State
+  // Pengelolaan State Pilihan Dokumen
   const [documents, setDocuments] = useState<DocumentRecord[]>([]);
   const [selectedDocIds, setSelectedDocIds] = useState<string[]>([]);
   const [isLoadingDocs, setIsLoadingDocs] = useState<boolean>(true);
 
-  // Form Generator Configuration
+  // Parameter Konfigurasi Artikel
   const [articleTitle, setArticleTitle] = useState<string>('');
   const [tone, setTone] = useState<string>('solutif');
   const [targetLength, setTargetLength] = useState<'SHORT' | 'MEDIUM' | 'LONG'>('MEDIUM');
   const [userInstruction, _setUserInstruction] = useState<string>(initialPrompt || '');
 
-  // Session & Interaction State
+  // Pengelolaan State Sesi & Editor Aktif
   const [activeSession, setActiveSession] = useState<ArticleSessionDetail | null>(null);
   const [articleSessionsHistory, setArticleSessionsHistory] = useState<ArticleSessionDetail[]>([]);
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [followUpQuery, setFollowUpQuery] = useState<string>('');
   const [isSendingFollowUp, setIsSendingFollowUp] = useState<boolean>(false);
 
-  // Live filter states for saved article sessions history (Calendar Datepicker & Text Search)
+  // Status Siklus Hidup Editor Artikel (State Machine) [5]
+  const [draftingStatus, setDraftingStatus] = useState<DraftingStatus>('IDLE');
+  const [draftingErrorType, setDraftingErrorType] = useState<string>('UNKNOWN_ERROR');
+  const [draftingErrorMsg, setDraftingErrorMsg] = useState<string>('');
+
+  // Cadangan memori parameter input yang gagal diproses (Fail-Safe Caching) [1, 5]
+  const [lastFailedConfig, setLastFailedConfig] = useState<{
+    documentIds: string[];
+    articleTitle: string;
+    targetLength: 'SHORT' | 'MEDIUM' | 'LONG';
+    tone: string;
+    userInstruction?: string;
+  } | null>(null);
+
+  // Parameter Filter Riwayat Artikel
   const [historySearchQuery, setHistorySearchQuery] = useState('');
   const [historyCalendarDate, setHistoryCalendarDate] = useState('');
 
   const filteredArticleSessions = articleSessionsHistory.filter((session) => {
-    // 1. Text Search Filter
     const q = historySearchQuery.toLowerCase();
     const titleText = session.articleTitle || session.title || '';
     const lastMsgText = (session as any).lastMessage || '';
@@ -64,7 +189,6 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
 
     if (!matchesText) return false;
 
-    // 2. Calendar Date Filter (YYYY-MM-DD)
     if (historyCalendarDate) {
       const sessionDate = new Date(session.updatedAt || session.createdAt);
       if (!isNaN(sessionDate.getTime())) {
@@ -76,10 +200,7 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
     return true;
   });
 
-  // Active Tab for Sidebar (Editor vs History)
   const [activeTab, setActiveTab] = useState<'editor' | 'history'>('editor');
-
-  // Toast
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const showToast = (msg: string) => {
@@ -87,7 +208,6 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
     setTimeout(() => setToastMessage(null), 4000);
   };
 
-  // Initial Data Fetch
   useEffect(() => {
     loadDocuments();
     loadHistory();
@@ -140,6 +260,9 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
     setSelectedDocIds([]);
   };
 
+  /**
+   * Mengeksekusi pembuatan draf naskah baru
+   */
   const handleGenerateNewArticle = async (e: React.FormEvent) => {
     e.preventDefault();
     if (selectedDocIds.length === 0) {
@@ -152,6 +275,9 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
     }
 
     setIsGenerating(true);
+    setDraftingStatus('IDLE');
+    setLastFailedConfig(null);
+
     try {
       const sessionDetail = await AiAssistantService.generateArticleMulti({
         documentIds: selectedDocIds,
@@ -162,16 +288,39 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
       });
 
       setActiveSession(sessionDetail);
+      setDraftingStatus('SUCCESS');
       setActiveTab('editor');
       showToast('✨ Draf artikel baru berhasil disintesis oleh AI dan disimpan ke Database!');
       loadHistory();
     } catch (err: any) {
-      showToast(`Gagal menghasilkan artikel: ${err.message}`);
+      let errorType = 'UNKNOWN_ERROR';
+      let displayMsg = err.message || 'Gagal menghasilkan artikel publikasi.';
+
+      if (err instanceof AiServiceException) {
+        errorType = err.errorType;
+        displayMsg = err.rawMessage;
+      }
+
+      setLastFailedConfig({
+        documentIds: selectedDocIds,
+        articleTitle,
+        targetLength,
+        tone,
+        userInstruction,
+      });
+
+      setDraftingErrorType(errorType);
+      setDraftingErrorMsg(displayMsg);
+      setDraftingStatus('ERROR');
+      showToast(`Sintesis draf naskah gagal: ${displayMsg}`);
     } finally {
       setIsGenerating(false);
     }
   };
 
+  /**
+   * Mengirim kueri instruksi revisi (re-drafting)
+   */
   const handleSendFollowUp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeSession || !followUpQuery.trim() || isSendingFollowUp) return;
@@ -181,25 +330,89 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
       const updated = await AiAssistantService.interactArticle(activeSession.id, followUpQuery);
       setActiveSession(updated);
       setFollowUpQuery('');
+      setDraftingStatus('SUCCESS');
       showToast('Draf artikel berhasil diperbarui berdasarkan instruksi revisi Anda.');
       loadHistory();
     } catch (err: any) {
-      showToast(`Gagal mengirim revisi: ${err.message}`);
+      let displayMsg = err.message || 'Gagal memproses revisi.';
+      if (err instanceof AiServiceException) {
+        displayMsg = err.rawMessage;
+      }
+      showToast(`Gagal memproses revisi naskah: ${displayMsg}`);
     } finally {
       setIsSendingFollowUp(false);
     }
+  };
+
+  /**
+   * Fungsi Sintesis Ulang Berbasis Parameter Cadangan (Fail-Safe Caching) [1, 5]
+   */
+  const handleRetryDrafting = async () => {
+    if (!lastFailedConfig) return;
+
+    setSelectedDocIds(lastFailedConfig.documentIds);
+    setArticleTitle(lastFailedConfig.articleTitle);
+    setTargetLength(lastFailedConfig.targetLength);
+    setTone(lastFailedConfig.tone);
+
+    setIsGenerating(true);
+    setDraftingStatus('IDLE');
+
+    try {
+      const sessionDetail = await AiAssistantService.generateArticleMulti({
+        documentIds: lastFailedConfig.documentIds,
+        articleTitle: lastFailedConfig.articleTitle,
+        targetLength: lastFailedConfig.targetLength,
+        tone: lastFailedConfig.tone,
+        userInstruction: lastFailedConfig.userInstruction,
+      });
+
+      setActiveSession(sessionDetail);
+      setDraftingStatus('SUCCESS');
+      setActiveTab('editor');
+      showToast('✨ Draf artikel berhasil disintesis ulang!');
+      loadHistory();
+      setLastFailedConfig(null);
+    } catch (err: any) {
+      let errorType = 'UNKNOWN_ERROR';
+      let displayMsg = err.message || 'Gagal melakukan sintesis ulang.';
+
+      if (err instanceof AiServiceException) {
+        errorType = err.errorType;
+        displayMsg = err.rawMessage;
+      }
+
+      setDraftingErrorType(errorType);
+      setDraftingErrorMsg(displayMsg);
+      setDraftingStatus('ERROR');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  /**
+   * Fungsi pembersih State untuk Sesi Baru (Reset States) [5]
+   */
+  const handleCreateNewSession = () => {
+    setActiveSession(null);
+    setDraftingStatus('IDLE');
+    setDraftingErrorType('UNKNOWN_ERROR');
+    setDraftingErrorMsg('');
+    setLastFailedConfig(null);
+    setFollowUpQuery('');
   };
 
   const handleOpenSessionFromHistory = async (sessionId: string) => {
     try {
       const session = await AiAssistantService.getArticleSession(sessionId);
       setActiveSession(session);
+      setDraftingStatus('SUCCESS');
       setArticleTitle(session.articleTitle || session.title);
       setTargetLength(session.targetLength || 'MEDIUM');
       setTone(session.tone || 'solutif');
 
       if (session.sources && session.sources.length > 0) {
-        setSelectedDocIds(session.sources.map((s) => s.id));
+        setSelectedDocIds(session.sources.map((s: any) => s.id));
       }
 
       setActiveTab('editor');
@@ -217,7 +430,7 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
       await AiAssistantService.deleteArticleSession(sessionId);
       showToast('Sesi artikel berhasil dihapus dari database.');
       if (activeSession?.id === sessionId) {
-        setActiveSession(null);
+        handleCreateNewSession();
       }
       loadHistory();
     } catch (err: any) {
@@ -240,8 +453,8 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
         </div>
       )}
 
-      {/* SECTION 1. HERO COMMAND STRIP HEADER */}
-      <div className="w-full bg-white border border-slate-300 px-6 py-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4 rounded-none shadow-2xs">
+      {/* SECTION 1. HERO HEADER */}
+      <div className="w-full bg-white border border-slate-300 p-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4 rounded-none shadow-2xs">
         <div className="flex flex-col">
           <h1 className="text-xl font-bold uppercase text-slate-900 tracking-tight">
             Penulis Artikel &amp; Rilis Media BRIDA
@@ -250,6 +463,14 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
             Perakitan artikel publikasi dan naskah siaran pers berbasis sintesis multidokumen acuan resmi BRIDA.
           </p>
         </div>
+
+        <button
+          onClick={onNavigateToQa}
+          className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-2 transition-colors shrink-0 cursor-pointer"
+        >
+          <MessageSquareCode size={14} />
+          <span>Kembali ke Q&amp;A Chat</span>
+        </button>
       </div>
 
       {initialPrompt && (
@@ -262,7 +483,7 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
         </div>
       )}
 
-      {/* SECTION 1: Control Panel (Multi-Doc Picker, Title Input, Length, & Tone) */}
+      {/* SECTION 2: Control Panel */}
       <div className="bg-white border border-slate-300 p-5 rounded-none shadow-xs space-y-4">
         <div className="flex items-center justify-between border-b border-slate-200 pb-3">
           <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wide flex items-center gap-2">
@@ -272,7 +493,7 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
         </div>
 
         <form onSubmit={handleGenerateNewArticle} className="space-y-4 font-roboto">
-          {/* Categorized Multi-Document Selector Hub */}
+          {/* Document Selector */}
           <CategorizedDocumentSelector
             documents={documents}
             selectedDocIds={selectedDocIds}
@@ -283,7 +504,7 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
             title="Pilih Dokumen Acuan Artikel"
           />
 
-          {/* Judul Artikel Input */}
+          {/* Title Input */}
           <div className="space-y-2 pt-4 border-t border-slate-200">
             <label className="block text-xs font-bold text-slate-800 uppercase tracking-wide">
               Judul / Topik Utama Artikel (Input Pengguna)
@@ -301,12 +522,11 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
             </p>
           </div>
 
-          {/* Row 2: Target Length & Tone Options dengan Pembatas Vertikal */}
+          {/* Target Length & Tone Options */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-slate-200">
-
-            {/* Length Selector (Kolom Kiri dengan Border Vertikal di kanan) */}
+            {/* Length Selector */}
             <div className="border-r border-slate-200 pr-6">
-              <label className="block text-xs font-bold text-slate-700 uppercase mb-2 tracking-wider">
+               <label className="block text-xs font-bold text-slate-700 uppercase mb-2 tracking-wider">
                 Panjang Teks Keluaran Artikel
               </label>
               <div className="grid grid-cols-3 divide-x divide-slate-200 border-y border-slate-200">
@@ -319,7 +539,7 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
                     key={item.key}
                     type="button"
                     onClick={() => setTargetLength(item.key as any)}
-                    className={`py-2 text-xs font-bold uppercase transition-all ${targetLength === item.key ? 'bg-teal-700 text-white' : 'hover:bg-slate-50 text-slate-700'}`}
+                    className={`py-2 text-xs font-bold uppercase transition-all ${targetLength === item.key ? 'bg-teal-700 text-white font-extrabold' : 'hover:bg-slate-50 text-slate-700'}`}
                   >
                     {item.label}
                   </button>
@@ -327,7 +547,7 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
               </div>
             </div>
 
-            {/* Tone Selector (Kolom Kanan) */}
+            {/* Tone Selector */}
             <div className="pl-0">
               <label className="block text-xs font-bold text-slate-700 uppercase mb-2 tracking-wider">
                 Gaya Bahasa / Tone Publikasi
@@ -338,7 +558,7 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
                     key={t}
                     type="button"
                     onClick={() => setTone(t)}
-                    className={`py-2 text-xs font-bold uppercase transition-all ${tone === t ? 'bg-teal-700 text-white' : 'hover:bg-slate-50 text-slate-700'}`}
+                    className={`py-2 text-xs font-bold uppercase transition-all ${tone === t ? 'bg-teal-700 text-white font-extrabold' : 'hover:bg-slate-50 text-slate-700'}`}
                   >
                     {t}
                   </button>
@@ -346,7 +566,6 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
               </div>
             </div>
           </div>
-
 
           {/* Submit Action */}
           <div className="flex justify-end pt-2">
@@ -358,12 +577,12 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
               {isGenerating ? (
                 <>
                   <Loader2 size={15} className="animate-spin" />
-                  <span>Sintesis CoT 2-Step Berlangsung...</span>
+                  <span>Membuat Artikel...</span>
                 </>
               ) : (
                 <>
                   <PenTool size={15} />
-                  <span>Generate Draf Artikel Baru (Simpan ke DB)</span>
+                  <span>Generate Draf Artikel Baru</span>
                 </>
               )}
             </button>
@@ -371,7 +590,7 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
         </form>
       </div>
 
-      {/* SECTION 2: Tab System (Editor Chat Aktif vs Riwayat Sesi DB) */}
+      {/* SECTION 3: Tab System */}
       <div className="flex items-center border-b border-slate-300">
         <button
           onClick={() => setActiveTab('editor')}
@@ -381,7 +600,7 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
             }`}
         >
           <FileText size={15} />
-          <span>Draf Artikel & Interactive Chat</span>
+          <span>Draf Artikel & Chat Interaktif</span>
         </button>
 
         <button
@@ -395,55 +614,80 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
             }`}
         >
           <History size={15} />
-          <span>Riwayat Sesi Artikel DB ({articleSessionsHistory.length})</span>
+          <span>Riwayat Artikel & Sesi Chat ({articleSessionsHistory.length})</span>
         </button>
       </div>
 
       {/* TAB CONTENT 1: Editor & Interactive Revision Chat */}
       {activeTab === 'editor' && (
-        !activeSession ? (
+        draftingStatus === 'IDLE' && !activeSession ? (
           <div className="bg-white border border-slate-300 p-12 text-center rounded-none shadow-xs space-y-4">
             <Layers size={42} className="mx-auto text-slate-400" />
             <h3 className="text-base font-bold text-slate-900">Belum Ada Sesi Artikel Aktif</h3>
             <p className="text-xs text-slate-600 max-w-md mx-auto">
-              Konfigurasikan judul dan dokumen acuan pada panel di atas, lalu klik <strong>'Generate Draf Artikel Baru'</strong> atau buka riwayat dari tab <strong>'Riwayat Sesi Artikel DB'</strong>.
+              Konfigurasikan judul dan dokumen acuan pada panel di atas, lalu klik <strong>'Generate Draf Artikel Baru'</strong> atau buka riwayat dari tab <strong>'Riwayat Sesi Chat'</strong>.
             </p>
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Left Col (2 cols): Active Article Preview & Full Text */}
-            <div className="lg:col-span-2 bg-white border border-slate-300 p-6 rounded-none shadow-xs space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
-                <div>
-                  <span className="text-[11px] font-bold text-teal-800 uppercase tracking-wider block">
-                    {activeSession.tone?.toUpperCase()} &bull; {activeSession.targetLength} &bull; {activeSession.sources?.length || 0} DOKUMEN ACUAN
-                  </span>
-                  <h2 className="text-lg font-bold text-slate-900">
-                    {activeSession.articleTitle || activeSession.title}
-                  </h2>
+            <div className="lg:col-span-2 bg-white border border-slate-300 p-6 rounded-none shadow-xs flex flex-col h-145">
+              {draftingStatus === 'ERROR' ? (
+                // Merender Polimorfis Kartu Fallback Kesalahan Sistem [5]
+                <DraftingFallbackCard
+                  errorType={draftingErrorType}
+                  rawErrorMsg={draftingErrorMsg}
+                  onRetry={handleRetryDrafting} // Fail-Safe Caching [1, 5]
+                  onNewSession={handleCreateNewSession}
+                />
+              ) : (
+                <div className="flex flex-col h-full overflow-hidden">
+                  <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3 shrink-0">
+                    {activeSession && (
+                      <div>
+                        <span className="text-[11px] font-bold text-teal-800 uppercase tracking-wider block">
+                          {activeSession.tone?.toUpperCase()} &bull; {activeSession.targetLength} &bull; {activeSession.sources?.length || 0} DOKUMEN ACUAN
+                        </span>
+                        <h2 className="text-lg font-bold text-slate-900 line-clamp-1">
+                          {articleTitle || activeSession.articleTitle || activeSession.title}
+                        </h2>
+                      </div>
+                    )}
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => onNavigateToEditor(activeSession!.id)}
+                        disabled={!activeSession}
+                        className="px-3 py-1.5 bg-teal-700 hover:bg-teal-850 disabled:bg-slate-300 disabled:text-slate-500 text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-1.5 shadow-2xs border border-teal-800 cursor-pointer"
+                      >
+                        <PenTool size={13} />
+                        <span>Buka Pratinjau &amp; Edit Manual</span>
+                      </button>
+                      <button
+                        onClick={() => handleCopyText(activeSession?.fullArticleText || '')}
+                        disabled={!activeSession}
+                        className="px-3 py-1.5 bg-slate-900 hover:bg-slate-950 disabled:bg-slate-300 disabled:text-slate-500 text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-1.5 shadow-2xs"
+                      >
+                        <Copy size={13} />
+                        <span>Salin Teks Artikel</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Preview naskah tulisan mentah hasil sintesis AI [3] */}
+                  <div className="bg-slate-50 border border-slate-300 p-6 flex-1 overflow-y-auto rounded-none text-left mt-4 text-xs leading-relaxed font-roboto">
+                    <RichMessageRenderer text={activeSession?.fullArticleText || 'Mempersiapkan draf naskah publikasi...'} />
+                  </div>
                 </div>
-
-                <button
-                  onClick={() => handleCopyText(activeSession.fullArticleText || '')}
-                  className="px-3 py-1.5 bg-slate-900 hover:bg-slate-950 text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-1.5 shadow-2xs"
-                >
-                  <Copy size={13} />
-                  <span>Salin Teks Artikel</span>
-                </button>
-              </div>
-
-              {/* Full Article Text Box */}
-              <div className="bg-slate-50 border border-slate-300 p-5 font-mono text-xs text-slate-900 leading-relaxed whitespace-pre-wrap max-h-[500px] overflow-y-auto rounded-none">
-                {activeSession.fullArticleText || 'Belum ada draf artikel.'}
-              </div>
+              )}
             </div>
 
             {/* Right Col (1 col): CoT Interactive Chat History & Revision Input */}
-            <div className="bg-white border border-slate-300 p-4 rounded-none shadow-xs flex flex-col h-[580px]">
+            <div className="bg-white border border-slate-300 p-4 rounded-none shadow-xs flex flex-col h-145">
               <div className="border-b border-slate-200 pb-3 mb-3">
                 <h3 className="text-xs font-bold text-slate-900 uppercase flex items-center gap-1.5">
                   <MessageSquareCode size={15} className="text-teal-700" />
-                  <span>Riwayat Percakapan & Revisi (CoT)</span>
+                  <span>Riwayat Percakapan & Revisi</span>
                 </h3>
                 <p className="text-[11px] text-slate-500 mt-0.5">
                   Setiap instruksi revisi disimpan ke PostgreSQL selayaknya obrolan AI.
@@ -452,7 +696,7 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
 
               {/* Chat Message List */}
               <div className="flex-1 overflow-y-auto space-y-3 pr-1">
-                {activeSession.messages?.map((msg) => (
+                {activeSession?.messages?.map((msg) => (
                   <div
                     key={msg.id}
                     className={`p-3 text-xs rounded-none leading-relaxed border border-slate-200 ${msg.role === 'USER'
@@ -461,9 +705,27 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
                       }`}
                   >
                     <div className="font-bold uppercase text-[10px] text-slate-500 mb-1">
-                      {msg.role === 'USER' ? 'Pengguna / Editor' : 'BRIDA AI Assistant'} &bull; {new Date(msg.createdAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+                      {msg.role === 'USER' ? 'Pengguna / Editor' : msg.role === 'SYSTEM' ? 'Sistem' : 'BRIDA AI Assistant'} &bull; {new Date(msg.createdAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
                     </div>
-                    <div className="whitespace-pre-wrap line-clamp-6">{msg.content}</div>
+                    {/* Render secara bersih draf revisi di dalam riwayat chat timeline [3] */}
+                    <div className="leading-relaxed font-roboto">
+                      {msg.role === 'ASSISTANT' ? (
+                        <div className="space-y-2">
+                          <div className="bg-teal-700/10 text-teal-900 border-l-2 border-teal-700 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 rounded-none w-fit">
+                            <Sparkles size={11} className="text-teal-700" />
+                            <span>Draf AI Diperbarui</span>
+                          </div>
+                          <p className="text-xs text-slate-700 italic">
+                            "{getAssistantMessageSummary(msg.content)}"
+                          </p>
+                          <div className="pt-1.5 border-t border-slate-200 text-[10px] font-semibold text-teal-800">
+                            📝 Naskah lengkap telah dimuat pada panel editor di sebelah kiri.
+                          </div>
+                        </div>
+                      ) : (
+                        <RichMessageRenderer text={msg.content} />
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -475,12 +737,13 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
                     type="text"
                     value={followUpQuery}
                     onChange={(e) => setFollowUpQuery(e.target.value)}
+                    disabled={!activeSession || isSendingFollowUp || draftingStatus === 'ERROR'}
                     placeholder="Instruksikan revisi (cth: Perbaiki paragraf 2)..."
-                    className="w-full text-xs pr-10 p-2.5 border border-slate-300 rounded-none focus:outline-none focus:border-teal-700"
+                    className="w-full text-xs pr-10 p-2.5 border border-slate-300 rounded-none focus:outline-none focus:border-teal-700 disabled:opacity-50"
                   />
                   <button
                     type="submit"
-                    disabled={isSendingFollowUp || !followUpQuery.trim()}
+                    disabled={isSendingFollowUp || !followUpQuery.trim() || draftingStatus === 'ERROR'}
                     className="absolute right-2 top-2 text-teal-700 hover:text-teal-900 disabled:opacity-40"
                   >
                     {isSendingFollowUp ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
@@ -504,7 +767,7 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
               </h2>
             </div>
 
-            {/* Filter Controls: Calendar Datepicker + Search Box */}
+            {/* Filter Controls */}
             <div className="flex flex-wrap items-center gap-2">
               {/* Calendar Datepicker Input */}
               <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-300 px-2 py-1 text-xs">

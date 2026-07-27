@@ -7,11 +7,13 @@ import { AnalyticsView } from './modules/analytics/views/analytics.view';
 import { ReportsView } from './modules/reports/views/reports.view';
 import { AiQaView } from './modules/ai-assistant/views/ai-qa.view';
 import { ArticleGeneratorView } from './modules/ai-assistant/views/article-generator.view';
+import { ArticlePreviewEditorView } from './modules/ai-assistant/views/article-preview-editor.view';
 
 export function App() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(true);
   const [activeRoute, setActiveRoute] = useState('dashboard');
   const [initialArticlePrompt, setInitialArticlePrompt] = useState<string | undefined>(undefined);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
 
   const pageTitles: Record<string, string> = {
     dashboard: 'Dashboard Spasial & Metrik Perkembangan',
@@ -20,6 +22,7 @@ export function App() {
     reports: 'Laporan Terstruktur & Matriks Rekap',
     'ai-request': 'AI Request & Asisten Obrolan Q&A',
     generator: 'Article Generator & Public Drafting (CoT)',
+    'article-editor': 'Pratinjau Cetak & Editor Manual',
   };
 
   const handleNavigateToGenerator = (promptText?: string) => {
@@ -52,6 +55,17 @@ export function App() {
           <ArticleGeneratorView 
             initialPrompt={initialArticlePrompt}
             onNavigateToQa={() => setActiveRoute('ai-request')}
+            onNavigateToEditor={(sessionId) => {
+              setActiveSessionId(sessionId);
+              setActiveRoute('article-editor');
+            }}
+          />
+        );
+      case 'article-editor':
+        return (
+          <ArticlePreviewEditorView
+            sessionId={activeSessionId}
+            onBack={() => setActiveRoute('generator')}
           />
         );
       default:

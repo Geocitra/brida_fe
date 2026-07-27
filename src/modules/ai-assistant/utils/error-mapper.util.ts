@@ -2,21 +2,22 @@ import { AiServiceException } from '../../../services/ai-assistant.service';
 
 /**
  * Kontrak respons keluaran terstruktur dari AiErrorMapper.
- * Menjamin keseragaman tipe data yang akan dirender oleh ChatPanel [3].
+ * Menjamin keseragaman tipe data yang akan dirender oleh ChatPanel dan Article Generator [3].
  */
 export interface MappedErrorResponse {
     title: string;       // Judul kesalahan formal ramah eksekutif
     description: string; // Penjelasan solutif berbahasa Indonesia
-    iconName: 'AlertCircle' | 'Clock' | 'ShieldAlert' | 'WifiOff' | 'Database'; // Indikator ikon representatif
+    iconName: 'AlertCircle' | 'Clock' | 'ShieldAlert' | 'WifiOff' | 'Database'; // Indikator nama ikon representatif
     actionType: 'RETRY' | 'NEW_SESSION' | 'LOGIN' | 'NONE'; // Rekomendasi tindakan taktis UX
 }
 
 export const AiErrorMapper = {
     /**
-     * Menganalisis objek kesalahan teknis dan memetakan datanya secara polimorfis
-     * menjadi narasi Bahasa Indonesia yang solutif dan sopan bagi jajaran eksekutif BRIDA [5].
+     * Menganalisis objek kesalahan teknis secara polimorfis dan kontekstual [5].
+     * Menerjemahkan kode status teknis menjadi narasi formal Bahasa Indonesia yang solutif
+     * berdasarkan konteks modul aktif (AI Chat vs. Article Generator) [1].
      */
-    map(error: unknown): MappedErrorResponse {
+    map(error: unknown, context: 'CHAT' | 'DRAFTING' = 'CHAT'): MappedErrorResponse {
         // Objek fallback aman jika terjadi kesalahan sistem umum tidak terduga (Fail-Safe) [5]
         const defaultResponse: MappedErrorResponse = {
             title: 'Hambatan Analisis Sistem',
@@ -46,7 +47,7 @@ export const AiErrorMapper = {
             }
         }
 
-        // 3. Pemetaan Kamus Narasi Berdasarkan Jenis Kesalahan (errorType)
+        // 3. Pemetaan Kamus Narasi Berdasarkan Jenis Kesalahan (errorType) & Konteks Modul
         switch (errorType) {
             case 'CONNECTION_FAILURE':
                 return {
@@ -58,6 +59,15 @@ export const AiErrorMapper = {
 
             case 'PayloadTooLarge':
             case 'TOKEN_OVERFLOW':
+                // Penyesuaian solusi kontekstual jika batas muatan token terlampaui saat drafting [1, 5]
+                if (context === 'DRAFTING') {
+                    return {
+                        title: 'Kapasitas Sintesis Terlampaui',
+                        description: 'Ukuran gabungan teks dokumen rujukan terlalu tebal untuk dirangkum sekaligus menjadi satu draf naskah. Silakan kurangi beberapa pilihan dokumen acuan pada panel atas, atau kurangi instruksi tambahan Anda.',
+                        iconName: 'Database',
+                        actionType: 'NEW_SESSION',
+                    };
+                }
                 return {
                     title: 'Kapasitas Diskusi Penuh',
                     description: 'Sesi diskusi ini telah melampaui batas anggaran token memori demi menjaga stabilitas sistem. Direkomendasikan untuk mempersempit pilihan dokumen acuan atau memulai diskusi di sesi baru.',
@@ -82,7 +92,7 @@ export const AiErrorMapper = {
                 };
         }
 
-        // 4. Pemetaan Fallback Berdasarkan Kode Status HTTP (Jika errorType bernilai default)
+        // 4. Pemetaan Fallback Berdasarkan Kode Status HTTP & Konteks Modul
         if (statusCode === 401 || statusCode === 403) {
             return {
                 title: 'Sesi Otorisasi Berakhir',
@@ -93,6 +103,15 @@ export const AiErrorMapper = {
         }
 
         if (statusCode === 413) {
+            // Penyesuaian solusi kontekstual jika dokumen acuan terlalu panjang saat drafting [1, 5]
+            if (context === 'DRAFTING') {
+                return {
+                    title: 'Muatan Dokumen Sintesis Terlalu Tebal',
+                    description: 'Berkas laporan daerah yang Anda jadikan acuan memiliki muatan teks yang melampaui kapasitas sintesis mesin penulis. Silakan kurangi dokumen acuan, atau pilih opsi draf dengan target panjang yang lebih ringkas.',
+                    iconName: 'Database',
+                    actionType: 'NEW_SESSION',
+                };
+            }
             return {
                 title: 'Batas Anggaran Dokumen Terlampaui',
                 description: 'Ukuran akumulatif dokumen acuan terlalu besar untuk dianalisis dalam satu sesi obrolan. Direkomendasikan untuk membagi dokumen rujukan atau memulai sesi diskusi baru.',

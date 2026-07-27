@@ -1,13 +1,142 @@
 import pdfMake from 'pdfmake/build/pdfmake';
 import pdfFonts from 'pdfmake/build/vfs_fonts';
+import htmlToPdfmake from 'html-to-pdfmake'; // Impor pustaka parser HTML [1]
 
-// Initialize pdfMake virtual file system for Roboto fonts
+// Inisialisasi sistem berkas virtual pdfMake untuk font Roboto bawaan
 const vfsFonts = (pdfFonts as any)?.pdfMake?.vfs || (pdfFonts as any)?.vfs || (pdfFonts as any);
 if (vfsFonts) {
   (pdfMake as any).vfs = vfsFonts;
 }
 
+/**
+ * Interface Konfigurasi Tata Letak Halaman PDF Dinamis (OCP) [1]
+ */
+export interface PDFFormatConfig {
+  fontFamily: 'Calibri' | 'Times New Roman' | 'Verdana' | 'Arial';
+  fontSize: number;
+  lineSpacing: number;
+  marginCm: number;
+}
+
+/**
+ * Mengunduh berkas biner font lokal secara asinkron dan mengonversinya ke Base64 [1].
+ * Mencegah pembengkakan ukuran bundel aplikasi utama hingga 10-15MB.
+ */
+async function fetchLocalFontToBase64(url: string): Promise<string> {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Gagal memuat aset biner font dari jalur server lokal: ${url}`);
+  }
+  const blob = await response.blob();
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const base64String = reader.result as string;
+      const base64Data = base64String.split(',')[1]; // Ambil data Base64 mentah
+      resolve(base64Data);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
 export const PdfExportService = {
+  /**
+   * Mengambil draf HTML interaktif, menyuntikkan font kustom secara dinamis,
+   * dan mencetak dokumen PDF formal dengan format presisi (WYSIWYG) [1].
+   */
+  async exportCustomFormattedArticlePdf(
+    htmlText: string,
+    config: PDFFormatConfig,
+    filename: string,
+  ): Promise<void> {
+    const fontFolderMap: Record<string, string> = {
+      'Times New Roman': 'times',
+      'Arial': 'arial',
+      'Verdana': 'verdana',
+      'Calibri': 'calibri',
+    };
+
+    const fontFileMap: Record<string, { normal: string; bold: string; italics: string; bolditalics: string }> = {
+      times: { normal: 'times.ttf', bold: 'timesbd.ttf', italics: 'timesi.ttf', bolditalics: 'timesbi.ttf' },
+      arial: { normal: 'arial.ttf', bold: 'arialbd.ttf', italics: 'ariali.ttf', bolditalics: 'arialbi.ttf' },
+      verdana: { normal: 'verdana.ttf', bold: 'verdanab.ttf', italics: 'verdanai.ttf', bolditalics: 'verdanaz.ttf' },
+      calibri: { normal: 'calibri.ttf', bold: 'calibrib.ttf', italics: 'calibrii.ttf', bolditalics: 'calibriz.ttf' },
+    };
+
+    const folder = fontFolderMap[config.fontFamily] || 'arial';
+    const files = fontFileMap[folder];
+
+    // 1. Ambil berkas font .ttf fisik secara asinkron dari folder /public/ [1]
+    const [vNormal, vBold, vItalics, vBoldItalics] = await Promise.all([
+      fetchLocalFontToBase64(`/fonts/${files.normal}`),
+      fetchLocalFontToBase64(`/fonts/${files.bold}`),
+      fetchLocalFontToBase64(`/fonts/${files.italics}`),
+      fetchLocalFontToBase64(`/fonts/${files.bolditalics}`),
+    ]);
+
+    // 2. Suntikkan font biner Base64 langsung ke VFS (Virtual File System) pdfMake [1]
+    (pdfMake as any).vfs[`${folder}-Regular.ttf`] = vNormal;
+    (pdfMake as any).vfs[`${folder}-Bold.ttf`] = vBold;
+    (pdfMake as any).vfs[`${folder}-Italic.ttf`] = vItalics;
+    (pdfMake as any).vfs[`${folder}-BoldItalic.ttf`] = vBoldItalics;
+
+    // Registrasi struktur keluarga font baru secara dinamis
+    (pdfMake as any).fonts = {
+      Roboto: {
+        normal: 'Roboto-Regular.ttf',
+        bold: 'Roboto-Medium.ttf',
+        italics: 'Roboto-Italic.ttf',
+        bolditalics: 'Roboto-MediumItalic.ttf',
+      },
+      CustomFont: {
+        normal: `${folder}-Regular.ttf`,
+        bold: `${folder}-Bold.ttf`,
+        italics: `${folder}-Italic.ttf`,
+        bolditalics: `${folder}-BoldItalic.ttf`,
+      },
+    };
+
+    // 3. Konversi satuan margin kertas dari Sentimeter ke Satuan Point pdfMake (1 cm = ~28.3465 pt) [1]
+    const marginPoints = Math.round(config.marginCm * 28.3465);
+
+    // 4. Terjemahkan draf HTML menjadi representasi JSON AST pdfMake [1]
+    const pdfContent = htmlToPdfmake(htmlText, {
+      window: window,
+    });
+
+    // 5. Susun dokumen definisi pdfMake yang terstruktur
+    const docDefinition: any = {
+      pageSize: 'A4',
+      pageMargins: [marginPoints, marginPoints, marginPoints, marginPoints],
+      defaultStyle: {
+        font: 'CustomFont', // Menggunakan font kustom yang dimuat dinamis [1]
+        fontSize: config.fontSize,
+        lineHeight: config.lineSpacing,
+        alignment: 'justify',
+      },
+      header: {
+        text: 'BRIDA SMART ANALYSIS — KABUPATEN MIMIKA',
+        alignment: 'right',
+        fontSize: 8,
+        color: '#94a3b8',
+        margin: [marginPoints, 15, marginPoints, 0],
+      },
+      footer: (currentPage: number, pageCount: number) => ({
+        columns: [
+          { text: 'Naskah Publikasi Resmi BRIDA Kabupaten Mimika', fontSize: 8, color: '#94a3b8' },
+          { text: `Halaman ${currentPage} dari ${pageCount}`, alignment: 'right', fontSize: 8, color: '#94a3b8' },
+        ],
+        margin: [marginPoints, 10, marginPoints, 0],
+      }),
+      content: pdfContent,
+    };
+
+    // 6. Jalankan perakitan dokumen dan unduh file PDF
+    const targetFilename = filename.toLowerCase().endsWith('.pdf') ? filename : `${filename}.pdf`;
+    pdfMake.createPdf(docDefinition).download(targetFilename);
+  },
+
   /**
    * Export Diagnostik Deviasi Indikator ke PDF Vector Pristine (pdfMake)
    */
@@ -30,7 +159,6 @@ export const PdfExportService = {
         margin: [30, 10, 30, 0],
       }),
       content: [
-        // Title Header
         {
           text: 'LEMBAR DIAGNOSTIK & DEVIASI INDIKATOR',
           fontSize: 16,
@@ -45,14 +173,10 @@ export const PdfExportService = {
           bold: true,
           margin: [0, 0, 0, 14],
         },
-
-        // Divider Line
         {
           canvas: [{ type: 'line', x1: 0, y1: 0, x2: 535, y2: 0, lineWidth: 1.5, lineColor: '#0f172a' }],
           margin: [0, 0, 0, 16],
         },
-
-        // Ringkasan Deviasi Table
         {
           text: '1. RINGKASAN DEVIASI CAPAIAN',
           fontSize: 11,
@@ -79,8 +203,6 @@ export const PdfExportService = {
           layout: 'lightHorizontalLines',
           margin: [0, 0, 0, 20],
         },
-
-        // Ringkasan Eksekutif AI
         {
           text: '2. RINGKASAN EKSEKUTIF ANALISIS (AI-SYNTHESIS)',
           fontSize: 11,
@@ -95,8 +217,6 @@ export const PdfExportService = {
           margin: [0, 0, 0, 16],
           alignment: 'justify',
         },
-
-        // Causal Inference Section
         {
           text: '3. ANALISIS FAKTOR PENYEBAB (AI - Causal Inference)',
           fontSize: 11,
@@ -121,8 +241,6 @@ export const PdfExportService = {
           layout: 'lightHorizontalLines',
           margin: [0, 0, 0, 20],
         },
-
-        // Priority Action Plan Section
         {
           text: '4. MATRIKS REKOMENDASI RESPON (ACTION PLAN)',
           fontSize: 11,
@@ -188,17 +306,13 @@ export const PdfExportService = {
         margin: [35, 10, 35, 0],
       }),
       content: [
-        // Kop Naskah Resmi
         { text: 'PEMERINTAH KABUPATEN MIMIKA', fontSize: 13, bold: true, alignment: 'center', color: '#0f172a' },
         { text: 'BADAN RISET DAN INOVASI DAERAH (BRIDA)', fontSize: 11, bold: true, alignment: 'center', color: '#0d9488', margin: [0, 2, 0, 4] },
         { text: 'Jl. Cenderawasih No. 1, Timika, Papua Tengah', fontSize: 8.5, alignment: 'center', color: '#475569', margin: [0, 0, 0, 10] },
-
         {
           canvas: [{ type: 'line', x1: 0, y1: 0, x2: 525, y2: 0, lineWidth: 2, lineColor: '#0f172a' }],
           margin: [0, 0, 0, 16],
         },
-
-        // Metadata Header
         {
           table: {
             widths: [80, 5, '*'],
@@ -206,17 +320,26 @@ export const PdfExportService = {
               [{ text: 'PENERIMA', bold: true, fontSize: 9 }, ':', { text: report.recipient, fontSize: 9, bold: true }],
               [{ text: 'PENGIRIM', bold: true, fontSize: 9 }, ':', { text: report.sender, fontSize: 9 }],
               [{ text: 'PERIODE', bold: true, fontSize: 9 }, ':', { text: `${report.period} (Rilis: ${report.date})`, fontSize: 9 }],
-              [{ text: 'SIFAT', bold: true, fontSize: 9 }, ':', { text: report.urgency, fontSize: 9, bold: true, color: '#dc2626' }],
+              [
+                { text: 'PRIORITAS', bold: true, fontSize: 9 },
+                ':',
+                {
+                  text: report.urgency,
+                  fontSize: 9,
+                  bold: true,
+                  color: (report.urgency || '').toLowerCase().includes('utama') || (report.urgency || '').toLowerCase().includes('tinggi')
+                    ? '#dc2626'
+                    : (report.urgency || '').toLowerCase().includes('menengah') || (report.urgency || '').toLowerCase().includes('sedang')
+                      ? '#d97706'
+                      : '#059669',
+                },
+              ],
             ],
           },
           layout: 'noBorders',
           margin: [0, 0, 0, 16],
         },
-
-        // Title
         { text: report.title, fontSize: 14, bold: true, alignment: 'center', color: '#0f172a', margin: [0, 0, 0, 14] },
-
-        // Ringkasan Eksekutif Box
         {
           table: {
             widths: ['*'],
@@ -236,8 +359,6 @@ export const PdfExportService = {
           layout: 'noBorders',
           margin: [0, 0, 0, 16],
         },
-
-        // Indikator Deviasi Signifikan
         { text: '1. KUMPULAN INDIKATOR DEVIASI SIGNIFIKAN', fontSize: 11, bold: true, color: '#0f172a', margin: [0, 0, 0, 8] },
         {
           table: {
@@ -260,8 +381,6 @@ export const PdfExportService = {
           layout: 'lightHorizontalLines',
           margin: [0, 0, 0, 16],
         },
-
-        // Dampak Kebijakan Nasional
         { text: '2. SIMULASI DAMPAK KEBIJAKAN MAKRO / NASIONAL', fontSize: 11, bold: true, color: '#0f172a', margin: [0, 0, 0, 6] },
         { text: `Kebijakan: ${report.nationalPolicyImpact.policyName}`, fontSize: 9.5, bold: true, color: '#0d9488', margin: [0, 0, 0, 4] },
         {
@@ -272,8 +391,6 @@ export const PdfExportService = {
           })),
           margin: [0, 0, 0, 16],
         },
-
-        // Action Plan Prioritas
         { text: '3. REKOMENDASI ACTION PLAN BUPATI', fontSize: 11, bold: true, color: '#0f172a', margin: [0, 0, 0, 6] },
         {
           ol: report.actionPriorities.map((act: string) => ({
@@ -284,8 +401,6 @@ export const PdfExportService = {
           })),
           margin: [0, 0, 0, 24],
         },
-
-        // Signature block
         {
           columns: [
             { width: '*', text: '' },
@@ -333,9 +448,9 @@ export const PdfExportService = {
           { label: 'Faktor Hambatan Cuaca Ekstrem', percentage: 20 },
         ],
         priorityRecommendations: [
-          { priority: 'TINGGI', title: 'Percepatan Proses Evaluasi Logistik', pic: 'Dinas PU & BRIDA', deadline: '30 Hari' }
+          { priority: 'TINGGI', title: 'Percepatan Proses Evaluasi Logistik', pic: 'Dinas PU & BRIDA', deadline: '30 Hari' },
         ],
-        summary: 'Hasil evaluasi menunjukkan terjadinya deviasi kinerja pada indikator Pendapatan Asli Daerah.'
+        summary: 'Hasil evaluasi menunjukkan terjadinya deviasi kinerja pada indikator Pendapatan Asli Daerah.',
       };
       this.exportAnalyticsPdf(indicator, filename);
       return;
