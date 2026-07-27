@@ -32,11 +32,15 @@ import {
 interface ReportsViewProps {
   onNavigateToGenerator?: (initialPrompt?: string) => void;
   onNavigateToDashboard?: () => void;
+  initialSelectedDocIds?: string[]; // Prop baru hasil forward [3]
+  onClearSharedDocIds?: () => void;  // Callback pembersihan [3]
 }
 
 export const ReportsView: React.FC<ReportsViewProps> = ({
   onNavigateToGenerator,
   onNavigateToDashboard,
+  initialSelectedDocIds,
+  onClearSharedDocIds,
 }) => {
   // State for available source documents
   const [documents, setDocuments] = useState<DocumentRecord[]>([]);
@@ -108,14 +112,21 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
     loadHistory();
   }, []);
 
+  /**
+   * Memuat dokumen acuan dari basis data
+   */
   const loadDocuments = async () => {
     setIsLoadingDocs(true);
     try {
       const fetchedDocs = await DocumentService.listDocuments();
       setDocuments(fetchedDocs || []);
-      if (fetchedDocs && fetchedDocs.length > 0 && selectedDocIds.length === 0) {
-        // Select first document by default
-        setSelectedDocIds([fetchedDocs[0].id]);
+
+      // HANYA jalankan seleksi default jika TIDAK ada dokumen hasil penerusan
+      if (!initialSelectedDocIds || initialSelectedDocIds.length === 0) {
+        if (fetchedDocs && fetchedDocs.length > 0 && selectedDocIds.length === 0) {
+          // Select first document by default
+          setSelectedDocIds([fetchedDocs[0].id]);
+        }
       }
     } catch (err: any) {
       console.error('Gagal memuat dokumen dari database:', err);
@@ -125,6 +136,27 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
       setIsLoadingDocs(false);
     }
   };
+
+  /**
+   * Menyelaraskan dokumen hasil penerusan secara aman (Forwarding State sync)
+   */
+  useEffect(() => {
+    if (documents.length > 0) {
+      if (initialSelectedDocIds && initialSelectedDocIds.length > 0) {
+        // Penyaringan defensif: Pastikan ID dokumen yang diteruskan benar-benar ada di database
+        const validIds = initialSelectedDocIds.filter((id) =>
+          documents.some((doc) => doc.id === id)
+        );
+
+        if (validIds.length > 0) {
+          setSelectedDocIds(validIds);
+        }
+
+        // Segera bersihkan state transien global untuk menghindari masalah sticky selection
+        onClearSharedDocIds?.();
+      }
+    }
+  }, [initialSelectedDocIds, documents]);
 
   const loadHistory = async () => {
     setIsLoadingHistory(true);
@@ -489,12 +521,12 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                   const urgencyStr = (currentReport.urgency || '').toUpperCase();
                   const isHigh = urgencyStr.includes('TINGGI') || urgencyStr.includes('UTAMA');
                   const isMedium = urgencyStr.includes('SEDANG') || urgencyStr.includes('MENENGAH');
-                  
+
                   const bgClass = isHigh
                     ? 'bg-red-50 text-red-800 border border-red-200'
                     : isMedium
-                    ? 'bg-amber-50 text-amber-800 border border-amber-200'
-                    : 'bg-emerald-50 text-emerald-800 border border-emerald-200';
+                      ? 'bg-amber-50 text-amber-800 border border-amber-200'
+                      : 'bg-emerald-50 text-emerald-800 border border-emerald-200';
 
                   return (
                     <span className={`px-3 py-1 text-xs font-bold uppercase rounded-none flex items-center gap-1.5 shrink-0 self-start ${bgClass}`}>

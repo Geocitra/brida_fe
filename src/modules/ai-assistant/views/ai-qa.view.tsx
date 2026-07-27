@@ -12,23 +12,36 @@ import {
 
 interface AiQaViewProps {
   onNavigateToGenerator: (initialPrompt?: string) => void;
+  initialSelectedDocIds?: string[]; // Prop baru hasil forward [3]
+  onClearSharedDocIds?: () => void;  // Callback pembersihan [3]
 }
 
-export const AiQaView: React.FC<AiQaViewProps> = ({ onNavigateToGenerator }) => {
+export const AiQaView: React.FC<AiQaViewProps> = ({
+  onNavigateToGenerator,
+  initialSelectedDocIds,
+  onClearSharedDocIds,
+}) => {
   const [documents, setDocuments] = useState<DocumentRecord[]>([]);
   const [selectedDocIds, setSelectedDocIds] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isAiProcessing, setIsAiProcessing] = useState(false);
 
+  /**
+   * Memuat daftar dokumen mentah dari database
+   */
   const loadDocuments = async () => {
     setIsLoading(true);
     setLoadError(null);
     try {
       const docs = await DocumentService.listDocuments();
       setDocuments(docs || []);
-      if (docs && docs.length > 0 && selectedDocIds.length === 0) {
-        setSelectedDocIds([docs[0].id]);
+
+      // HANYA jalankan inisialisasi default jika TIDAK ada dokumen hasil penerusan
+      if (!initialSelectedDocIds || initialSelectedDocIds.length === 0) {
+        if (docs && docs.length > 0 && selectedDocIds.length === 0) {
+          setSelectedDocIds([docs[0].id]);
+        }
       }
     } catch (err: any) {
       setDocuments([]);
@@ -41,6 +54,28 @@ export const AiQaView: React.FC<AiQaViewProps> = ({ onNavigateToGenerator }) => 
   useEffect(() => {
     loadDocuments();
   }, []);
+
+  /**
+   * Sinkronisasi Dokumen Hasil Penerusan (Forwarding Handler)
+   * Menjamin dokumen hasil penerusan divalidasi silang terhadap data rujukan riil di basis data
+   */
+  useEffect(() => {
+    if (documents.length > 0) {
+      if (initialSelectedDocIds && initialSelectedDocIds.length > 0) {
+        // Lakukan penyaringan defensif: Pastikan ID dokumen yang diteruskan benar-benar eksis di database
+        const validIds = initialSelectedDocIds.filter((id) =>
+          documents.some((doc) => doc.id === id)
+        );
+
+        if (validIds.length > 0) {
+          setSelectedDocIds(validIds);
+        }
+
+        // Segera bersihkan state transien global untuk menghindari masalah sticky selection
+        onClearSharedDocIds?.();
+      }
+    }
+  }, [initialSelectedDocIds, documents]);
 
   const selectedDocs = documents.filter((d) => selectedDocIds.includes(d.id));
 

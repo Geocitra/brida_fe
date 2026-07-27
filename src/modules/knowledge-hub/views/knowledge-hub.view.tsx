@@ -2,12 +2,18 @@ import React, { useState, useEffect } from 'react';
 import { UploadDropzone } from '../components/upload-dropzone';
 import { DocumentTable } from '../components/document-table';
 import { DocumentDetailModal } from '../components/document-detail-modal.component';
+import { FloatingActionBar } from '../components/floating-action-bar.component'; // Komponen Baru
 import { DocumentService, type DocumentRecord } from '../../../services/document.service';
 import { MOCK_DATA } from '../../../services/mock-data.service';
 import { Loader2, AlertCircle, RefreshCw, Trash2 } from 'lucide-react';
 
-export const KnowledgeHubView: React.FC = () => {
+interface KnowledgeHubViewProps {
+  onForward: (documentIds: string[], targetRoute: string, promptText?: string) => void;
+}
+
+export const KnowledgeHubView: React.FC<KnowledgeHubViewProps> = ({ onForward }) => {
   const [documents, setDocuments] = useState<DocumentRecord[]>([]);
+  const [selectedDocIds, setSelectedDocIds] = useState<string[]>([]); // State seleksi ganda
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isUsingMock, setIsUsingMock] = useState(false);
@@ -20,7 +26,7 @@ export const KnowledgeHubView: React.FC = () => {
     setLoadError(null);
     try {
       const docs = await DocumentService.listDocuments();
-      setDocuments(docs);
+      setDocuments(docs || []);
       setIsUsingMock(false);
     } catch {
       // Fallback ke data contoh (mock) apabila backend tidak terhubung
@@ -35,6 +41,12 @@ export const KnowledgeHubView: React.FC = () => {
   useEffect(() => {
     loadDocuments();
   }, []);
+
+  // Sync Guardrail: Bersihkan ID terpilih jika berkas dihapus dari daftar aktif
+  useEffect(() => {
+    const activeIds = documents.map((d) => d.id);
+    setSelectedDocIds((prev) => prev.filter((id) => activeIds.includes(id)));
+  }, [documents]);
 
   const handleUploadSuccess = (newDoc: DocumentRecord) => {
     setDocuments((prev) => [newDoc, ...prev]);
@@ -58,8 +70,22 @@ export const KnowledgeHubView: React.FC = () => {
     }
   };
 
+  /**
+   * Menangani aksi penerusan dokumen ke modul target melalui Global Controller
+   */
+  const handleExecuteForward = (targetRoute: string) => {
+    // Validasi batasan keras (Hard Limit: Maksimal 3 Dokumen)
+    if (selectedDocIds.length > 3) {
+      alert('Batas Maksimal Terlampaui: Anda hanya dapat memilih maksimal 3 dokumen acuan untuk diteruskan demi kestabilan pemrosesan AI.');
+      return;
+    }
+
+    // Kirim kumpulan ID ke rute target lewat handler global di App.tsx
+    onForward(selectedDocIds, targetRoute);
+  };
+
   return (
-    <div className="flex flex-col w-full bg-slate-100/70 p-6 space-y-6 font-roboto">
+    <div className="flex flex-col w-full bg-slate-100/70 p-6 space-y-6 font-roboto relative pb-24">
       {/* 
         SECTION 1. COMMAND STRIP HEADER
         Identitas Utama Halaman di kiri (H1), Status DB Telemetry di kanan.
@@ -122,12 +148,24 @@ export const KnowledgeHubView: React.FC = () => {
       ) : (
         <DocumentTable
           documents={documents}
+          selectedDocIds={selectedDocIds}
+          onSelectionChange={setSelectedDocIds} // Callback sinkronisasi pilihan checkbox
           onViewDetail={(doc) => setDetailDoc(doc)}
           onDeleteDocument={(doc) => setDeleteConfirmDoc(doc)}
         />
       )}
 
-
+      {/* 
+        SECTION 4. FLOATING ACTION BAR (BAR MELAYANG DI BAWAH)
+        Hanya muncul jika terdapat minimal satu dokumen yang dicentang.
+      */}
+      {selectedDocIds.length > 0 && (
+        <FloatingActionBar
+          selectedCount={selectedDocIds.length}
+          onClearSelection={() => setSelectedDocIds([])}
+          onForward={handleExecuteForward}
+        />
+      )}
 
       {/* 
         5. DETAIL VISUALIZER MODAL

@@ -117,6 +117,8 @@ export type DraftingStatus = 'IDLE' | 'SUCCESS' | 'ERROR';
 
 export interface ArticleGeneratorViewProps {
   initialPrompt?: string;
+  initialSelectedDocIds?: string[];
+  onClearSharedDocIds?: () => void;
   onNavigateToQa: () => void;
   onNavigateToEditor: (sessionId: string) => void;
 }
@@ -131,7 +133,7 @@ const getAssistantMessageSummary = (content: string): string => {
     .replace(/[*_`]/g, '')    // Hapus format bold/italic/code
     .replace(/\s+/g, ' ')     // Ubah spasi berlebih menjadi spasi tunggal
     .trim();
-  
+
   if (clean.length > 180) {
     return clean.substring(0, 180) + '...';
   }
@@ -142,6 +144,8 @@ const getAssistantMessageSummary = (content: string): string => {
 
 export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
   initialPrompt,
+  initialSelectedDocIds,
+  onClearSharedDocIds,
   onNavigateToQa,
   onNavigateToEditor,
 }) => {
@@ -213,15 +217,22 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
     loadHistory();
   }, []);
 
+  /**
+   * Memuat dokumen acuan dari database
+   */
   const loadDocuments = async () => {
     setIsLoadingDocs(true);
     try {
       const fetched = await DocumentService.listDocuments();
       setDocuments(fetched || []);
-      if (fetched && fetched.length > 0 && selectedDocIds.length === 0) {
-        setSelectedDocIds([fetched[0].id]);
-        if (!articleTitle) {
-          setArticleTitle(`Artikel Strategis: ${fetched[0].title}`);
+
+      // HANYA lakukan inisialisasi default jika tidak ada dokumen hasil forward
+      if (!initialSelectedDocIds || initialSelectedDocIds.length === 0) {
+        if (fetched && fetched.length > 0 && selectedDocIds.length === 0) {
+          setSelectedDocIds([fetched[0].id]);
+          if (!articleTitle) {
+            setArticleTitle(`Artikel Strategis: ${fetched[0].title}`);
+          }
         }
       }
     } catch (err: any) {
@@ -231,6 +242,33 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
       setIsLoadingDocs(false);
     }
   };
+
+  /**
+   * Mengonsumsi dan memvalidasi silang data dokumen yang diteruskan (Forwarding State sync)
+   */
+  useEffect(() => {
+    if (documents.length > 0) {
+      if (initialSelectedDocIds && initialSelectedDocIds.length > 0) {
+        // Penyaringan defensif: Pastikan ID dokumen yang diteruskan benar-benar ada di database
+        const validIds = initialSelectedDocIds.filter((id) =>
+          documents.some((doc) => doc.id === id)
+        );
+
+        if (validIds.length > 0) {
+          setSelectedDocIds(validIds);
+
+          // Perbarui judul draf secara otomatis berdasarkan judul dokumen utama rujukan
+          const primaryDoc = documents.find((d) => d.id === validIds[0]);
+          if (primaryDoc && !articleTitle) {
+            setArticleTitle(`Artikel Strategis: ${primaryDoc.title}`);
+          }
+        }
+
+        // Segera bersihkan state transien global untuk mencegah tumpang tindih seleksi berikutnya
+        onClearSharedDocIds?.();
+      }
+    }
+  }, [initialSelectedDocIds, documents]);
 
   const loadHistory = async () => {
     try {
@@ -526,7 +564,7 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-slate-200">
             {/* Length Selector */}
             <div className="border-r border-slate-200 pr-6">
-               <label className="block text-xs font-bold text-slate-700 uppercase mb-2 tracking-wider">
+              <label className="block text-xs font-bold text-slate-700 uppercase mb-2 tracking-wider">
                 Panjang Teks Keluaran Artikel
               </label>
               <div className="grid grid-cols-3 divide-x divide-slate-200 border-y border-slate-200">

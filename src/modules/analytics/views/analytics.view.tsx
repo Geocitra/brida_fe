@@ -42,9 +42,15 @@ interface SavedAnalysisSession {
 
 interface AnalyticsViewProps {
   onNavigateToGenerator?: (initialPrompt?: string) => void;
+  initialSelectedDocIds?: string[]; // Prop baru hasil forward [3]
+  onClearSharedDocIds?: () => void;  // Callback pembersihan [3]
 }
 
-export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenerator }) => {
+export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
+  onNavigateToGenerator,
+  initialSelectedDocIds,
+  onClearSharedDocIds,
+}) => {
   const [compareResult, setCompareResult] = useState<DeviationCompareResult | null>(null);
 
   const [documents, setDocuments] = useState<DocumentRecord[]>([]);
@@ -63,6 +69,16 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
   // Live filter states for saved cache sessions (Calendar Datepicker & Text Search)
   const [sessionSearchQuery, setSessionSearchQuery] = useState('');
   const [selectedCalendarDate, setSelectedCalendarDate] = useState<string>('');
+
+  // ===================== DIALOG MODAL STATE FOR ROLE MAPPING =====================
+  const [isMappingModalOpen, setIsMappingModalOpen] = useState(false);
+  const [modalBaselineId, setModalBaselineId] = useState('');
+  const [modalRealizationId, setModalRealizationId] = useState('');
+  const [modalIndicatorName, setModalIndicatorName] = useState('Analisis Deviasi Dokumen Terpilih');
+  const [modalSector, setModalSector] = useState('Pembangunan & Kebijakan Daerah');
+  const [modalTargetValue, setModalTargetValue] = useState(100);
+  const [modalRealizationValue, setModalRealizationValue] = useState(84.5);
+  const [modalUnitSuffix, setModalUnitSuffix] = useState('%');
 
   const filteredSavedSessions = savedSessions.filter((session) => {
     // 1. Text Query Filter
@@ -86,7 +102,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
     return true;
   });
 
-  // Live DB Cache Status Check when document selection changes
+  // Live DB Cache Status Check saat pilihan dokumen berubah
   useEffect(() => {
     if (selectedDocIds.length > 0) {
       checkCacheStatus(selectedDocIds);
@@ -107,7 +123,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
     }
   };
 
-  // Load document list & saved sessions (from DB + LocalStorage) on mount
+  // Memuat data dokumen awal & memulihkan sesi
   useEffect(() => {
     const loadInitialData = async () => {
       setIsLoadingDocs(true);
@@ -115,7 +131,12 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
         const docs = await DocumentService.listDocuments().catch(() => []);
         setDocuments(docs || []);
 
-        if (docs && docs.length > 0) {
+        // Prioritaskan dokumen hasil forward jika ada, jika tidak, centang semua
+        if (initialSelectedDocIds && initialSelectedDocIds.length > 0) {
+          setSelectedDocIds(initialSelectedDocIds);
+          // Langsung bersihkan state global agar tidak terjadi "sticky selection"
+          onClearSharedDocIds?.();
+        } else if (docs && docs.length > 0) {
           setSelectedDocIds(docs.map((d) => d.id));
         }
 
@@ -185,7 +206,6 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
           // Fallback if backend is unavailable
         }
 
-        // Combine DB and LocalStorage sessions seamlessly
         const allSessions = [...dbSessions, ...localSessions];
         const uniqueSessions = Array.from(new Map(allSessions.map((s) => [s.id, s])).values());
 
@@ -200,7 +220,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
     };
 
     loadInitialData();
-  }, []);
+  }, [initialSelectedDocIds]);
 
   const saveSessionToStorage = (newSessions: SavedAnalysisSession[]) => {
     setSavedSessions(newSessions);
@@ -225,38 +245,57 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
     }
   };
 
-  // Run multi-document analysis comparison
-  const handleExecuteMultiAnalysis = async () => {
+  /**
+   * Tahap 1: Membuka dialog pemetaan peran sebelum eksekusi API RAG
+   */
+  const handleOpenMappingModal = () => {
     if (selectedDocIds.length === 0) {
       alert('Silakan pilih minimal 1 dokumen acuan di atas.');
       return;
     }
 
+    // Cari dokumen Baseline & Realisasi secara proaktif dari pilihan user
+    const autoBaseline = documents.find(
+      (d) => selectedDocIds.includes(d.id) && d.metadata?.docType === 'BASELINE'
+    );
+    const autoRealization = documents.find(
+      (d) => selectedDocIds.includes(d.id) && d.metadata?.docType === 'REALIZATION'
+    );
+    const firstSelected = documents.find((d) => selectedDocIds.includes(d.id));
+
+    // Isi nilai default modal
+    setModalBaselineId(autoBaseline?.id || firstSelected?.id || '');
+    setModalRealizationId(autoRealization?.id || firstSelected?.id || '');
+    setIsMappingModalOpen(true);
+  };
+
+  /**
+   * Tahap 2: Mengeksekusi perbandingan analitis dengan data parameter dari modal
+   */
+  const handleConfirmExecuteAnalysis = async () => {
+    setIsMappingModalOpen(false);
     setIsComparing(true);
 
     try {
-      const baselineDoc = documents.find((d) => selectedDocIds.includes(d.id) && d.metadata?.docType === 'BASELINE');
-      const realizationDoc = documents.find((d) => selectedDocIds.includes(d.id) && d.metadata?.docType === 'REALIZATION');
-      const fallbackDoc = documents.find((d) => selectedDocIds.includes(d.id));
-
       const selectedDocTitles = documents
         .filter((d) => selectedDocIds.includes(d.id))
         .map((d) => d.title);
 
       const res = await AnalysisService.compareDeviation({
-        indicatorName: 'Analisis Deviasi Dokumen Terpilih',
-        targetValue: 100,
-        realizationValue: 84.5,
-        sector: 'Pembangunan & Kebijakan Daerah',
-        unitPrefix: '',
-        unitSuffix: '%',
-        baselineDocId: baselineDoc?.id || fallbackDoc?.id,
-        realizationDocId: realizationDoc?.id || fallbackDoc?.id,
+        indicatorName: modalIndicatorName,
+        targetValue: Number(modalTargetValue),
+        realizationValue: Number(modalRealizationValue),
+        sector: modalSector,
+        unitPrefix: modalUnitSuffix === 'Miliar' || modalUnitSuffix === 'Juta' ? 'Rp ' : '',
+        unitSuffix: modalUnitSuffix === 'Miliar' ? ' Miliar' : modalUnitSuffix === 'Juta' ? ' Juta' : modalUnitSuffix,
+        baselineDocId: modalBaselineId,
+        realizationDocId: modalRealizationId,
+        documentIds: selectedDocIds, // Kirim seluruh dokumen terpilih sebagai ruang konteks RAG tambahan
       });
 
       setCompareResult(res);
 
-      // Save new analysis run to history list
+      // Simpan sesi analisis baru ke daftar riwayat lokal
       const nowIso = new Date().toISOString();
       const dateStr = new Date().toLocaleDateString('id-ID', {
         weekday: 'short',
@@ -271,7 +310,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
         id: `sess-${Date.now()}`,
         timestamp: dateStr,
         createdAtISO: nowIso,
-        indicatorName: res.math?.indicatorName || 'Analisis Deviasi Multidokumen',
+        indicatorName: res.math?.indicatorName || modalIndicatorName,
         selectedDocTitles,
         compareResult: res,
       };
@@ -280,7 +319,8 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
       saveSessionToStorage(updatedSessions);
       setActiveSessionId(newSession.id);
     } catch (err: any) {
-      console.error('Error executing multi-analysis:', err);
+      console.error('Gagal memproses analisis multidokumen:', err);
+      alert(`Gagal mengeksekusi analisis: ${err.message || 'Koneksi API bermasalah'}`);
     } finally {
       setIsComparing(false);
     }
@@ -306,7 +346,6 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
     }
   };
 
-  // Export PDF functionality
   const handleExportPdf = async () => {
     if (!compareResult) return;
     setIsExportingPdf(true);
@@ -366,9 +405,12 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
   const isAllRealizationSelected = realizationDocs.length > 0 && realizationDocs.every((d) => selectedDocIds.includes(d.id));
   const isAllGeneralSelected = generalDocs.length > 0 && generalDocs.every((d) => selectedDocIds.includes(d.id));
 
+  // Mendapatkan daftar dokumen terpilih untuk dropdown di dialog modal
+  const selectedDocumentsList = documents.filter((d) => selectedDocIds.includes(d.id));
+
   return (
-    <div className="flex flex-col w-full bg-slate-100/70 p-6 space-y-6 font-roboto">
-      {/* SECTION 1. HERO COMMAND STRIP HEADER */}
+    <div className="flex flex-col w-full bg-slate-100/70 p-6 space-y-6 font-roboto relative">
+      { }
       <div className="w-full bg-white border border-slate-300 px-6 py-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4 rounded-none shadow-2xs">
         <div className="flex flex-col">
           <h1 className="text-xl font-bold uppercase text-slate-900 tracking-tight">
@@ -379,7 +421,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
           </p>
         </div>
 
-        {/* Sisi Kanan: Dokumen Terpilih Counter Badge */}
+        { }
         <div className="flex items-center md:pl-6">
           <div className="px-1 py-2 flex flex-col justify-center rounded-none">
             <span className="text-[9px] uppercase font-bold text-slate-500 tracking-wider">
@@ -392,7 +434,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
         </div>
       </div>
 
-      {/* LIVE DATABASE CACHE DETECTED ALERT STRIP */}
+      { }
       {cacheStatus?.isCached && (
         <div className="bg-teal-50 border border-teal-300 p-4 rounded-none flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs font-roboto">
           <div className="flex items-center gap-2.5">
@@ -417,10 +459,10 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
         </div>
       )}
 
-      {/* ===================== SAVED HISTORY SESSION BAR WITH FILTER ===================== */}
+      { }
       {savedSessions.length > 0 && (
         <div className="bg-white border border-slate-300 p-4 rounded-none shadow-2xs space-y-3 font-roboto">
-          {/* Header & Filter Search Bar */}
+          { }
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 border-b border-slate-200 pb-2.5">
             <div className="flex items-center gap-2">
               <History size={16} className="text-teal-700 shrink-0" />
@@ -429,9 +471,9 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
               </span>
             </div>
 
-            {/* Combined Filter Controls: Calendar Datepicker + Search Box */}
+            { }
             <div className="flex flex-wrap items-center gap-2">
-              {/* Calendar Datepicker Input */}
+              { }
               <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-300 px-2 py-1 text-xs">
                 <Calendar size={13} className="text-teal-700 shrink-0" />
                 <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wider hidden sm:inline">
@@ -454,7 +496,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
                 )}
               </div>
 
-              {/* Text Search Input */}
+              { }
               <div className="relative w-full sm:w-56">
                 <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
@@ -477,7 +519,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
             </div>
           </div>
 
-          {/* Session Cards Grid / Scroll */}
+          { }
           {filteredSavedSessions.length === 0 ? (
             <p className="text-xs text-slate-500 py-2 italic font-normal">
               Tidak ada cache sesi analisis yang cocok dengan filter kata kunci "{sessionSearchQuery}".
@@ -490,11 +532,10 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
                   <div
                     key={session.id}
                     onClick={() => handleSelectHistorySession(session)}
-                    className={`px-3.5 py-2 border text-xs cursor-pointer flex items-center gap-2.5 shrink-0 transition-all rounded-none ${
-                      isActive
-                        ? 'bg-teal-50 border-teal-600 text-teal-950 font-bold shadow-2xs'
-                        : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
-                    }`}
+                    className={`px-3.5 py-2 border text-xs cursor-pointer flex items-center gap-2.5 shrink-0 transition-all rounded-none ${isActive
+                      ? 'bg-teal-50 border-teal-600 text-teal-950 font-bold shadow-2xs'
+                      : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                      }`}
                   >
                     <Clock size={13} className="text-teal-700 shrink-0" />
                     <div className="flex flex-col">
@@ -518,7 +559,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
         </div>
       )}
 
-      {/* ===================== MULTI-DOCUMENT SELECTOR HUB (FLAT & UN-NESTED) ===================== */}
+      { }
       <div className="bg-white border border-slate-200 p-6 rounded-none shadow-xs space-y-4 font-roboto">
         <div className="flex items-center justify-between border-b border-slate-200 pb-3">
           <div className="flex items-center gap-2">
@@ -547,7 +588,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-slate-200 border-y border-slate-200 py-2">
-            {/* Group 1: Baseline */}
+            { }
             <div className="p-3 space-y-2.5">
               <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                 <span className="text-xs font-semibold text-slate-800 flex items-center gap-1.5">
@@ -577,9 +618,8 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
                       <div
                         key={doc.id}
                         onClick={() => toggleDocumentSelection(doc.id)}
-                        className={`p-2 text-xs cursor-pointer flex items-start gap-2 transition-colors ${
-                          isSelected ? 'bg-teal-50/80 font-semibold text-slate-900' : 'hover:bg-slate-50 text-slate-600'
-                        }`}
+                        className={`p-2 text-xs cursor-pointer flex items-start gap-2 transition-colors ${isSelected ? 'bg-teal-50/80 font-semibold text-slate-900' : 'hover:bg-slate-50 text-slate-600'
+                          }`}
                       >
                         {isSelected ? <CheckSquare size={15} className="text-teal-700 shrink-0 mt-0.5" /> : <Square size={15} className="text-slate-400 shrink-0 mt-0.5" />}
                         <span className="truncate">{doc.title}</span>
@@ -590,7 +630,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
               </div>
             </div>
 
-            {/* Group 2: Realisasi */}
+            { }
             <div className="p-3 space-y-2.5">
               <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                 <span className="text-xs font-semibold text-slate-800 flex items-center gap-1.5">
@@ -620,9 +660,8 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
                       <div
                         key={doc.id}
                         onClick={() => toggleDocumentSelection(doc.id)}
-                        className={`p-2 text-xs cursor-pointer flex items-start gap-2 transition-colors ${
-                          isSelected ? 'bg-teal-50/80 font-semibold text-slate-900' : 'hover:bg-slate-50 text-slate-600'
-                        }`}
+                        className={`p-2 text-xs cursor-pointer flex items-start gap-2 transition-colors ${isSelected ? 'bg-teal-50/80 font-semibold text-slate-900' : 'hover:bg-slate-50 text-slate-600'
+                          }`}
                       >
                         {isSelected ? <CheckSquare size={15} className="text-teal-700 shrink-0 mt-0.5" /> : <Square size={15} className="text-slate-400 shrink-0 mt-0.5" />}
                         <span className="truncate">{doc.title}</span>
@@ -633,7 +672,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
               </div>
             </div>
 
-            {/* Group 3: Referensi Umum */}
+            { }
             <div className="p-3 space-y-2.5">
               <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                 <span className="text-xs font-semibold text-slate-800 flex items-center gap-1.5">
@@ -663,9 +702,8 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
                       <div
                         key={doc.id}
                         onClick={() => toggleDocumentSelection(doc.id)}
-                        className={`p-2 text-xs cursor-pointer flex items-start gap-2 transition-colors ${
-                          isSelected ? 'bg-teal-50/80 font-semibold text-slate-900' : 'hover:bg-slate-50 text-slate-600'
-                        }`}
+                        className={`p-2 text-xs cursor-pointer flex items-start gap-2 transition-colors ${isSelected ? 'bg-teal-50/80 font-semibold text-slate-900' : 'hover:bg-slate-50 text-slate-600'
+                          }`}
                       >
                         {isSelected ? <CheckSquare size={15} className="text-teal-700 shrink-0 mt-0.5" /> : <Square size={15} className="text-slate-400 shrink-0 mt-0.5" />}
                         <span className="truncate">{doc.title}</span>
@@ -678,10 +716,10 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
           </div>
         )}
 
-        {/* Action Button Bar */}
+        { }
         <div className="pt-2 flex justify-end">
           <button
-            onClick={handleExecuteMultiAnalysis}
+            onClick={handleOpenMappingModal} // Alihkan dari handleExecute ke pembukaan modal dialog [5]
             disabled={isComparing || selectedDocIds.length === 0}
             className="px-5 py-2.5 bg-teal-700 hover:bg-teal-800 disabled:bg-slate-300 text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-2 border border-teal-900 shadow-sm"
           >
@@ -695,10 +733,10 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
         </div>
       </div>
 
-      {/* ===================== DIAGNOSTIC RESULTS DISPLAY ===================== */}
+      { }
       {(isComparing || compareResult) && (
         <div className="space-y-4">
-          {/* Executive Action Toolbar */}
+          { }
           <div className="flex items-center justify-between bg-white border border-slate-300 p-3 rounded-none">
             <span className="text-xs font-bold text-slate-900 uppercase tracking-wider">
               Hasil Diagnostik Deviasi: {compareResult?.math?.indicatorName || 'Analisis Multidokumen'}
@@ -740,9 +778,9 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
             </div>
           </div>
 
-          {/* Printable Deep-Dive Container */}
+          { }
           <div id="deep-dive-analysis-container" className="space-y-6 bg-white p-4 border border-slate-300">
-            {/* Kop Printable Header */}
+            { }
             <div className="p-4 bg-slate-50 border border-slate-300 rounded-none flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
               <div>
                 <span className="text-[10px] font-bold text-teal-800 uppercase tracking-widest block">
@@ -760,7 +798,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
               </div>
             </div>
 
-            {/* Component 1: Deviation Summary Card */}
+            { }
             {compareResult && (
               <>
                 <hr className="border-slate-200" />
@@ -775,7 +813,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
               </>
             )}
 
-            {/* Component 2: Causal Factor Chart */}
+            { }
             {isComparing ? (
               <div className="bg-white border border-slate-300 p-12 text-center text-slate-600 space-y-2">
                 <Loader2 size={28} className="animate-spin text-teal-700 mx-auto" />
@@ -793,7 +831,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
               </>
             ) : null}
 
-            {/* Component 3: Recommendation List Matrix */}
+            { }
             {compareResult && (
               <>
                 <hr className="border-slate-200" />
@@ -805,6 +843,166 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
           </div>
         </div>
       )}
+
+      {/* ===================== ROLE MAPPING DIALOG MODAL (COMPLY WITH THE DESIGN) ===================== */}
+      {isMappingModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-300 shadow-2xl max-w-lg w-full p-6 rounded-none space-y-4 font-roboto">
+
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+              <div className="flex items-center gap-2 text-slate-900">
+                <BarChart3 size={18} className="text-teal-700" />
+                <h3 className="text-sm font-bold uppercase">Pemetaan Peran &amp; Parameter Analisis</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsMappingModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Modal Form */}
+            <div className="space-y-4">
+              {/* Dropdown 1: Baseline */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                  Pilih Dokumen Target (Baseline) [3]
+                </label>
+                <select
+                  value={modalBaselineId}
+                  onChange={(e) => setModalBaselineId(e.target.value)}
+                  className="w-full text-xs p-2.5 border border-slate-300 focus:outline-none focus:border-teal-700 bg-white font-semibold rounded-none"
+                >
+                  <option value="">-- Pilih Dokumen Target --</option>
+                  {selectedDocumentsList.map((doc) => (
+                    <option key={doc.id} value={doc.id}>
+                      [{doc.metadata?.category || 'Umum'}] {doc.title}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Dropdown 2: Realisasi */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                  Pilih Dokumen Capaian (Realisasi) [3]
+                </label>
+                <select
+                  value={modalRealizationId}
+                  onChange={(e) => setModalRealizationId(e.target.value)}
+                  className="w-full text-xs p-2.5 border border-slate-300 focus:outline-none focus:border-teal-700 bg-white font-semibold rounded-none"
+                >
+                  <option value="">-- Pilih Dokumen Realisasi --</option>
+                  {selectedDocumentsList.map((doc) => (
+                    <option key={doc.id} value={doc.id}>
+                      [{doc.metadata?.category || 'Umum'}] {doc.title}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Text Fields */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                    Nama Indikator Daerah
+                  </label>
+                  <input
+                    type="text"
+                    value={modalIndicatorName}
+                    onChange={(e) => setModalIndicatorName(e.target.value)}
+                    required
+                    className="w-full text-xs p-2.5 border border-slate-300 focus:outline-none focus:border-teal-700 rounded-none font-semibold"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                    Sektor Kebijakan
+                  </label>
+                  <input
+                    type="text"
+                    value={modalSector}
+                    onChange={(e) => setModalSector(e.target.value)}
+                    required
+                    className="w-full text-xs p-2.5 border border-slate-300 focus:outline-none focus:border-teal-700 rounded-none font-semibold"
+                  />
+                </div>
+              </div>
+
+              {/* Numerical Calculations */}
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                    Nilai Target
+                  </label>
+                  <input
+                    type="number"
+                    step="any"
+                    value={modalTargetValue}
+                    onChange={(e) => setModalTargetValue(Number(e.target.value))}
+                    required
+                    className="w-full text-xs p-2.5 border border-slate-300 focus:outline-none focus:border-teal-700 rounded-none font-semibold"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                    Nilai Realisasi
+                  </label>
+                  <input
+                    type="number"
+                    step="any"
+                    value={modalRealizationValue}
+                    onChange={(e) => setModalRealizationValue(Number(e.target.value))}
+                    required
+                    className="w-full text-xs p-2.5 border border-slate-300 focus:outline-none focus:border-teal-700 rounded-none font-semibold"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                    Satuan Indikator
+                  </label>
+                  <select
+                    value={modalUnitSuffix}
+                    onChange={(e) => setModalUnitSuffix(e.target.value)}
+                    className="w-full text-xs p-2.5 border border-slate-300 focus:outline-none focus:border-teal-700 bg-white font-semibold rounded-none"
+                  >
+                    <option value="%">% (Persentase)</option>
+                    <option value="Miliar">Rupiah (Miliar)</option>
+                    <option value="Juta">Rupiah (Juta)</option>
+                    <option value="Km">Km (Panjang)</option>
+                    <option value="Jiwa">Jiwa (Penduduk)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200">
+              <button
+                type="button"
+                onClick={() => setIsMappingModalOpen(false)}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs uppercase rounded-none border border-slate-300 cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmExecuteAnalysis}
+                disabled={!modalBaselineId || !modalRealizationId}
+                className="px-4 py-2 bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-2 border border-teal-850 shadow-xs cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Play size={14} />
+                <span>Proses Analisis Deviasi</span>
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };
