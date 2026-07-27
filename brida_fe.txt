@@ -429,11 +429,13 @@ import { AnalyticsView } from './modules/analytics/views/analytics.view';
 import { ReportsView } from './modules/reports/views/reports.view';
 import { AiQaView } from './modules/ai-assistant/views/ai-qa.view';
 import { ArticleGeneratorView } from './modules/ai-assistant/views/article-generator.view';
+import { ArticlePreviewEditorView } from './modules/ai-assistant/views/article-preview-editor.view';
 
 export function App() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(true);
   const [activeRoute, setActiveRoute] = useState('dashboard');
   const [initialArticlePrompt, setInitialArticlePrompt] = useState<string | undefined>(undefined);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
 
   const pageTitles: Record<string, string> = {
     dashboard: 'Dashboard Spasial & Metrik Perkembangan',
@@ -442,6 +444,7 @@ export function App() {
     reports: 'Laporan Terstruktur & Matriks Rekap',
     'ai-request': 'AI Request & Asisten Obrolan Q&A',
     generator: 'Article Generator & Public Drafting (CoT)',
+    'article-editor': 'Pratinjau Cetak & Editor Manual',
   };
 
   const handleNavigateToGenerator = (promptText?: string) => {
@@ -474,6 +477,17 @@ export function App() {
           <ArticleGeneratorView
             initialPrompt={initialArticlePrompt}
             onNavigateToQa={() => setActiveRoute('ai-request')}
+            onNavigateToEditor={(sessionId) => {
+              setActiveSessionId(sessionId);
+              setActiveRoute('article-editor');
+            }}
+          />
+        );
+      case 'article-editor':
+        return (
+          <ArticlePreviewEditorView
+            sessionId={activeSessionId}
+            onBack={() => setActiveRoute('generator')}
           />
         );
       default:
@@ -1286,7 +1300,7 @@ export const ArticlePreviewWorkspace: React.FC<ArticlePreviewWorkspaceProps> = (
                 </label>
                 <div className="flex-1 overflow-y-auto border border-slate-300 bg-slate-200/50 p-6 flex justify-center no-print">
                     <div
-                        className={`bg-white shadow-lg border border-slate-300 text-slate-800 text-justify text-left prose max-w-none prose-slate prose-xs focus:outline-none transition-all ${fontStyles[fontFamily]}`}
+                        className={`bg-white shadow-lg border border-slate-300 text-slate-800 text-justify prose max-w-none prose-slate prose-xs focus:outline-none transition-all ${fontStyles[fontFamily]}`}
                         style={{
                             lineHeight: lineSpacing,
                             padding: `${marginCm}cm`,
@@ -2159,10 +2173,10 @@ export const FormatControlPanel: React.FC<FormatControlPanelProps> = ({
                     disabled={disabled || isSaving || isPrinting}
                     className="w-full bg-white border border-slate-400 text-xs font-bold px-2.5 py-2 rounded-none focus:outline-none focus:border-teal-600 shadow-xs cursor-pointer disabled:opacity-50"
                 >
-                    <option value="Calibri">Geocitra (Calibri)</option>
-                    <option value="Times New Roman">Geocitra (TNR 11pt)</option>
-                    <option value="Verdana">Geocitra (Verdana 10pt)</option>
-                    <option value="Arial">Geocitra (Arial 11pt)</option>
+                    <option value="Calibri">Calibri</option>
+                    <option value="Times New Roman">Times New Roman</option>
+                    <option value="Verdana">Verdana 10pt</option>
+                    <option value="Arial">Arial 11pt</option>
                 </select>
             </div>
 
@@ -2402,7 +2416,7 @@ export const InteractivePaperSheet: React.FC<InteractivePaperSheetProps> = ({
         <div className="flex justify-center bg-slate-200/50 p-6 overflow-x-auto select-none no-print w-full">
             {}
             <div
-                className={`bg-white shadow-lg border border-slate-300 text-slate-800 text-justify text-left prose max-w-none prose-slate prose-xs focus:outline-none transition-all ${fontStyles[fontFamily]}`}
+                className={`bg-white shadow-lg border border-slate-300 text-slate-800 text-justify prose max-w-none prose-slate prose-xs focus:outline-none transition-all ${fontStyles[fontFamily]}`}
                 style={{
                     lineHeight: lineSpacing,
                     padding: `${marginCm}cm`,
@@ -2710,7 +2724,6 @@ export const AiWorkspaceView: React.FC = () => {
 
 --- FILE: src\modules\ai-assistant\views\article-generator.view.tsx ---
 import React, { useState, useEffect } from 'react';
-import { marked } from 'marked';
 import { DocumentService } from '../../../services/document.service';
 import type { DocumentRecord } from '../../../services/document.service';
 import { AiAssistantService, AiServiceException } from '../../../services/ai-assistant.service';
@@ -2718,7 +2731,6 @@ import type { ArticleSessionDetail } from '../../../services/ai-assistant.servic
 import { CategorizedDocumentSelector } from '../../../components/common/categorized-document-selector.component';
 import { AiErrorMapper } from '../utils/error-mapper.util';
 import { RichMessageRenderer } from '../components/chat-panel.component';
-import { PdfExportService } from '../../../services/pdf-export.service';
 import {
   MessageSquareCode,
   Sparkles,
@@ -2743,8 +2755,6 @@ import {
   WifiOff,
   Plus,
   LogOut,
-  Save,
-  Download,
 } from 'lucide-react';
 
 const iconMap = {
@@ -2826,198 +2836,60 @@ const DraftingFallbackCard: React.FC<DraftingFallbackCardProps> = ({
   );
 };
 
-interface FormatControlPanelProps {
-  fontFamily: 'Calibri' | 'Times New Roman' | 'Verdana' | 'Arial';
-  setFontFamily: (f: any) => void;
-  lineSpacing: number;
-  setLineSpacing: (s: number) => void;
-  marginCm: number;
-  setMarginCm: (m: number) => void;
-  onSave: () => void;
-  onPrint: () => void;
-  isSaving: boolean;
-  isPrinting: boolean;
-}
-
-const FormatControlPanel: React.FC<FormatControlPanelProps> = ({
-  fontFamily,
-  setFontFamily,
-  lineSpacing,
-  setLineSpacing,
-  marginCm,
-  setMarginCm,
-  onSave,
-  onPrint,
-  isSaving,
-  isPrinting,
-}) => {
-  return (
-    <div className="bg-slate-50 border border-slate-300 p-4 space-y-4 rounded-none shadow-2xs">
-      <h3 className="text-xs font-bold uppercase text-slate-800 tracking-wider border-b border-slate-200 pb-2">
-        Kontrol Tampilan Kertas (A4)
-      </h3>
-
-      {}
-      <div className="space-y-1">
-        <label className="block text-[11px] font-bold text-slate-600 uppercase">Tipe Huruf (Font)</label>
-        <select
-          value={fontFamily}
-          onChange={(e) => setFontFamily(e.target.value as any)}
-          className="w-full bg-white border border-slate-300 text-xs font-semibold px-2.5 py-1.5 rounded-none focus:outline-none focus:border-teal-600 shadow-xs"
-        >
-          <option value="Calibri">Geocitra (Calibri)</option>
-          <option value="Times New Roman">Geocitra (TNR 11pt)</option>
-          <option value="Verdana">Geocitra (Verdana 10pt)</option>
-          <option value="Arial">Geocitra (Arial 11pt)</option>
-        </select>
-      </div>
-
-      {}
-      <div className="space-y-1">
-        <label className="block text-[11px] font-bold text-slate-600 uppercase">Jarak Baris (Spasi)</label>
-        <div className="grid grid-cols-2 divide-x divide-slate-300 border border-slate-300 bg-white">
-          <button
-            type="button"
-            onClick={() => setLineSpacing(1.18)}
-            className={`py-1 text-xs font-bold transition-colors ${lineSpacing === 1.18 ? 'bg-teal-700 text-white' : 'hover:bg-slate-50 text-slate-700'}`}
-          >
-            1.18 (Nota Dinas)
-          </button>
-          <button
-            type="button"
-            onClick={() => setLineSpacing(1.5)}
-            className={`py-1 text-xs font-bold transition-colors ${lineSpacing === 1.5 ? 'bg-teal-700 text-white' : 'hover:bg-slate-50 text-slate-700'}`}
-          >
-            1.50 (Laporan)
-          </button>
-        </div>
-      </div>
-
-      {}
-      <div className="space-y-1">
-        <label className="block text-[11px] font-bold text-slate-600 uppercase">Margin Sisi Kertas (cm)</label>
-        <div className="grid grid-cols-2 divide-x divide-slate-300 border border-slate-300 bg-white">
-          <button
-            type="button"
-            onClick={() => setMarginCm(2.5)}
-            className={`py-1 text-xs font-bold transition-colors ${marginCm === 2.5 ? 'bg-teal-700 text-white' : 'hover:bg-slate-50 text-slate-700'}`}
-          >
-            2.5 cm (Standar)
-          </button>
-          <button
-            type="button"
-            onClick={() => setMarginCm(3.0)}
-            className={`py-1 text-xs font-bold transition-colors ${marginCm === 3.0 ? 'bg-teal-700 text-white' : 'hover:bg-slate-50 text-slate-700'}`}
-          >
-            3.0 cm (Longgar)
-          </button>
-        </div>
-      </div>
-
-      {}
-      <div className="pt-2 space-y-2 border-t border-slate-200">
-        <button
-          type="button"
-          onClick={onSave}
-          disabled={isSaving}
-          className="w-full px-4 py-2 bg-slate-900 hover:bg-slate-950 text-white font-bold text-xs uppercase tracking-wider rounded-none flex items-center justify-center gap-2 border border-slate-950 shadow-xs cursor-pointer"
-        >
-          {isSaving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
-          <span>Simpan Perubahan DB</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={onPrint}
-          disabled={isPrinting}
-          className="w-full px-4 py-2 bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs uppercase tracking-wider rounded-none flex items-center justify-center gap-2 border border-teal-850 shadow-xs cursor-pointer"
-        >
-          {isPrinting ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
-          <span>Cetak PDF Resmi</span>
-        </button>
-      </div>
-    </div>
-  );
-};
-
-interface InteractivePaperSheetProps {
-  htmlContent: string;
-  fontFamily: 'Calibri' | 'Times New Roman' | 'Verdana' | 'Arial';
-  lineSpacing: number;
-  marginCm: number;
-}
-
-const fontStyles: Record<string, string> = {
-  'Calibri': 'font-sans',
-  'Times New Roman': 'font-serif',
-  'Verdana': 'font-sans tracking-tight',
-  'Arial': 'font-sans tracking-tight',
-};
-
-const InteractivePaperSheet: React.FC<InteractivePaperSheetProps> = ({
-  htmlContent,
-  fontFamily,
-  lineSpacing,
-  marginCm,
-}) => {
-  const fontSize = fontFamily === 'Times New Roman' ? '11pt' : fontFamily === 'Verdana' ? '10pt' : '11pt';
-
-  return (
-    <div className="flex justify-center bg-slate-200/50 p-6 overflow-x-auto select-none no-print">
-      <div
-        className={`bg-white shadow-lg border border-slate-300 text-slate-800 text-justify text-left prose max-w-none prose-slate prose-xs focus:outline-none transition-all ${fontStyles[fontFamily]}`}
-        style={{
-          lineHeight: lineSpacing,
-          padding: `${marginCm}cm`,
-          minHeight: '29.7cm',
-          width: '21.0cm',
-          fontSize,
-        }}
-        dangerouslySetInnerHTML={{ __html: htmlContent }}
-      />
-    </div>
-  );
-};
-
 export type DraftingStatus = 'IDLE' | 'SUCCESS' | 'ERROR';
 
 export interface ArticleGeneratorViewProps {
   initialPrompt?: string;
   onNavigateToQa: () => void;
+  onNavigateToEditor: (sessionId: string) => void;
 }
+
+const getAssistantMessageSummary = (content: string): string => {
+  if (!content) return '';
+
+  let clean = content
+    .replace(/#+\s+.+/g, '')
+    .replace(/[*_`]/g, '')    // Hapus format bold/italic/code
+    .replace(/\s+/g, ' ')     // Ubah spasi berlebih menjadi spasi tunggal
+    .trim();
+
+  if (clean.length > 180) {
+    return clean.substring(0, 180) + '...';
+  }
+  return clean;
+};
+
+// --- KOMPONEN UTAMA: ARTICLE GENERATOR VIEW ---
 
 export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
   initialPrompt,
   onNavigateToQa,
+  onNavigateToEditor,
 }) => {
-
+  // Pengelolaan State Pilihan Dokumen
   const [documents, setDocuments] = useState<DocumentRecord[]>([]);
   const [selectedDocIds, setSelectedDocIds] = useState<string[]>([]);
   const [isLoadingDocs, setIsLoadingDocs] = useState<boolean>(true);
 
+  // Parameter Konfigurasi Artikel
   const [articleTitle, setArticleTitle] = useState<string>('');
   const [tone, setTone] = useState<string>('solutif');
   const [targetLength, setTargetLength] = useState<'SHORT' | 'MEDIUM' | 'LONG'>('MEDIUM');
   const [userInstruction, _setUserInstruction] = useState<string>(initialPrompt || '');
 
-  const [fontFamily, setFontFamily] = useState<'Calibri' | 'Times New Roman' | 'Verdana' | 'Arial'>('Calibri');
-  const [lineSpacing, setLineSpacing] = useState<number>(1.18);
-  const [marginCm, setMarginCm] = useState<number>(2.5);
-
+  // Pengelolaan State Sesi & Editor Aktif
   const [activeSession, setActiveSession] = useState<ArticleSessionDetail | null>(null);
-  const [editableText, setEditableText] = useState<string>('');
   const [articleSessionsHistory, setArticleSessionsHistory] = useState<ArticleSessionDetail[]>([]);
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [followUpQuery, setFollowUpQuery] = useState<string>('');
   const [isSendingFollowUp, setIsSendingFollowUp] = useState<boolean>(false);
 
-  const [isSavingManual, setIsSavingManual] = useState<boolean>(false);
-  const [isPrinting, setIsPrinting] = useState<boolean>(false);
-
+  // Status Siklus Hidup Editor Artikel (State Machine) [5]
   const [draftingStatus, setDraftingStatus] = useState<DraftingStatus>('IDLE');
   const [draftingErrorType, setDraftingErrorType] = useState<string>('UNKNOWN_ERROR');
   const [draftingErrorMsg, setDraftingErrorMsg] = useState<string>('');
 
+  // Cadangan memori parameter input yang gagal diproses (Fail-Safe Caching) [1, 5]
   const [lastFailedConfig, setLastFailedConfig] = useState<{
     documentIds: string[];
     articleTitle: string;
@@ -3026,6 +2898,7 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
     userInstruction?: string;
   } | null>(null);
 
+  // Parameter Filter Riwayat Artikel
   const [historySearchQuery, setHistorySearchQuery] = useState('');
   const [historyCalendarDate, setHistoryCalendarDate] = useState('');
 
@@ -3108,15 +2981,9 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
     setSelectedDocIds([]);
   };
 
-  const getRenderedHtml = (markdownText: string): string => {
-    try {
-      return marked.parse(markdownText) as string;
-    } catch (err) {
-      console.error('Gagal mengonversi Markdown ke HTML:', err);
-      return markdownText;
-    }
-  };
-
+  /**
+   * Mengeksekusi pembuatan draf naskah baru
+   */
   const handleGenerateNewArticle = async (e: React.FormEvent) => {
     e.preventDefault();
     if (selectedDocIds.length === 0) {
@@ -3142,7 +3009,6 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
       });
 
       setActiveSession(sessionDetail);
-      setEditableText(sessionDetail.fullArticleText || '');
       setDraftingStatus('SUCCESS');
       setActiveTab('editor');
       showToast('✨ Draf artikel baru berhasil disintesis oleh AI dan disimpan ke Database!');
@@ -3173,69 +3039,9 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
     }
   };
 
-  const handleSaveArticleManual = async (): Promise<boolean> => {
-    if (!activeSession) return false;
-    setIsSavingManual(true);
-
-    try {
-      const updated = await AiAssistantService.updateArticleSessionContent(
-        activeSession.id,
-        articleTitle,
-        editableText,
-      );
-      setActiveSession(updated);
-      setEditableText(updated.fullArticleText || '');
-      showToast('💾 Perubahan naskah Anda berhasil disimpan permanen ke database BRIDA!');
-      loadHistory();
-      return true;
-    } catch (err: any) {
-      const displayMsg = err.rawMessage || err.message || 'Gagal menyinkronkan data.';
-      showToast(`Gagal menyimpan ke database: ${displayMsg}`);
-      return false;
-    } finally {
-      setIsSavingManual(false);
-    }
-  };
-
-  const handlePrintArticlePdf = async () => {
-    if (!activeSession) return;
-    setIsPrinting(true);
-    showToast('⏳ Menyinkronkan revisi draf terakhir Anda ke database sebelum mencetak... [1]');
-
-    try {
-
-      await AiAssistantService.updateArticleSessionContent(
-        activeSession.id,
-        articleTitle,
-        editableText,
-      );
-
-      const htmlContent = getRenderedHtml(editableText);
-
-      showToast('🖨️ Mengonversi dan merakit dokumen PDF resmi...');
-      const fontSize = fontFamily === 'Times New Roman' ? 11 : fontFamily === 'Verdana' ? 10 : 11;
-
-      await PdfExportService.exportCustomFormattedArticlePdf(
-        htmlContent,
-        {
-          fontFamily,
-          fontSize,
-          lineSpacing,
-          marginCm,
-        },
-        articleTitle || 'Draf_Artikel_BRIDA_Mimika',
-      );
-
-      showToast('✅ Dokumen PDF resmi berhasil diunduh!');
-      loadHistory();
-    } catch (err: any) {
-      const displayMsg = err.rawMessage || err.message || 'Gagal melakukan ekspor.';
-      showToast(`Pencetakan PDF gagal: ${displayMsg}`);
-    } finally {
-      setIsPrinting(false);
-    }
-  };
-
+  /**
+   * Mengirim kueri instruksi revisi (re-drafting)
+   */
   const handleSendFollowUp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeSession || !followUpQuery.trim() || isSendingFollowUp) return;
@@ -3244,7 +3050,6 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
     try {
       const updated = await AiAssistantService.interactArticle(activeSession.id, followUpQuery);
       setActiveSession(updated);
-      setEditableText(updated.fullArticleText || '');
       setFollowUpQuery('');
       setDraftingStatus('SUCCESS');
       showToast('Draf artikel berhasil diperbarui berdasarkan instruksi revisi Anda.');
@@ -3260,6 +3065,9 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
     }
   };
 
+  /**
+   * Fungsi Sintesis Ulang Berbasis Parameter Cadangan (Fail-Safe Caching) [1, 5]
+   */
   const handleRetryDrafting = async () => {
     if (!lastFailedConfig) return;
 
@@ -3281,7 +3089,6 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
       });
 
       setActiveSession(sessionDetail);
-      setEditableText(sessionDetail.fullArticleText || '');
       setDraftingStatus('SUCCESS');
       setActiveTab('editor');
       showToast('✨ Draf artikel berhasil disintesis ulang!');
@@ -3304,9 +3111,11 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
     }
   };
 
+  /**
+   * Fungsi pembersih State untuk Sesi Baru (Reset States) [5]
+   */
   const handleCreateNewSession = () => {
     setActiveSession(null);
-    setEditableText('');
     setDraftingStatus('IDLE');
     setDraftingErrorType('UNKNOWN_ERROR');
     setDraftingErrorMsg('');
@@ -3318,7 +3127,6 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
     try {
       const session = await AiAssistantService.getArticleSession(sessionId);
       setActiveSession(session);
-      setEditableText(session.fullArticleText || '');
       setDraftingStatus('SUCCESS');
       setArticleTitle(session.articleTitle || session.title);
       setTargetLength(session.targetLength || 'MEDIUM');
@@ -3358,7 +3166,7 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
 
   return (
     <div className="flex flex-col w-full bg-slate-100/70 p-6 space-y-6 font-roboto">
-      {}
+      {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-5 py-3 border border-slate-700 shadow-xl flex items-center gap-3 rounded-none">
           <CheckCircle2 size={18} className="text-teal-400 shrink-0" />
@@ -3366,8 +3174,8 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
         </div>
       )}
 
-      {}
-      <div className="w-full bg-white border border-slate-300 px-6 py-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4 rounded-none shadow-2xs">
+      {/* SECTION 1. HERO HEADER */}
+      <div className="w-full bg-white border border-slate-300 p-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4 rounded-none shadow-2xs">
         <div className="flex flex-col">
           <h1 className="text-xl font-bold uppercase text-slate-900 tracking-tight">
             Penulis Artikel &amp; Rilis Media BRIDA
@@ -3396,7 +3204,7 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
         </div>
       )}
 
-      {}
+      {/* SECTION 2: Control Panel */}
       <div className="bg-white border border-slate-300 p-5 rounded-none shadow-xs space-y-4">
         <div className="flex items-center justify-between border-b border-slate-200 pb-3">
           <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wide flex items-center gap-2">
@@ -3406,7 +3214,7 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
         </div>
 
         <form onSubmit={handleGenerateNewArticle} className="space-y-4 font-roboto">
-          {}
+          {/* Document Selector */}
           <CategorizedDocumentSelector
             documents={documents}
             selectedDocIds={selectedDocIds}
@@ -3417,7 +3225,7 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
             title="Pilih Dokumen Acuan Artikel"
           />
 
-          {}
+          {/* Title Input */}
           <div className="space-y-2 pt-4 border-t border-slate-200">
             <label className="block text-xs font-bold text-slate-800 uppercase tracking-wide">
               Judul / Topik Utama Artikel (Input Pengguna)
@@ -3435,11 +3243,11 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
             </p>
           </div>
 
-          {}
+          {/* Target Length & Tone Options */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-slate-200">
-            {}
+            {/* Length Selector */}
             <div className="border-r border-slate-200 pr-6">
-              <label className="block text-xs font-bold text-slate-700 uppercase mb-2 tracking-wider">
+               <label className="block text-xs font-bold text-slate-700 uppercase mb-2 tracking-wider">
                 Panjang Teks Keluaran Artikel
               </label>
               <div className="grid grid-cols-3 divide-x divide-slate-200 border-y border-slate-200">
@@ -3460,7 +3268,7 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
               </div>
             </div>
 
-            {}
+            {/* Tone Selector */}
             <div className="pl-0">
               <label className="block text-xs font-bold text-slate-700 uppercase mb-2 tracking-wider">
                 Gaya Bahasa / Tone Publikasi
@@ -3480,7 +3288,7 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
             </div>
           </div>
 
-          {}
+          {/* Submit Action */}
           <div className="flex justify-end pt-2">
             <button
               type="submit"
@@ -3503,7 +3311,7 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
         </form>
       </div>
 
-      {}
+      {/* SECTION 3: Tab System */}
       <div className="flex items-center border-b border-slate-300">
         <button
           onClick={() => setActiveTab('editor')}
@@ -3531,7 +3339,7 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
         </button>
       </div>
 
-      {}
+      {/* TAB CONTENT 1: Editor & Interactive Revision Chat */}
       {activeTab === 'editor' && (
         draftingStatus === 'IDLE' && !activeSession ? (
           <div className="bg-white border border-slate-300 p-12 text-center rounded-none shadow-xs space-y-4">
@@ -3542,31 +3350,15 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-            {}
-            <div className="lg:col-span-1">
-              <FormatControlPanel
-                fontFamily={fontFamily}
-                setFontFamily={setFontFamily}
-                lineSpacing={lineSpacing}
-                setLineSpacing={setLineSpacing}
-                marginCm={marginCm}
-                setMarginCm={setMarginCm}
-                onSave={handleSaveArticleManual}
-                onPrint={handlePrintArticlePdf}
-                isSaving={isSavingManual}
-                isPrinting={isPrinting}
-              />
-            </div>
-
-            {}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Left Col (2 cols): Active Article Preview & Full Text */}
             <div className="lg:col-span-2 bg-white border border-slate-300 p-6 rounded-none shadow-xs flex flex-col h-145">
               {draftingStatus === 'ERROR' ? (
-
+                // Merender Polimorfis Kartu Fallback Kesalahan Sistem [5]
                 <DraftingFallbackCard
                   errorType={draftingErrorType}
                   rawErrorMsg={draftingErrorMsg}
-                  onRetry={handleRetryDrafting}
+                  onRetry={handleRetryDrafting} // Fail-Safe Caching [1, 5]
                   onNewSession={handleCreateNewSession}
                 />
               ) : (
@@ -3583,52 +3375,35 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
                       </div>
                     )}
 
-                    <button
-                      onClick={() => handleCopyText(editableText)}
-                      disabled={!activeSession}
-                      className="px-3 py-1.5 bg-slate-900 hover:bg-slate-950 disabled:bg-slate-300 disabled:text-slate-500 text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-1.5 shadow-2xs"
-                    >
-                      <Copy size={13} />
-                      <span>Salin Teks Markdown</span>
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => onNavigateToEditor(activeSession!.id)}
+                        disabled={!activeSession}
+                        className="px-3 py-1.5 bg-teal-700 hover:bg-teal-850 disabled:bg-slate-300 disabled:text-slate-500 text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-1.5 shadow-2xs border border-teal-800 cursor-pointer"
+                      >
+                        <PenTool size={13} />
+                        <span>Buka Pratinjau &amp; Edit Manual</span>
+                      </button>
+                      <button
+                        onClick={() => handleCopyText(activeSession?.fullArticleText || '')}
+                        disabled={!activeSession}
+                        className="px-3 py-1.5 bg-slate-900 hover:bg-slate-950 disabled:bg-slate-300 disabled:text-slate-500 text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-1.5 shadow-2xs"
+                      >
+                        <Copy size={13} />
+                        <span>Salin Teks Artikel</span>
+                      </button>
+                    </div>
                   </div>
 
-                  {}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 flex-1 min-h-0 mt-4">
-                    {}
-                    <div className="flex flex-col h-full">
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
-                        Markdown Source (Tulis / Sunting Manual)
-                      </label>
-                      <textarea
-                        value={editableText}
-                        onChange={(e) => setEditableText(e.target.value)}
-                        disabled={isGenerating}
-                        className="w-full flex-1 bg-slate-50 border border-slate-300 p-4 text-xs font-mono leading-relaxed text-slate-900 focus:outline-none focus:bg-white focus:border-teal-600 rounded-none resize-none overflow-y-auto"
-                        placeholder="Tulis naskah artikel Anda di sini..."
-                      />
-                    </div>
-
-                    {}
-                    <div className="flex flex-col h-full overflow-hidden">
-                      <label className="block text-[10px] font-bold text-teal-800 uppercase tracking-wider mb-1.5">
-                        Real-time A4 PDF Preview (Cetak Sesuai Layar)
-                      </label>
-                      <div className="flex-1 overflow-y-auto border border-slate-300 bg-slate-200">
-                        <InteractivePaperSheet
-                          htmlContent={getRenderedHtml(editableText)}
-                          fontFamily={fontFamily}
-                          lineSpacing={lineSpacing}
-                          marginCm={marginCm}
-                        />
-                      </div>
-                    </div>
+                  {/* Preview naskah tulisan mentah hasil sintesis AI [3] */}
+                  <div className="bg-slate-50 border border-slate-300 p-6 flex-1 overflow-y-auto rounded-none text-left mt-4 text-xs leading-relaxed font-roboto">
+                    <RichMessageRenderer text={activeSession?.fullArticleText || 'Mempersiapkan draf naskah publikasi...'} />
                   </div>
                 </div>
               )}
             </div>
 
-            {}
+            {/* Right Col (1 col): CoT Interactive Chat History & Revision Input */}
             <div className="bg-white border border-slate-300 p-4 rounded-none shadow-xs flex flex-col h-145">
               <div className="border-b border-slate-200 pb-3 mb-3">
                 <h3 className="text-xs font-bold text-slate-900 uppercase flex items-center gap-1.5">
@@ -3640,7 +3415,7 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
                 </p>
               </div>
 
-              {}
+              {/* Chat Message List */}
               <div className="flex-1 overflow-y-auto space-y-3 pr-1">
                 {activeSession?.messages?.map((msg) => (
                   <div
@@ -3651,11 +3426,26 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
                       }`}
                   >
                     <div className="font-bold uppercase text-[10px] text-slate-500 mb-1">
-                      {msg.role === 'USER' ? 'Pengguna / Editor' : 'BRIDA AI Assistant'} &bull; {new Date(msg.createdAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+                      {msg.role === 'USER' ? 'Pengguna / Editor' : msg.role === 'SYSTEM' ? 'Sistem' : 'BRIDA AI Assistant'} &bull; {new Date(msg.createdAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
                     </div>
                     {}
                     <div className="leading-relaxed font-roboto">
-                      <RichMessageRenderer text={msg.content} />
+                      {msg.role === 'ASSISTANT' ? (
+                        <div className="space-y-2">
+                          <div className="bg-teal-700/10 text-teal-900 border-l-2 border-teal-700 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 rounded-none w-fit">
+                            <Sparkles size={11} className="text-teal-700" />
+                            <span>Draf AI Diperbarui</span>
+                          </div>
+                          <p className="text-xs text-slate-700 italic">
+                            "{getAssistantMessageSummary(msg.content)}"
+                          </p>
+                          <div className="pt-1.5 border-t border-slate-200 text-[10px] font-semibold text-teal-800">
+                            📝 Naskah lengkap telah dimuat pada panel editor di sebelah kiri.
+                          </div>
+                        </div>
+                      ) : (
+                        <RichMessageRenderer text={msg.content} />
+                      )}
                     </div>
                   </div>
                 ))}
@@ -3814,6 +3604,382 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
 };
 
 export default ArticleGeneratorView;
+
+--- FILE: src\modules\ai-assistant\views\article-preview-editor.view.tsx ---
+import React, { useState, useEffect } from 'react';
+import { marked } from 'marked';
+import { AiAssistantService } from '../../../services/ai-assistant.service';
+import type { ArticleSessionDetail } from '../../../services/ai-assistant.service';
+import { PdfExportService } from '../../../services/pdf-export.service';
+import {
+  Loader2,
+  Save,
+  Download,
+  ArrowLeft,
+  CheckCircle2,
+  AlertCircle,
+  FileText,
+} from 'lucide-react';
+
+interface ArticlePreviewEditorViewProps {
+  sessionId: string | null;
+  onBack: () => void;
+}
+
+const fontStyles: Record<string, string> = {
+  'Calibri': 'font-sans',
+  'Times New Roman': 'font-serif',
+  'Verdana': 'font-sans tracking-tight',
+  'Arial': 'font-sans tracking-tight',
+};
+
+const InteractivePaperSheet: React.FC<{
+  htmlContent: string;
+  fontFamily: 'Calibri' | 'Times New Roman' | 'Verdana' | 'Arial';
+  lineSpacing: number;
+  marginCm: number;
+}> = ({ htmlContent, fontFamily, lineSpacing, marginCm }) => {
+  const fontSize = fontFamily === 'Times New Roman' ? '11pt' : fontFamily === 'Verdana' ? '10pt' : '11pt';
+
+  return (
+    <div className="flex justify-center bg-slate-200/50 p-6 overflow-x-auto select-none no-print">
+      <div
+        className={`bg-white shadow-lg border border-slate-300 text-slate-800 text-justify prose max-w-none prose-slate prose-xs focus:outline-none transition-all ${fontStyles[fontFamily]}`}
+        style={{
+          lineHeight: lineSpacing,
+          padding: `${marginCm}cm`,
+          minHeight: '29.7cm',
+          width: '21.0cm',
+          fontSize,
+        }}
+        dangerouslySetInnerHTML={{ __html: htmlContent }}
+      />
+    </div>
+  );
+};
+
+export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> = ({
+  sessionId,
+  onBack,
+}) => {
+  const [activeSession, setActiveSession] = useState<ArticleSessionDetail | null>(null);
+  const [editableText, setEditableText] = useState<string>('');
+  const [articleTitle, setArticleTitle] = useState<string>('');
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+
+  const [fontFamily, setFontFamily] = useState<'Calibri' | 'Times New Roman' | 'Verdana' | 'Arial'>('Calibri');
+  const [lineSpacing, setLineSpacing] = useState<number>(1.18);
+  const [marginCm, setMarginCm] = useState<number>(2.5);
+
+  const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [isPrinting, setIsPrinting] = useState<boolean>(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 4000);
+  };
+
+  useEffect(() => {
+    if (sessionId) {
+      loadSession();
+    }
+  }, [sessionId]);
+
+  const loadSession = async () => {
+    setIsLoading(true);
+    try {
+      const session = await AiAssistantService.getArticleSession(sessionId!);
+      setActiveSession(session);
+      setEditableText(session.fullArticleText || '');
+      setArticleTitle(session.articleTitle || session.title || '');
+    } catch (err: any) {
+      console.error('Gagal memuat sesi artikel:', err);
+      showToast('Gagal memuat sesi artikel dari database.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const getRenderedHtml = (markdownText: string): string => {
+    try {
+      return marked.parse(markdownText) as string;
+    } catch (err) {
+      console.error('Gagal mengonversi Markdown ke HTML:', err);
+      return markdownText;
+    }
+  };
+
+  const handleSave = async () => {
+    if (!sessionId) return;
+    setIsSaving(true);
+    try {
+      const updated = await AiAssistantService.updateArticleSessionContent(
+        sessionId,
+        articleTitle,
+        editableText
+      );
+      setActiveSession(updated);
+      setEditableText(updated.fullArticleText || '');
+      showToast('💾 Perubahan naskah Anda berhasil disimpan permanen ke database BRIDA!');
+    } catch (err: any) {
+      const displayMsg = err.rawMessage || err.message || 'Gagal menyinkronkan data.';
+      showToast(`Gagal menyimpan ke database: ${displayMsg}`);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handlePrint = async () => {
+    if (!editableText) {
+      showToast('⚠️ Tidak ada naskah untuk dicetak. Silakan buka sesi dari halaman generator.');
+      return;
+    }
+    setIsPrinting(true);
+
+    if (sessionId) {
+      try {
+        showToast('⏳ Menyinkronkan revisi draf terakhir ke database...');
+        await AiAssistantService.updateArticleSessionContent(
+          sessionId,
+          articleTitle,
+          editableText
+        );
+      } catch (saveErr: any) {
+
+        console.warn('[ArticlePreviewEditor] Silent-save sebelum cetak gagal:', saveErr);
+        showToast('⚠️ Gagal sinkron ke DB, namun PDF tetap diproses...');
+
+        await new Promise(res => setTimeout(res, 1500));
+      }
+    }
+
+    try {
+
+      const htmlContent = await Promise.resolve(marked.parse(editableText));
+
+      showToast('🖨️ Mengonversi dan merakit dokumen PDF resmi...');
+      const fontSize = fontFamily === 'Times New Roman' ? 11 : fontFamily === 'Verdana' ? 10 : 11;
+
+      await PdfExportService.exportCustomFormattedArticlePdf(
+        htmlContent,
+        {
+          fontFamily,
+          fontSize,
+          lineSpacing,
+          marginCm,
+        },
+        articleTitle || 'Draf_Artikel_BRIDA_Mimika'
+      );
+
+      showToast('✅ Dokumen PDF resmi berhasil diunduh!');
+    } catch (err: any) {
+      const displayMsg = err.rawMessage || err.message || 'Gagal melakukan ekspor.';
+      console.error('[ArticlePreviewEditor] Gagal generate PDF:', err);
+      showToast(`❌ Pencetakan PDF gagal: ${displayMsg}`);
+    } finally {
+      setIsPrinting(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-96 font-roboto bg-slate-50/50 border border-slate-300">
+        <div className="flex flex-col items-center gap-2">
+          <Loader2 className="animate-spin text-teal-700" size={24} />
+          <span className="text-xs font-bold uppercase tracking-wider text-slate-600">Memuat Sesi Redaksi...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (!sessionId || !activeSession) {
+    return (
+      <div className="flex items-center justify-center h-96 font-roboto bg-slate-50/50 border border-slate-300 p-6 text-center space-y-4">
+        <div className="max-w-md mx-auto space-y-2">
+          <AlertCircle className="mx-auto text-red-600" size={36} />
+          <h3 className="text-base font-bold text-slate-900 uppercase">Akses Sesi Gagal</h3>
+          <p className="text-xs text-slate-600">
+            ID Sesi Sifat Editorial kosong atau tidak valid. Silakan kembali ke Halaman Penulis Artikel untuk memilih sesi aktif.
+          </p>
+          <button
+            onClick={onBack}
+            className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-1.5 cursor-pointer mt-4"
+          >
+            <ArrowLeft size={13} />
+            <span>Kembali ke AI Editor</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col w-full bg-slate-100/70 p-6 space-y-6 font-roboto">
+      {}
+      {toastMessage && (
+        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-5 py-3 border border-slate-700 shadow-xl flex items-center gap-3 rounded-none">
+          <CheckCircle2 size={18} className="text-teal-400 shrink-0" />
+          <span className="text-sm font-semibold">{toastMessage}</span>
+        </div>
+      )}
+
+      {}
+      <div className="w-full bg-white border border-slate-300 p-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4 rounded-none shadow-2xs">
+        <div className="flex flex-col">
+          <button
+            onClick={onBack}
+            className="self-start mb-2 text-xs font-bold text-teal-700 hover:text-teal-850 inline-flex items-center gap-1.5 cursor-pointer"
+          >
+            <ArrowLeft size={13} />
+            <span>Kembali ke AI Editor</span>
+          </button>
+          <h1 className="text-xl font-bold uppercase text-slate-900 tracking-tight mt-1">
+            Redaksi &amp; Layouting Cetak (A4)
+          </h1>
+          <p className="text-xs text-slate-500 font-normal mt-1">
+            Sesi Cetak: <span className="font-bold text-slate-700">{articleTitle || activeSession.title}</span>
+          </p>
+        </div>
+      </div>
+
+      {}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+        {}
+        <div className="lg:col-span-2 space-y-6 flex flex-col h-185">
+          {}
+          <div className="bg-white border border-slate-300 p-5 space-y-4 rounded-none shadow-xs">
+            <h3 className="text-xs font-bold uppercase text-slate-800 tracking-wider border-b border-slate-200 pb-2">
+              Kontrol Letak Kertas &amp; Estetika Cetak
+            </h3>
+
+            {}
+            <div className="space-y-1">
+              <label className="block text-[11px] font-bold text-slate-600 uppercase">Tipe Huruf (Font)</label>
+              <select
+                value={fontFamily}
+                onChange={(e) => setFontFamily(e.target.value as any)}
+                className="w-full bg-white border border-slate-300 text-xs font-semibold px-2.5 py-1.5 rounded-none focus:outline-none focus:border-teal-600 shadow-xs"
+              >
+                <option value="Calibri">Calibri</option>
+                <option value="Times New Roman">Times New Roman</option>
+                <option value="Verdana">Verdana</option>
+                <option value="Arial">Arial</option>
+              </select>
+            </div>
+
+            {}
+            <div className="space-y-1">
+              <label className="block text-[11px] font-bold text-slate-600 uppercase">Jarak Baris (Spasi)</label>
+              <div className="grid grid-cols-2 divide-x divide-slate-300 border border-slate-300 bg-white">
+                <button
+                  type="button"
+                  onClick={() => setLineSpacing(1.18)}
+                  className={`py-1 text-xs font-bold transition-colors cursor-pointer ${lineSpacing === 1.18 ? 'bg-teal-700 text-white' : 'hover:bg-slate-50 text-slate-700'}`}
+                >
+                  1.18 (Nota Dinas)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLineSpacing(1.5)}
+                  className={`py-1 text-xs font-bold transition-colors cursor-pointer ${lineSpacing === 1.5 ? 'bg-teal-700 text-white' : 'hover:bg-slate-50 text-slate-700'}`}
+                >
+                  1.50 (Laporan)
+                </button>
+              </div>
+            </div>
+
+            {}
+            <div className="space-y-1">
+              <label className="block text-[11px] font-bold text-slate-600 uppercase">Margin Sisi Kertas (cm)</label>
+              <div className="grid grid-cols-2 divide-x divide-slate-300 border border-slate-300 bg-white">
+                <button
+                  type="button"
+                  onClick={() => setMarginCm(2.5)}
+                  className={`py-1 text-xs font-bold transition-colors cursor-pointer ${marginCm === 2.5 ? 'bg-teal-700 text-white' : 'hover:bg-slate-50 text-slate-700'}`}
+                >
+                  2.5 cm (Standar)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMarginCm(3.0)}
+                  className={`py-1 text-xs font-bold transition-colors cursor-pointer ${marginCm === 3.0 ? 'bg-teal-700 text-white' : 'hover:bg-slate-50 text-slate-700'}`}
+                >
+                  3.0 cm (Longgar)
+                </button>
+              </div>
+            </div>
+
+            {}
+            <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-200">
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={isSaving}
+                className="px-4 py-2 bg-slate-900 hover:bg-slate-950 text-white font-bold text-xs uppercase tracking-wider rounded-none flex items-center justify-center gap-1.5 border border-slate-950 shadow-xs cursor-pointer disabled:opacity-50"
+              >
+                {isSaving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
+                <span>Simpan DB</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handlePrint}
+                disabled={isPrinting}
+                className="px-4 py-2 bg-teal-700 hover:bg-teal-850 text-white font-bold text-xs uppercase tracking-wider rounded-none flex items-center justify-center gap-1.5 border border-teal-850 shadow-xs cursor-pointer disabled:opacity-50"
+              >
+                {isPrinting ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
+                <span>Cetak PDF</span>
+              </button>
+            </div>
+          </div>
+
+          {}
+          <div className="bg-white border border-slate-300 p-5 flex flex-col flex-1 min-h-0">
+            <div className="flex items-center gap-1.5 mb-2 shrink-0">
+              <FileText size={14} className="text-slate-500" />
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                Sumber Naskah Markdown (Sunting Manual)
+              </label>
+            </div>
+            <textarea
+              value={editableText}
+              onChange={(e) => setEditableText(e.target.value)}
+              className="w-full flex-1 bg-slate-50 border border-slate-300 p-4 text-xs font-mono leading-relaxed text-slate-900 focus:outline-none focus:bg-white focus:border-teal-600 rounded-none resize-none overflow-y-auto"
+              placeholder="Tulis naskah draf artikel Anda di sini..."
+            />
+          </div>
+        </div>
+
+        {}
+        <div className="lg:col-span-3 bg-white border border-slate-300 p-6 flex flex-col h-185 overflow-hidden">
+          <div className="border-b border-slate-200 pb-3 mb-4 shrink-0 flex items-center justify-between">
+            <h3 className="text-xs font-bold text-teal-800 uppercase tracking-wider">
+              Pratinjau Halaman A4 Resmi (WYSIWYG)
+            </h3>
+            <span className="text-[10px] text-slate-400 font-semibold italic">
+              *Tampilan menyerupai cetak fisik PDF
+            </span>
+          </div>
+
+          <div className="flex-1 overflow-y-auto border border-slate-300 bg-slate-200">
+            <InteractivePaperSheet
+              htmlContent={getRenderedHtml(editableText)}
+              fontFamily={fontFamily}
+              lineSpacing={lineSpacing}
+              marginCm={marginCm}
+            />
+          </div>
+        </div>
+      </div>
+
+      {}
+      <div className="text-center text-xs text-slate-500 font-medium pt-4">
+        BRIDA SMART Editorial Workspace &bull; Terintegrasi Storage Database PostgreSQL &amp; Engine Generative AI Mimika
+      </div>
+    </div>
+  );
+};
 
 --- FILE: src\modules\analytics\components\causal-factor-chart.component.tsx ---
 import React from 'react';
@@ -8095,6 +8261,8 @@ if (vfsFonts) {
   (pdfMake as any).vfs = vfsFonts;
 }
 
+const fontVfsCache: Record<string, string> = {};
+
 export interface PDFFormatConfig {
   fontFamily: 'Calibri' | 'Times New Roman' | 'Verdana' | 'Arial';
   fontSize: number;
@@ -8103,9 +8271,11 @@ export interface PDFFormatConfig {
 }
 
 async function fetchLocalFontToBase64(url: string): Promise<string> {
+  if (fontVfsCache[url]) return fontVfsCache[url];
+
   const response = await fetch(url);
   if (!response.ok) {
-    throw new Error(`Gagal memuat aset biner font dari jalur server lokal: ${url}`);
+    throw new Error(`Gagal memuat aset biner font dari jalur server lokal: ${url} (HTTP ${response.status})`);
   }
   const blob = await response.blob();
   return new Promise<string>((resolve, reject) => {
@@ -8113,6 +8283,7 @@ async function fetchLocalFontToBase64(url: string): Promise<string> {
     reader.onloadend = () => {
       const base64String = reader.result as string;
       const base64Data = base64String.split(',')[1];
+      fontVfsCache[url] = base64Data;
       resolve(base64Data);
     };
     reader.onerror = reject;
@@ -8127,71 +8298,67 @@ export const PdfExportService = {
     config: PDFFormatConfig,
     filename: string,
   ): Promise<void> {
-    const fontFolderMap: Record<string, string> = {
-      'Times New Roman': 'times',
-      'Arial': 'arial',
-      'Verdana': 'verdana',
-      'Calibri': 'calibri',
-    };
-
     const fontFileMap: Record<string, { normal: string; bold: string; italics: string; bolditalics: string }> = {
-      times: { normal: 'times.ttf', bold: 'timesbd.ttf', italics: 'timesi.ttf', bolditalics: 'timesbi.ttf' },
-      arial: { normal: 'arial.ttf', bold: 'arialbd.ttf', italics: 'ariali.ttf', bolditalics: 'arialbi.ttf' },
-      verdana: { normal: 'verdana.ttf', bold: 'verdanab.ttf', italics: 'verdanai.ttf', bolditalics: 'verdanaz.ttf' },
-      calibri: { normal: 'calibri.ttf', bold: 'calibrib.ttf', italics: 'calibrii.ttf', bolditalics: 'calibriz.ttf' },
+      'Times New Roman': { normal: 'times.ttf', bold: 'timesbd.ttf', italics: 'timesi.ttf', bolditalics: 'timesbi.ttf' },
+      'Arial':           { normal: 'arial.ttf', bold: 'arialbd.ttf', italics: 'ariali.ttf', bolditalics: 'arialbi.ttf' },
+      'Verdana':         { normal: 'verdana.ttf', bold: 'verdanab.ttf', italics: 'verdanai.ttf', bolditalics: 'verdanaz.ttf' },
+      'Calibri':         { normal: 'calibri.ttf', bold: 'calibrib.ttf', italics: 'calibrii.ttf', bolditalics: 'calibriz.ttf' },
     };
 
-    const folder = fontFolderMap[config.fontFamily] || 'arial';
-    const files = fontFileMap[folder];
+    const files = fontFileMap[config.fontFamily] || fontFileMap['Arial'];
+
+    const vfsPrefix = files.normal.replace('.ttf', '');
 
     const [vNormal, vBold, vItalics, vBoldItalics] = await Promise.all([
-      fetchLocalFontToBase64(`/fonts/${folder}/${files.normal}`),
-      fetchLocalFontToBase64(`/fonts/${folder}/${files.bold}`),
-      fetchLocalFontToBase64(`/fonts/${folder}/${files.italics}`),
-      fetchLocalFontToBase64(`/fonts/${folder}/${files.bolditalics}`),
+      fetchLocalFontToBase64(`/fonts/${files.normal}`),
+      fetchLocalFontToBase64(`/fonts/${files.bold}`),
+      fetchLocalFontToBase64(`/fonts/${files.italics}`),
+      fetchLocalFontToBase64(`/fonts/${files.bolditalics}`),
     ]);
 
-    (pdfMake as any).vfs[`${folder}-Regular.ttf`] = vNormal;
-    (pdfMake as any).vfs[`${folder}-Bold.ttf`] = vBold;
-    (pdfMake as any).vfs[`${folder}-Italic.ttf`] = vItalics;
-    (pdfMake as any).vfs[`${folder}-BoldItalic.ttf`] = vBoldItalics;
-
-    (pdfMake as any).fonts = {
-      Roboto: {
-        normal: 'Roboto-Regular.ttf',
-        bold: 'Roboto-Medium.ttf',
-        italics: 'Roboto-Italic.ttf',
-        bolditalics: 'Roboto-MediumItalic.ttf',
-      },
-      CustomFont: {
-        normal: `${folder}-Regular.ttf`,
-        bold: `${folder}-Bold.ttf`,
-        italics: `${folder}-Italic.ttf`,
-        bolditalics: `${folder}-BoldItalic.ttf`,
-      },
+    const currentVfs = (pdfMake as any).vfs || {};
+    (pdfMake as any).vfs = {
+      ...currentVfs,
+      [`${vfsPrefix}-Regular.ttf`]:    vNormal,
+      [`${vfsPrefix}-Bold.ttf`]:       vBold,
+      [`${vfsPrefix}-Italic.ttf`]:     vItalics,
+      [`${vfsPrefix}-BoldItalic.ttf`]: vBoldItalics,
     };
 
     const marginPoints = Math.round(config.marginCm * 28.3465);
 
-    const pdfContent = htmlToPdfmake(htmlText, {
-      window: window,
-    });
+    const pdfContent = htmlToPdfmake(htmlText, { window: window });
 
     const docDefinition: any = {
       pageSize: 'A4',
       pageMargins: [marginPoints, marginPoints, marginPoints, marginPoints],
+
+      fonts: {
+        Roboto: {
+          normal:      'Roboto-Regular.ttf',
+          bold:        'Roboto-Medium.ttf',
+          italics:     'Roboto-Italic.ttf',
+          bolditalics: 'Roboto-MediumItalic.ttf',
+        },
+        CustomFont: {
+          normal:      `${vfsPrefix}-Regular.ttf`,
+          bold:        `${vfsPrefix}-Bold.ttf`,
+          italics:     `${vfsPrefix}-Italic.ttf`,
+          bolditalics: `${vfsPrefix}-BoldItalic.ttf`,
+        },
+      },
       defaultStyle: {
-        font: 'CustomFont',
-        fontSize: config.fontSize,
+        font:       'CustomFont',
+        fontSize:   config.fontSize,
         lineHeight: config.lineSpacing,
-        alignment: 'justify',
+        alignment:  'justify',
       },
       header: {
-        text: 'BRIDA SMART ANALYSIS — KABUPATEN MIMIKA',
+        text:      'BRIDA SMART ANALYSIS — KABUPATEN MIMIKA',
         alignment: 'right',
-        fontSize: 8,
-        color: '#94a3b8',
-        margin: [marginPoints, 15, marginPoints, 0],
+        fontSize:  8,
+        color:     '#94a3b8',
+        margin:    [marginPoints, 15, marginPoints, 0],
       },
       footer: (currentPage: number, pageCount: number) => ({
         columns: [
