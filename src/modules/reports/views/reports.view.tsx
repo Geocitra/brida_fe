@@ -329,9 +329,6 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
       {/* SECTION 1. HERO COMMAND STRIP HEADER */}
       <div className="w-full bg-white border border-slate-300 px-6 py-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4 rounded-none shadow-2xs no-print">
         <div className="flex flex-col">
-          <span className="text-[10px] font-bold tracking-widest text-teal-800 uppercase mb-1">
-            Beranda / Laporan Eksekutif
-          </span>
           <h1 className="text-xl font-bold uppercase text-slate-900 tracking-tight">
             Laporan Strategis &amp; Nota Dinas Bupati
           </h1>
@@ -346,7 +343,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
             className="px-3.5 py-2 bg-teal-700 hover:bg-teal-800 text-white text-xs font-bold rounded-none flex items-center gap-2 cursor-pointer transition-colors"
           >
             <UploadCloud size={14} />
-            <span>+ Unggah Dokumen Acuan Baru</span>
+            <span>Unggah Dokumen Acuan Baru</span>
           </button>
 
           {onNavigateToDashboard && (
@@ -413,11 +410,10 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
       <div className="flex items-center border-b border-slate-300 no-print">
         <button
           onClick={() => setActiveTab('active')}
-          className={`px-5 py-2.5 text-xs font-bold uppercase tracking-wider border-b-2 flex items-center gap-2 rounded-none transition-all ${
-            activeTab === 'active'
-              ? 'border-teal-700 text-teal-900 bg-white shadow-2xs font-extrabold'
-              : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-          }`}
+          className={`px-5 py-2.5 text-xs font-bold uppercase tracking-wider border-b-2 flex items-center gap-2 rounded-none transition-all ${activeTab === 'active'
+            ? 'border-teal-700 text-teal-900 bg-white shadow-2xs font-extrabold'
+            : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            }`}
         >
           <FileText size={15} />
           <span>Laporan Aktif (Kop Resmi Bupati)</span>
@@ -428,11 +424,10 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
             setActiveTab('history');
             loadHistory();
           }}
-          className={`px-5 py-2.5 text-xs font-bold uppercase tracking-wider border-b-2 flex items-center gap-2 rounded-none transition-all ${
-            activeTab === 'history'
-              ? 'border-teal-700 text-teal-900 bg-white shadow-2xs font-extrabold'
-              : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-          }`}
+          className={`px-5 py-2.5 text-xs font-bold uppercase tracking-wider border-b-2 flex items-center gap-2 rounded-none transition-all ${activeTab === 'history'
+            ? 'border-teal-700 text-teal-900 bg-white shadow-2xs font-extrabold'
+            : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            }`}
         >
           <History size={15} />
           <span>Riwayat Laporan Database ({savedReports.length})</span>
@@ -497,7 +492,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
               </div>
 
               {/* Penerima/Pengirim Details (Left Border Accent - Zero Nested Box) */}
-              <div className="text-xs text-slate-700 space-y-1 font-medium border-l-2 border-teal-700 pl-4 py-1.5 mt-3">
+              <div className="text-xs text-slate-700 space-y-1 font-medium border-teal-700 pl-4 py-1.5 mt-3">
                 <div><strong>Penerima:</strong> {currentReport.recipient}</div>
                 <div><strong>Pengirim:</strong> {currentReport.sender}</div>
                 <div className="flex flex-wrap items-center gap-3 text-slate-600">
@@ -512,7 +507,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
             </div>
 
             {/* Ringkasan Eksekutif (Executive Summary - Clean Left Accent - Zero Nested Box) */}
-            <div className="border-l-4 border-teal-700 pl-4 py-2.5 bg-slate-50/70 text-slate-900 font-normal leading-relaxed italic text-sm">
+            <div className="border-teal-700 pl-4 py-2.5 bg-slate-50/70 text-slate-900 font-normal leading-relaxed italic text-sm text-justify pr-4">
               <strong className="block text-xs uppercase tracking-wider text-teal-900 font-bold mb-1.5 not-italic flex items-center gap-1.5">
                 <FileText size={14} className="text-teal-700" />
                 <span>RINGKASAN EKSEKUTIF</span>
@@ -552,7 +547,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                   <span>ANALISIS DAMPAK KEBIJAKAN EKSTERNAL / NASIONAL</span>
                 </h3>
 
-                <div className="border-l-2 border-slate-300 pl-4 py-1 space-y-2 text-xs">
+                <div className="border-slate-300 pl-4 py-1 space-y-2 text-xs">
                   <strong className="block text-sm font-bold text-slate-900">
                     Kebijakan Makro: {currentReport.nationalPolicyImpact.policyName}
                   </strong>
@@ -582,7 +577,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                   </span>
                   <div className="space-y-2">
                     {currentReport.actionPriorities.map((act: string, idx: number) => (
-                      <div key={idx} className="text-xs text-slate-800 font-medium border-l-3 border-amber-600 pl-3 py-1">
+                      <div key={idx} className="text-xs text-slate-800 font-medium border-amber-600 pl-3 py-1">
                         {act}
                       </div>
                     ))}

@@ -89,7 +89,7 @@ export const CategorizedDocumentSelector: React.FC<CategorizedDocumentSelectorPr
   };
 
   return (
-    <div className="bg-white border border-slate-300 p-5 rounded-none shadow-2xs space-y-4 font-roboto">
+    <div className="space-y-4 font-roboto">
       {/* Header Toolbar & Controls */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-200 pb-3">
         <div className="flex items-center gap-2">
@@ -146,7 +146,7 @@ export const CategorizedDocumentSelector: React.FC<CategorizedDocumentSelectorPr
             Kosongkan
           </button>
 
-          {onUploadNew && (
+          {/* {onUploadNew && (
             <button
               type="button"
               onClick={onUploadNew}
@@ -156,7 +156,7 @@ export const CategorizedDocumentSelector: React.FC<CategorizedDocumentSelectorPr
               <Plus size={13} />
               <span>+ Unggah</span>
             </button>
-          )}
+          )} */}
         </div>
       </div>
 
@@ -219,11 +219,10 @@ export const CategorizedDocumentSelector: React.FC<CategorizedDocumentSelectorPr
                     <div
                       key={doc.id}
                       onClick={() => onToggleDoc(doc.id)}
-                      className={`p-2 text-xs cursor-pointer flex items-start gap-2 transition-colors rounded-none ${
-                        isSelected
-                          ? 'bg-teal-50 font-bold text-teal-950'
-                          : 'hover:bg-slate-50 text-slate-700'
-                      }`}
+                      className={`p-2 text-xs cursor-pointer flex items-start gap-2 transition-colors rounded-none ${isSelected
+                        ? 'bg-teal-50 font-bold text-teal-950'
+                        : 'hover:bg-slate-50 text-slate-700'
+                        }`}
                     >
                       {isSelected ? (
                         <CheckSquare size={14} className="text-teal-700 shrink-0 mt-0.5" />
@@ -271,11 +270,10 @@ export const CategorizedDocumentSelector: React.FC<CategorizedDocumentSelectorPr
                     <div
                       key={doc.id}
                       onClick={() => onToggleDoc(doc.id)}
-                      className={`p-2 text-xs cursor-pointer flex items-start gap-2 transition-colors rounded-none ${
-                        isSelected
-                          ? 'bg-teal-50 font-bold text-teal-950'
-                          : 'hover:bg-slate-50 text-slate-700'
-                      }`}
+                      className={`p-2 text-xs cursor-pointer flex items-start gap-2 transition-colors rounded-none ${isSelected
+                        ? 'bg-teal-50 font-bold text-teal-950'
+                        : 'hover:bg-slate-50 text-slate-700'
+                        }`}
                     >
                       {isSelected ? (
                         <CheckSquare size={14} className="text-teal-700 shrink-0 mt-0.5" />
@@ -323,11 +321,10 @@ export const CategorizedDocumentSelector: React.FC<CategorizedDocumentSelectorPr
                     <div
                       key={doc.id}
                       onClick={() => onToggleDoc(doc.id)}
-                      className={`p-2 text-xs cursor-pointer flex items-start gap-2 transition-colors rounded-none ${
-                        isSelected
-                          ? 'bg-teal-50 font-bold text-teal-950'
-                          : 'hover:bg-slate-50 text-slate-700'
-                      }`}
+                      className={`p-2 text-xs cursor-pointer flex items-start gap-2 transition-colors rounded-none ${isSelected
+                        ? 'bg-teal-50 font-bold text-teal-950'
+                        : 'hover:bg-slate-50 text-slate-700'
+                        }`}
                     >
                       {isSelected ? (
                         <CheckSquare size={14} className="text-teal-700 shrink-0 mt-0.5" />

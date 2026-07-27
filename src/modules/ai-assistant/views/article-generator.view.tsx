@@ -243,9 +243,6 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
       {/* SECTION 1. HERO COMMAND STRIP HEADER */}
       <div className="w-full bg-white border border-slate-300 px-6 py-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4 rounded-none shadow-2xs">
         <div className="flex flex-col">
-          <span className="text-[10px] font-bold tracking-widest text-teal-800 uppercase mb-1">
-            Beranda / Penulis Artikel Publikasi
-          </span>
           <h1 className="text-xl font-bold uppercase text-slate-900 tracking-tight">
             Penulis Artikel &amp; Rilis Media BRIDA
           </h1>
@@ -253,14 +250,6 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
             Perakitan artikel publikasi dan naskah siaran pers berbasis sintesis multidokumen acuan resmi BRIDA.
           </p>
         </div>
-
-        <button
-          onClick={onNavigateToQa}
-          className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-2 transition-colors shrink-0 cursor-pointer"
-        >
-          <MessageSquareCode size={14} />
-          <span>Kembali ke Q&amp;A Chat</span>
-        </button>
       </div>
 
       {initialPrompt && (
@@ -280,9 +269,6 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
             <PenTool size={16} className="text-teal-700" />
             <span>1. Konfigurasi Dokumen Acuan & Parameter Artikel</span>
           </h2>
-          <span className="px-2.5 py-0.5 bg-teal-100 text-teal-800 text-[11px] font-bold uppercase border border-teal-300">
-            CoT Engine v2 Active
-          </span>
         </div>
 
         <form onSubmit={handleGenerateNewArticle} className="space-y-4 font-roboto">
@@ -298,7 +284,7 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
           />
 
           {/* Judul Artikel Input */}
-          <div className="bg-white border border-slate-300 p-4 rounded-none shadow-2xs space-y-2">
+          <div className="space-y-2 pt-4 border-t border-slate-200">
             <label className="block text-xs font-bold text-slate-800 uppercase tracking-wide">
               Judul / Topik Utama Artikel (Input Pengguna)
             </label>
@@ -315,28 +301,25 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
             </p>
           </div>
 
-          {/* Row 2: Target Length & Tone Options (FLAT DIVIDED ROW, NO NESTED BOXES) */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2 border-t border-slate-200">
-            {/* Length Selector */}
-            <div>
+          {/* Row 2: Target Length & Tone Options dengan Pembatas Vertikal */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-slate-200">
+
+            {/* Length Selector (Kolom Kiri dengan Border Vertikal di kanan) */}
+            <div className="border-r border-slate-200 pr-6">
               <label className="block text-xs font-bold text-slate-700 uppercase mb-2 tracking-wider">
                 Panjang Teks Keluaran Artikel
               </label>
               <div className="grid grid-cols-3 divide-x divide-slate-200 border-y border-slate-200">
                 {[
-                  { key: 'SHORT', label: 'Ringkas (~300 Kata)' },
-                  { key: 'MEDIUM', label: 'Sedang (~700 Kata)' },
+                  { key: 'SHORT', label: 'Ringkas (~700 Kata)' },
+                  { key: 'MEDIUM', label: 'Sedang (~1000 Kata)' },
                   { key: 'LONG', label: 'Mendalam (~1500 Kata)' },
                 ].map((item) => (
                   <button
                     key={item.key}
                     type="button"
                     onClick={() => setTargetLength(item.key as any)}
-                    className={`py-2 px-2 text-xs font-bold uppercase transition-all cursor-pointer text-center ${
-                      targetLength === item.key
-                        ? 'bg-teal-700 text-white font-extrabold'
-                        : 'hover:bg-slate-50 text-slate-700'
-                    }`}
+                    className={`py-2 text-xs font-bold uppercase transition-all ${targetLength === item.key ? 'bg-teal-700 text-white' : 'hover:bg-slate-50 text-slate-700'}`}
                   >
                     {item.label}
                   </button>
@@ -344,8 +327,8 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
               </div>
             </div>
 
-            {/* Tone Selector */}
-            <div>
+            {/* Tone Selector (Kolom Kanan) */}
+            <div className="pl-0">
               <label className="block text-xs font-bold text-slate-700 uppercase mb-2 tracking-wider">
                 Gaya Bahasa / Tone Publikasi
               </label>
@@ -355,11 +338,7 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
                     key={t}
                     type="button"
                     onClick={() => setTone(t)}
-                    className={`py-2 px-2 text-xs font-bold uppercase transition-all cursor-pointer text-center ${
-                      tone === t
-                        ? 'bg-teal-700 text-white font-extrabold'
-                        : 'hover:bg-slate-50 text-slate-700'
-                    }`}
+                    className={`py-2 text-xs font-bold uppercase transition-all ${tone === t ? 'bg-teal-700 text-white' : 'hover:bg-slate-50 text-slate-700'}`}
                   >
                     {t}
                   </button>
@@ -396,11 +375,10 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
       <div className="flex items-center border-b border-slate-300">
         <button
           onClick={() => setActiveTab('editor')}
-          className={`px-5 py-2.5 text-xs font-bold uppercase tracking-wider border-b-2 flex items-center gap-2 rounded-none transition-all ${
-            activeTab === 'editor'
-              ? 'border-teal-700 text-teal-900 bg-white font-extrabold shadow-2xs'
-              : 'border-transparent text-slate-600 hover:bg-slate-100'
-          }`}
+          className={`px-5 py-2.5 text-xs font-bold uppercase tracking-wider border-b-2 flex items-center gap-2 rounded-none transition-all ${activeTab === 'editor'
+            ? 'border-teal-700 text-teal-900 bg-white font-extrabold shadow-2xs'
+            : 'border-transparent text-slate-600 hover:bg-slate-100'
+            }`}
         >
           <FileText size={15} />
           <span>Draf Artikel & Interactive Chat</span>
@@ -411,11 +389,10 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
             setActiveTab('history');
             loadHistory();
           }}
-          className={`px-5 py-2.5 text-xs font-bold uppercase tracking-wider border-b-2 flex items-center gap-2 rounded-none transition-all ${
-            activeTab === 'history'
-              ? 'border-teal-700 text-teal-900 bg-white font-extrabold shadow-2xs'
-              : 'border-transparent text-slate-600 hover:bg-slate-100'
-          }`}
+          className={`px-5 py-2.5 text-xs font-bold uppercase tracking-wider border-b-2 flex items-center gap-2 rounded-none transition-all ${activeTab === 'history'
+            ? 'border-teal-700 text-teal-900 bg-white font-extrabold shadow-2xs'
+            : 'border-transparent text-slate-600 hover:bg-slate-100'
+            }`}
         >
           <History size={15} />
           <span>Riwayat Sesi Artikel DB ({articleSessionsHistory.length})</span>
@@ -478,11 +455,10 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
                 {activeSession.messages?.map((msg) => (
                   <div
                     key={msg.id}
-                    className={`p-3 text-xs rounded-none leading-relaxed border border-slate-200 ${
-                      msg.role === 'USER'
-                        ? 'bg-slate-100 text-slate-900'
-                        : 'bg-teal-50 text-teal-950 font-medium'
-                    }`}
+                    className={`p-3 text-xs rounded-none leading-relaxed border border-slate-200 ${msg.role === 'USER'
+                      ? 'bg-slate-100 text-slate-900'
+                      : 'bg-teal-50 text-teal-950 font-medium'
+                      }`}
                   >
                     <div className="font-bold uppercase text-[10px] text-slate-500 mb-1">
                       {msg.role === 'USER' ? 'Pengguna / Editor' : 'BRIDA AI Assistant'} &bull; {new Date(msg.createdAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
