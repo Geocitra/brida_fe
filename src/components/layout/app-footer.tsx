@@ -34,7 +34,7 @@ export const AppFooter: React.FC = () => {
           </div>
           <div className="pl-4 flex items-center gap-1.5 text-slate-600">
             <Cpu size={14} className="text-teal-600" />
-            <span className="font-semibold text-slate-700">v2.4.0-prod</span>
+            <span className="font-semibold text-slate-700">v1.0.0-dev</span>
           </div>
         </div>
       </div>

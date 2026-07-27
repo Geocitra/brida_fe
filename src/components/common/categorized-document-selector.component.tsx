@@ -23,6 +23,7 @@ interface CategorizedDocumentSelectorProps {
   isLoading?: boolean;
   onUploadNew?: () => void;
   title?: string;
+  isLocked?: boolean;
 }
 
 export const CategorizedDocumentSelector: React.FC<CategorizedDocumentSelectorProps> = ({
@@ -34,6 +35,7 @@ export const CategorizedDocumentSelector: React.FC<CategorizedDocumentSelectorPr
   isLoading = false,
   onUploadNew,
   title = 'Pilih Dokumen Acuan Berdasarkan Kategori',
+  isLocked = false,
 }) => {
   const [docSearchQuery, setDocSearchQuery] = useState('');
 
@@ -64,12 +66,26 @@ export const CategorizedDocumentSelector: React.FC<CategorizedDocumentSelectorPr
     (d) => !baselineDocs.includes(d) && !realizationDocs.includes(d)
   );
 
+  const isAllBaselineSelected = baselineDocs.length > 0 && baselineDocs.every((d) => selectedDocIds.includes(d.id));
+  const isAllRealizationSelected = realizationDocs.length > 0 && realizationDocs.every((d) => selectedDocIds.includes(d.id));
+  const isAllReferenceSelected = referenceDocs.length > 0 && referenceDocs.every((d) => selectedDocIds.includes(d.id));
+
   const selectCategoryGroup = (groupDocs: DocumentRecord[]) => {
-    groupDocs.forEach((d) => {
-      if (!selectedDocIds.includes(d.id)) {
-        onToggleDoc(d.id);
-      }
-    });
+    const groupDocIds = groupDocs.map((d) => d.id);
+    const allSelected = groupDocIds.every((id) => selectedDocIds.includes(id));
+    if (allSelected) {
+      groupDocIds.forEach((id) => {
+        if (selectedDocIds.includes(id)) {
+          onToggleDoc(id);
+        }
+      });
+    } else {
+      groupDocIds.forEach((id) => {
+        if (!selectedDocIds.includes(id)) {
+          onToggleDoc(id);
+        }
+      });
+    }
   };
 
   return (
@@ -78,8 +94,13 @@ export const CategorizedDocumentSelector: React.FC<CategorizedDocumentSelectorPr
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-200 pb-3">
         <div className="flex items-center gap-2">
           <FileText size={18} className="text-teal-700 shrink-0" />
-          <h2 className="text-sm font-bold text-slate-900 tracking-wide uppercase">
-            {title} ({selectedDocIds.length} Dipilih)
+          <h2 className="text-sm font-bold text-slate-900 tracking-wide uppercase flex items-center gap-2">
+            <span>{title} ({selectedDocIds.length} Dipilih)</span>
+            {isLocked && (
+              <span className="px-2 py-0.5 bg-amber-100 text-amber-800 text-[10px] font-extrabold border border-amber-300 tracking-wider">
+                🔒 PILIHAN TERKUNCI (AI MEMPROSES)
+              </span>
+            )}
           </h2>
         </div>
 
@@ -92,9 +113,10 @@ export const CategorizedDocumentSelector: React.FC<CategorizedDocumentSelectorPr
               value={docSearchQuery}
               onChange={(e) => setDocSearchQuery(e.target.value)}
               placeholder="Cari nama dokumen..."
-              className="w-full bg-slate-50 border border-slate-300 pl-8 pr-7 py-1 text-xs text-slate-900 focus:outline-none focus:border-teal-700 rounded-none font-medium"
+              disabled={isLocked}
+              className="w-full bg-slate-50 border border-slate-300 pl-8 pr-7 py-1 text-xs text-slate-900 focus:outline-none focus:border-teal-700 rounded-none font-medium disabled:opacity-60"
             />
-            {docSearchQuery && (
+            {docSearchQuery && !isLocked && (
               <button
                 type="button"
                 onClick={() => setDocSearchQuery('')}
@@ -109,7 +131,8 @@ export const CategorizedDocumentSelector: React.FC<CategorizedDocumentSelectorPr
           <button
             type="button"
             onClick={onSelectAll}
-            className="text-xs font-bold text-teal-700 hover:underline cursor-pointer"
+            disabled={isLocked}
+            className={`text-xs font-bold text-teal-700 ${isLocked ? 'opacity-40 cursor-not-allowed' : 'hover:underline cursor-pointer'}`}
           >
             Pilih Semua
           </button>
@@ -117,7 +140,8 @@ export const CategorizedDocumentSelector: React.FC<CategorizedDocumentSelectorPr
           <button
             type="button"
             onClick={onClearAll}
-            className="text-xs font-medium text-slate-500 hover:text-slate-800 hover:underline cursor-pointer"
+            disabled={isLocked}
+            className={`text-xs font-medium ${isLocked ? 'opacity-40 cursor-not-allowed' : 'text-slate-500 hover:text-slate-800 hover:underline cursor-pointer'}`}
           >
             Kosongkan
           </button>
@@ -126,7 +150,8 @@ export const CategorizedDocumentSelector: React.FC<CategorizedDocumentSelectorPr
             <button
               type="button"
               onClick={onUploadNew}
-              className="px-2.5 py-1 bg-teal-700 hover:bg-teal-800 text-white text-xs font-bold uppercase rounded-none inline-flex items-center gap-1 cursor-pointer transition-colors"
+              disabled={isLocked}
+              className="px-2.5 py-1 bg-teal-700 hover:bg-teal-800 disabled:bg-slate-300 text-white text-xs font-bold uppercase rounded-none inline-flex items-center gap-1 cursor-pointer transition-colors disabled:cursor-not-allowed disabled:text-slate-500 disabled:border-slate-300"
             >
               <Plus size={13} />
               <span>+ Unggah</span>
@@ -144,13 +169,14 @@ export const CategorizedDocumentSelector: React.FC<CategorizedDocumentSelectorPr
         <div className="p-6 bg-slate-50 border border-slate-200 text-center space-y-2">
           <AlertCircle size={24} className="mx-auto text-slate-400" />
           <p className="text-xs font-semibold text-slate-700">
-            Belum ada dokumen terindeks di Knowledge Hub database.
+            Belum ada dokumen terindeks di Repositori database.
           </p>
           {onUploadNew && (
             <button
               type="button"
               onClick={onUploadNew}
-              className="px-3 py-1.5 bg-teal-700 text-white text-xs font-bold uppercase rounded-none inline-flex items-center gap-1.5 cursor-pointer"
+              disabled={isLocked}
+              className="px-3 py-1.5 bg-teal-700 text-white text-xs font-bold uppercase rounded-none inline-flex items-center gap-1.5 cursor-pointer disabled:bg-slate-300"
             >
               <Plus size={13} />
               <span>Unggah Dokumen Acuan Pertama</span>
@@ -159,7 +185,7 @@ export const CategorizedDocumentSelector: React.FC<CategorizedDocumentSelectorPr
         </div>
       ) : (
         /* Categorized 3-Column Grid (Compact with Max Height Scrollable Columns) */
-        <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-slate-200 border-y border-slate-200 py-1 font-roboto">
+        <div className={`grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-slate-200 border-slate-200 py-1 font-roboto ${isLocked ? 'opacity-50 pointer-events-none' : ''}`}>
           {/* Group 1: Target (Baseline) */}
           <div className="p-3 space-y-2">
             <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
@@ -172,9 +198,14 @@ export const CategorizedDocumentSelector: React.FC<CategorizedDocumentSelectorPr
                 <button
                   type="button"
                   onClick={() => selectCategoryGroup(baselineDocs)}
-                  className="text-[11px] font-semibold text-teal-700 hover:underline cursor-pointer"
+                  className="text-slate-500 hover:text-teal-700 transition-colors cursor-pointer p-0.5"
+                  title={isAllBaselineSelected ? 'Batal Pilih Semua (Uncheck All)' : 'Pilih Semua (Check All)'}
                 >
-                  Pilih Semua
+                  {isAllBaselineSelected ? (
+                    <CheckSquare size={16} className="text-teal-700" />
+                  ) : (
+                    <Square size={16} className="text-slate-400" />
+                  )}
                 </button>
               )}
             </div>
@@ -190,7 +221,7 @@ export const CategorizedDocumentSelector: React.FC<CategorizedDocumentSelectorPr
                       onClick={() => onToggleDoc(doc.id)}
                       className={`p-2 text-xs cursor-pointer flex items-start gap-2 transition-colors rounded-none ${
                         isSelected
-                          ? 'bg-teal-50 font-bold text-teal-950 border-l-2 border-teal-700'
+                          ? 'bg-teal-50 font-bold text-teal-950'
                           : 'hover:bg-slate-50 text-slate-700'
                       }`}
                     >
@@ -219,9 +250,14 @@ export const CategorizedDocumentSelector: React.FC<CategorizedDocumentSelectorPr
                 <button
                   type="button"
                   onClick={() => selectCategoryGroup(realizationDocs)}
-                  className="text-[11px] font-semibold text-teal-700 hover:underline cursor-pointer"
+                  className="text-slate-500 hover:text-teal-700 transition-colors cursor-pointer p-0.5"
+                  title={isAllRealizationSelected ? 'Batal Pilih Semua (Uncheck All)' : 'Pilih Semua (Check All)'}
                 >
-                  Pilih Semua
+                  {isAllRealizationSelected ? (
+                    <CheckSquare size={16} className="text-teal-700" />
+                  ) : (
+                    <Square size={16} className="text-slate-400" />
+                  )}
                 </button>
               )}
             </div>
@@ -237,7 +273,7 @@ export const CategorizedDocumentSelector: React.FC<CategorizedDocumentSelectorPr
                       onClick={() => onToggleDoc(doc.id)}
                       className={`p-2 text-xs cursor-pointer flex items-start gap-2 transition-colors rounded-none ${
                         isSelected
-                          ? 'bg-teal-50 font-bold text-teal-950 border-l-2 border-teal-700'
+                          ? 'bg-teal-50 font-bold text-teal-950'
                           : 'hover:bg-slate-50 text-slate-700'
                       }`}
                     >
@@ -266,9 +302,14 @@ export const CategorizedDocumentSelector: React.FC<CategorizedDocumentSelectorPr
                 <button
                   type="button"
                   onClick={() => selectCategoryGroup(referenceDocs)}
-                  className="text-[11px] font-semibold text-teal-700 hover:underline cursor-pointer"
+                  className="text-slate-500 hover:text-teal-700 transition-colors cursor-pointer p-0.5"
+                  title={isAllReferenceSelected ? 'Batal Pilih Semua (Uncheck All)' : 'Pilih Semua (Check All)'}
                 >
-                  Pilih Semua
+                  {isAllReferenceSelected ? (
+                    <CheckSquare size={16} className="text-teal-700" />
+                  ) : (
+                    <Square size={16} className="text-slate-400" />
+                  )}
                 </button>
               )}
             </div>
@@ -284,7 +325,7 @@ export const CategorizedDocumentSelector: React.FC<CategorizedDocumentSelectorPr
                       onClick={() => onToggleDoc(doc.id)}
                       className={`p-2 text-xs cursor-pointer flex items-start gap-2 transition-colors rounded-none ${
                         isSelected
-                          ? 'bg-teal-50 font-bold text-teal-950 border-l-2 border-teal-700'
+                          ? 'bg-teal-50 font-bold text-teal-950'
                           : 'hover:bg-slate-50 text-slate-700'
                       }`}
                     >

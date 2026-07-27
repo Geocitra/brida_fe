@@ -12,29 +12,26 @@ export const CausalFactorChart: React.FC<CausalFactorChartProps> = ({
   causalFactors,
 }) => {
   return (
-    <div className="bg-white border border-slate-300 p-6 rounded-none shadow-xs font-roboto space-y-4">
+    <div className="font-roboto space-y-4">
       <div className="flex items-center justify-between border-b border-slate-200 pb-3">
         <div className="flex items-center gap-2">
           <Cpu size={20} className="text-teal-700 shrink-0" />
-          <h3 className="text-h3 text-slate-900">Analisis Faktor Penyebab (Causal Inference AI)</h3>
+          <h3 className="text-h3 text-slate-900">Analisis Faktor Penyebab</h3>
         </div>
-        <span className="text-[10px] font-bold text-teal-800 bg-teal-50 border border-teal-200 px-2.5 py-1 uppercase tracking-wider rounded-none">
-          Gemini AI Engine
-        </span>
       </div>
 
-      <p className="text-body text-slate-700 bg-slate-50 border-l-4 border-teal-600 p-3 text-xs font-medium">
+      <p className="text-xs text-slate-700 font-medium leading-relaxed text-justify" style={{ textAlign: 'justify' }}>
         {summaryText}
       </p>
 
-      <div className="space-y-4 pt-1">
+      <div className="divide-y divide-slate-200 pt-1">
         {causalFactors.map((item, idx) => (
-          <div key={idx} className="space-y-1.5 bg-slate-50/70 p-3.5 border border-slate-200 rounded-none">
+          <div key={idx} className="py-4 space-y-1.5">
             <div className="flex items-center justify-between text-xs">
               <span className="font-bold text-slate-900">
                 {idx + 1}. {item.factor}
               </span>
-              <span className="font-bold text-teal-700 bg-teal-100 px-2 py-0.5 border border-teal-200 text-[11px]">
+              <span className="font-bold text-teal-900 px-2 py-0.5 text-[11px] rounded-none">
                 Kontribusi: {item.weightPercentage}%
               </span>
             </div>

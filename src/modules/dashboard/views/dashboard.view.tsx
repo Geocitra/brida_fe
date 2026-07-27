@@ -12,7 +12,7 @@ export const DashboardView: React.FC = () => {
   }, []);
 
   return (
-    <div className="flex flex-col w-full min-h-full bg-slate-100/70 p-6 space-y-6 font-roboto">
+    <div className="flex flex-col w-full bg-slate-100/70 p-6 space-y-6 font-roboto">
       {/* SECTION 1. HERO COMMAND STRIP HEADER */}
       <div className="w-full bg-white border border-slate-300 px-6 py-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4 rounded-none shadow-2xs">
         <div className="flex flex-col">

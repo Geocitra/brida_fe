@@ -26,7 +26,7 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
   return (
     <div className="bg-white border border-slate-200 rounded-none overflow-hidden shadow-xs">
       <div className="px-6 py-3.5 border-b border-slate-200 bg-slate-50/50">
-        <h2 className="text-base font-bold text-slate-900">Arsip Dokumen Pengetahuan (Knowledge Hub)</h2>
+        <h2 className="text-base font-bold text-slate-900">Daftar Dokumen</h2>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-left border-collapse">

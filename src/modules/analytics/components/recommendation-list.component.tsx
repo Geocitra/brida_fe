@@ -10,15 +10,12 @@ export const RecommendationList: React.FC<RecommendationListProps> = ({
   recommendations,
 }) => {
   return (
-    <div className="bg-white border border-slate-300 p-6 rounded-none shadow-xs font-roboto space-y-4">
+    <div className="font-roboto space-y-4">
       <div className="flex items-center justify-between border-b border-slate-200 pb-3">
         <div className="flex items-center gap-2">
           <ClipboardList size={20} className="text-teal-700 shrink-0" />
           <h3 className="text-h3 text-slate-900">Matriks Rekomendasi Respon Prioritas</h3>
         </div>
-        <span className="text-[10px] font-bold text-slate-700 bg-slate-100 border border-slate-300 px-2.5 py-1 uppercase tracking-wider rounded-none">
-          Actionable Executive Output
-        </span>
       </div>
 
       <div className="overflow-x-auto">

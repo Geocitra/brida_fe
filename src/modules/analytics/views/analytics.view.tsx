@@ -26,7 +26,6 @@ import {
   Clock,
   Trash2,
   Database,
-  Sparkles,
   Search,
   X,
   Calendar,
@@ -59,7 +58,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
 
   // DB Cache States
   const [cacheStatus, setCacheStatus] = useState<CheckCacheResponse | null>(null);
-  const [isCheckingCache, setIsCheckingCache] = useState(false);
+  const [_isCheckingCache, setIsCheckingCache] = useState(false);
 
   // Live filter states for saved cache sessions (Calendar Datepicker & Text Search)
   const [sessionSearchQuery, setSessionSearchQuery] = useState('');
@@ -315,6 +314,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
       await PdfExportService.exportElementToPdf(
         'deep-dive-analysis-container',
         `Analisis_Deviasi_${compareResult.math.indicatorName.replace(/[^a-zA-Z0-9]/g, '_')}_2026.pdf`,
+        compareResult,
       );
     } catch (err: any) {
       alert(`Gagal mengekspor PDF: ${err.message || 'Terjadi kesalahan'}`);
@@ -362,14 +362,15 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
   const realizationDocs = documents.filter((d) => d.metadata?.docType === 'REALIZATION');
   const generalDocs = documents.filter((d) => d.metadata?.docType === 'GENERAL_REFERENCE' || !d.metadata?.docType);
 
+  const isAllBaselineSelected = baselineDocs.length > 0 && baselineDocs.every((d) => selectedDocIds.includes(d.id));
+  const isAllRealizationSelected = realizationDocs.length > 0 && realizationDocs.every((d) => selectedDocIds.includes(d.id));
+  const isAllGeneralSelected = generalDocs.length > 0 && generalDocs.every((d) => selectedDocIds.includes(d.id));
+
   return (
-    <div className="flex flex-col w-full min-h-full bg-slate-100/70 p-6 space-y-6 font-roboto">
+    <div className="flex flex-col w-full bg-slate-100/70 p-6 space-y-6 font-roboto">
       {/* SECTION 1. HERO COMMAND STRIP HEADER */}
       <div className="w-full bg-white border border-slate-300 px-6 py-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4 rounded-none shadow-2xs">
         <div className="flex flex-col">
-          <span className="text-[10px] font-bold tracking-widest text-teal-800 uppercase mb-1">
-            Beranda / Analisis Deviasi
-          </span>
           <h1 className="text-xl font-bold uppercase text-slate-900 tracking-tight">
             Analisis Deviasi Multidokumen
           </h1>
@@ -379,7 +380,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
         </div>
 
         {/* Sisi Kanan: Dokumen Terpilih Counter Badge */}
-        <div className="flex items-center md:border-l md:border-slate-300 md:pl-6">
+        <div className="flex items-center md:pl-6">
           <div className="px-1 py-2 flex flex-col justify-center rounded-none">
             <span className="text-[9px] uppercase font-bold text-slate-500 tracking-wider">
               Dokumen Acuan Terpilih
@@ -418,7 +419,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
 
       {/* ===================== SAVED HISTORY SESSION BAR WITH FILTER ===================== */}
       {savedSessions.length > 0 && (
-        <div className="bg-white border border-slate-300 border-l-4 border-l-teal-700 p-4 rounded-none shadow-2xs space-y-3 font-roboto">
+        <div className="bg-white border border-slate-300 p-4 rounded-none shadow-2xs space-y-3 font-roboto">
           {/* Header & Filter Search Bar */}
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 border-b border-slate-200 pb-2.5">
             <div className="flex items-center gap-2">
@@ -541,7 +542,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
           <div className="p-6 bg-slate-50 border border-slate-200 text-center space-y-2">
             <AlertCircle size={24} className="mx-auto text-slate-400" />
             <p className="text-xs font-semibold text-slate-700">
-              Belum ada dokumen diunggah di Knowledge Hub.
+              Belum ada dokumen diunggah di Repositori.
             </p>
           </div>
         ) : (
@@ -556,9 +557,14 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
                 <button
                   type="button"
                   onClick={() => selectAllCategoryDocs('BASELINE')}
-                  className="text-[11px] font-medium text-teal-700 hover:underline cursor-pointer"
+                  className="text-slate-500 hover:text-teal-700 transition-colors cursor-pointer p-0.5"
+                  title={isAllBaselineSelected ? 'Batal Pilih Semua (Uncheck All)' : 'Pilih Semua (Check All)'}
                 >
-                  Pilih Semua
+                  {isAllBaselineSelected ? (
+                    <CheckSquare size={16} className="text-teal-700" />
+                  ) : (
+                    <Square size={16} className="text-slate-400" />
+                  )}
                 </button>
               </div>
               <div className="space-y-1 max-h-52 overflow-y-auto pr-1">
@@ -594,9 +600,14 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
                 <button
                   type="button"
                   onClick={() => selectAllCategoryDocs('REALIZATION')}
-                  className="text-[11px] font-medium text-teal-700 hover:underline cursor-pointer"
+                  className="text-slate-500 hover:text-teal-700 transition-colors cursor-pointer p-0.5"
+                  title={isAllRealizationSelected ? 'Batal Pilih Semua (Uncheck All)' : 'Pilih Semua (Check All)'}
                 >
-                  Pilih Semua
+                  {isAllRealizationSelected ? (
+                    <CheckSquare size={16} className="text-teal-700" />
+                  ) : (
+                    <Square size={16} className="text-slate-400" />
+                  )}
                 </button>
               </div>
               <div className="space-y-1 max-h-52 overflow-y-auto pr-1">
@@ -632,9 +643,14 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
                 <button
                   type="button"
                   onClick={() => selectAllCategoryDocs('GENERAL_REFERENCE')}
-                  className="text-[11px] font-medium text-teal-700 hover:underline cursor-pointer"
+                  className="text-slate-500 hover:text-teal-700 transition-colors cursor-pointer p-0.5"
+                  title={isAllGeneralSelected ? 'Batal Pilih Semua (Uncheck All)' : 'Pilih Semua (Check All)'}
                 >
-                  Pilih Semua
+                  {isAllGeneralSelected ? (
+                    <CheckSquare size={16} className="text-teal-700" />
+                  ) : (
+                    <Square size={16} className="text-slate-400" />
+                  )}
                 </button>
               </div>
               <div className="space-y-1 max-h-52 overflow-y-auto pr-1">
@@ -727,7 +743,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
           {/* Printable Deep-Dive Container */}
           <div id="deep-dive-analysis-container" className="space-y-6 bg-white p-4 border border-slate-300">
             {/* Kop Printable Header */}
-            <div className="p-4 bg-slate-50 border border-slate-300 border-l-4 border-l-teal-700 rounded-none flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <div className="p-4 bg-slate-50 border border-slate-300 rounded-none flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
               <div>
                 <span className="text-[10px] font-bold text-teal-800 uppercase tracking-widest block">
                   BADAN RISET DAN INOVASI DAERAH (BRIDA) KABUPATEN MIMIKA
@@ -746,14 +762,17 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
 
             {/* Component 1: Deviation Summary Card */}
             {compareResult && (
-              <DeviationSummaryCard
-                indicatorName={compareResult.math.indicatorName}
-                sector={compareResult.math.sector}
-                targetText={compareResult.math.targetText}
-                realizationText={compareResult.math.realizationText}
-                deviationPercentage={compareResult.math.deviationPercentage}
-                urgencyStatus={compareResult.math.urgencyStatus}
-              />
+              <>
+                <hr className="border-slate-200" />
+                <DeviationSummaryCard
+                  indicatorName={compareResult.math.indicatorName}
+                  sector={compareResult.math.sector}
+                  targetText={compareResult.math.targetText}
+                  realizationText={compareResult.math.realizationText}
+                  deviationPercentage={compareResult.math.deviationPercentage}
+                  urgencyStatus={compareResult.math.urgencyStatus}
+                />
+              </>
             )}
 
             {/* Component 2: Causal Factor Chart */}
@@ -765,17 +784,23 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
                 </p>
               </div>
             ) : compareResult ? (
-              <CausalFactorChart
-                summaryText={compareResult.causal.summary}
-                causalFactors={compareResult.causal.causalFactors}
-              />
+              <>
+                <hr className="border-slate-200" />
+                <CausalFactorChart
+                  summaryText={compareResult.causal.summary}
+                  causalFactors={compareResult.causal.causalFactors}
+                />
+              </>
             ) : null}
 
             {/* Component 3: Recommendation List Matrix */}
             {compareResult && (
-              <RecommendationList
-                recommendations={compareResult.causal.recommendations}
-              />
+              <>
+                <hr className="border-slate-200" />
+                <RecommendationList
+                  recommendations={compareResult.causal.recommendations}
+                />
+              </>
             )}
           </div>
         </div>

@@ -59,7 +59,7 @@ export const KnowledgeHubView: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col w-full min-h-full bg-slate-100/70 p-6 space-y-6 font-roboto">
+    <div className="flex flex-col w-full bg-slate-100/70 p-6 space-y-6 font-roboto">
       {/* 
         SECTION 1. COMMAND STRIP HEADER
         Identitas Utama Halaman di kiri (H1), Status DB Telemetry di kanan.

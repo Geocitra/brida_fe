@@ -231,7 +231,7 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
   };
 
   return (
-    <div className="flex flex-col w-full min-h-full bg-slate-100/70 p-6 space-y-6 font-roboto">
+    <div className="flex flex-col w-full bg-slate-100/70 p-6 space-y-6 font-roboto">
       {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-5 py-3 border border-slate-700 shadow-xl flex items-center gap-3 rounded-none">
@@ -478,10 +478,10 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
                 {activeSession.messages?.map((msg) => (
                   <div
                     key={msg.id}
-                    className={`p-3 text-xs rounded-none leading-relaxed ${
+                    className={`p-3 text-xs rounded-none leading-relaxed border border-slate-200 ${
                       msg.role === 'USER'
-                        ? 'bg-slate-100 border-l-2 border-slate-700 text-slate-900'
-                        : 'bg-teal-50 border-l-2 border-teal-700 text-teal-950 font-medium'
+                        ? 'bg-slate-100 text-slate-900'
+                        : 'bg-teal-50 text-teal-950 font-medium'
                     }`}
                   >
                     <div className="font-bold uppercase text-[10px] text-slate-500 mb-1">

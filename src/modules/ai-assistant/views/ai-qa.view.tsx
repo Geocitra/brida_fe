@@ -16,9 +16,10 @@ interface AiQaViewProps {
 
 export const AiQaView: React.FC<AiQaViewProps> = ({ onNavigateToGenerator }) => {
   const [documents, setDocuments] = useState<DocumentRecord[]>([]);
-  const [selectedDocId, setSelectedDocId] = useState<string | null>(null);
+  const [selectedDocIds, setSelectedDocIds] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [isAiProcessing, setIsAiProcessing] = useState(false);
 
   const loadDocuments = async () => {
     setIsLoading(true);
@@ -26,8 +27,8 @@ export const AiQaView: React.FC<AiQaViewProps> = ({ onNavigateToGenerator }) => 
     try {
       const docs = await DocumentService.listDocuments();
       setDocuments(docs || []);
-      if (docs && docs.length > 0 && !selectedDocId) {
-        setSelectedDocId(docs[0].id);
+      if (docs && docs.length > 0 && selectedDocIds.length === 0) {
+        setSelectedDocIds([docs[0].id]);
       }
     } catch (err: any) {
       setDocuments([]);
@@ -41,18 +42,15 @@ export const AiQaView: React.FC<AiQaViewProps> = ({ onNavigateToGenerator }) => 
     loadDocuments();
   }, []);
 
-  const selectedDoc = documents.find((d) => d.id === selectedDocId);
+  const selectedDocs = documents.filter((d) => selectedDocIds.includes(d.id));
 
   return (
-    <div className="flex flex-col w-full min-h-full bg-slate-100/70 p-6 space-y-6 font-roboto">
+    <div className="flex flex-col w-full bg-slate-100/70 p-6 space-y-6 font-roboto">
       {/* SECTION 1. HERO COMMAND STRIP HEADER */}
       <div className="w-full bg-white border border-slate-300 px-6 py-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4 rounded-none shadow-2xs">
         <div className="flex flex-col">
-          <span className="text-[10px] font-bold tracking-widest text-teal-800 uppercase mb-1">
-            Modul Asisten &amp; RAG Knowledge Base
-          </span>
           <h1 className="text-xl font-extrabold text-slate-900 tracking-tight">
-            Tanya Jawab Dokumen AI (Interactive Q&amp;A)
+            AI Chat Assistant
           </h1>
           <p className="text-xs text-slate-600 font-normal mt-0.5">
             Tanyakan konteks atau analisis isi dokumen acuan secara langsung menggunakan model LLM terintegrasi.
@@ -89,20 +87,26 @@ export const AiQaView: React.FC<AiQaViewProps> = ({ onNavigateToGenerator }) => 
       {/* Categorized Document Selector Hub */}
       <CategorizedDocumentSelector
         documents={documents}
-        selectedDocIds={selectedDocId ? [selectedDocId] : []}
-        onToggleDoc={(docId) => setSelectedDocId(selectedDocId === docId ? null : docId)}
-        onSelectAll={() => documents.length > 0 && setSelectedDocId(documents[0].id)}
-        onClearAll={() => setSelectedDocId(null)}
+        selectedDocIds={selectedDocIds}
+        onToggleDoc={(docId) => {
+          setSelectedDocIds((prev) =>
+            prev.includes(docId) ? prev.filter((id) => id !== docId) : [...prev, docId]
+          );
+        }}
+        onSelectAll={() => setSelectedDocIds(documents.map((d) => d.id))}
+        onClearAll={() => setSelectedDocIds([])}
         isLoading={isLoading}
-        title="Pilih Dokumen Sumber Tanya Jawab (Q&A)"
+        isLocked={isAiProcessing}
+        title="Pilih Dokumen"
       />
 
       {/* Main Q&A Chat Panel */}
       {!isLoading && (
         <ChatPanel
-          selectedDocumentId={selectedDocId}
-          documentTitle={selectedDoc?.title}
+          selectedDocumentIds={selectedDocIds}
+          documentTitles={selectedDocs.map((d) => d.title)}
           onArticleIntentDetected={(promptText) => onNavigateToGenerator(promptText)}
+          onLoadingChange={(loading) => setIsAiProcessing(loading)}
         />
       )}
     </div>

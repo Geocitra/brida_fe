@@ -42,11 +42,11 @@ export const AiAssistantService = {
   /**
    * Create a new AI chat session tied to a specific document.
    */
-  async createSession(documentId: string, title?: string): Promise<string> {
+  async createSession(documentId: string, title?: string, documentIds?: string[]): Promise<string> {
     const response = await fetch(`${API_BASE_URL}/assistant/session`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ documentId, title }),
+      body: JSON.stringify({ documentId, title, documentIds }),
     });
     const result = await response.json();
     if (!response.ok || !result.success) {

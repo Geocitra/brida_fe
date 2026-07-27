@@ -3,7 +3,7 @@ import { PdfExportService } from '../../../services/pdf-export.service';
 import { DocumentService } from '../../../services/document.service';
 import type { DocumentRecord } from '../../../services/document.service';
 import { ReportService } from '../../../services/report.service';
-import type { GeneratedReportDetail, CheckCacheResponse } from '../../../services/report.service';
+import type { GeneratedReportDetail } from '../../../services/report.service';
 import { CategorizedDocumentSelector } from '../../../components/common/categorized-document-selector.component';
 import {
   ArrowLeft,
@@ -17,7 +17,6 @@ import {
   Loader2,
   Calendar,
   Building2,
-  Zap,
   History,
   Sparkles,
   RefreshCw,
@@ -318,7 +317,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
   };
 
   return (
-    <div className="flex flex-col w-full min-h-full bg-slate-100/70 p-6 space-y-6 font-roboto">
+    <div className="flex flex-col w-full bg-slate-100/70 p-6 space-y-6 font-roboto">
       {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-5 py-3 border border-slate-700 shadow-xl flex items-center gap-3 rounded-none no-print">

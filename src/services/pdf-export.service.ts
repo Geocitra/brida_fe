@@ -1,6 +1,5 @@
 import pdfMake from 'pdfmake/build/pdfmake';
 import pdfFonts from 'pdfmake/build/vfs_fonts';
-import type { IndicatorMatrixItem } from './mock-data.service';
 
 // Initialize pdfMake virtual file system for Roboto fonts
 const vfsFonts = (pdfFonts as any)?.pdfMake?.vfs || (pdfFonts as any)?.vfs || (pdfFonts as any);
@@ -12,7 +11,7 @@ export const PdfExportService = {
   /**
    * Export Diagnostik Deviasi Indikator ke PDF Vector Pristine (pdfMake)
    */
-  exportAnalyticsPdf(indicator: IndicatorMatrixItem): void {
+  exportAnalyticsPdf(indicator: any, filename?: string): void {
     const docDefinition: any = {
       pageSize: 'A4',
       pageMargins: [30, 30, 30, 30],
@@ -81,9 +80,25 @@ export const PdfExportService = {
           margin: [0, 0, 0, 20],
         },
 
+        // Ringkasan Eksekutif AI
+        {
+          text: '2. RINGKASAN EKSEKUTIF ANALISIS (AI-SYNTHESIS)',
+          fontSize: 11,
+          bold: true,
+          color: '#0f172a',
+          margin: [0, 0, 0, 8],
+        },
+        {
+          text: indicator.summary || 'Hasil analisis deskriptif AI belum tersedia.',
+          fontSize: 9.5,
+          leading: 1.3,
+          margin: [0, 0, 0, 16],
+          alignment: 'justify',
+        },
+
         // Causal Inference Section
         {
-          text: '2. ANALISIS FAKTOR PENYEBAB (AI - Causal Inference)',
+          text: '3. ANALISIS FAKTOR PENYEBAB (AI - Causal Inference)',
           fontSize: 11,
           bold: true,
           color: '#0f172a',
@@ -97,7 +112,7 @@ export const PdfExportService = {
                 { text: 'Faktor Penyebab Utama', style: 'tableHeader' },
                 { text: 'Kontribusi', style: 'tableHeader' },
               ],
-              ...indicator.causalFactors.map((f, i) => [
+              ...indicator.causalFactors.map((f: any, i: number) => [
                 { text: `Faktor ${i + 1}: ${f.label}`, fontSize: 9.5 },
                 { text: `${f.percentage}%`, fontSize: 9.5, bold: true, alignment: 'center' },
               ]),
@@ -109,7 +124,7 @@ export const PdfExportService = {
 
         // Priority Action Plan Section
         {
-          text: '3. MATRIKS REKOMENDASI RESPON (ACTION PLAN)',
+          text: '4. MATRIKS REKOMENDASI RESPON (ACTION PLAN)',
           fontSize: 11,
           bold: true,
           color: '#0f172a',
@@ -125,7 +140,7 @@ export const PdfExportService = {
                 { text: 'Penanggung Jawab', style: 'tableHeader' },
                 { text: 'Tenggat Waktu', style: 'tableHeader' },
               ],
-              ...indicator.priorityRecommendations.map((rec) => [
+              ...indicator.priorityRecommendations.map((rec: any) => [
                 { text: rec.priority, fontSize: 8.5, bold: true, color: '#dc2626' },
                 { text: rec.title, fontSize: 8.5, bold: true },
                 { text: rec.pic, fontSize: 8 },
@@ -147,7 +162,8 @@ export const PdfExportService = {
       },
     };
 
-    pdfMake.createPdf(docDefinition).download(`Analisis_Deviasi_${indicator.id.toUpperCase()}_Mimika.pdf`);
+    const targetFilename = filename || `Analisis_Deviasi_${indicator.id.toUpperCase()}_Mimika.pdf`;
+    pdfMake.createPdf(docDefinition).download(targetFilename);
   },
 
   /**
@@ -301,20 +317,55 @@ export const PdfExportService = {
   /**
    * Export DOM Element / Indicator to PDF using pdfMake
    */
-  async exportElementToPdf(_elementId: string, _filename: string): Promise<void> {
-    const indicator: any = {
+  async exportElementToPdf(_elementId: string, filename: string, compareResult?: any): Promise<void> {
+    if (!compareResult) {
+      const indicator: any = {
+        id: 'ind-export',
+        name: 'Pendapatan Asli Daerah (PAD)',
+        sector: 'Fiskal & Ekonomi',
+        period: 'TA 2026',
+        baseline: 'Rp 110 M',
+        realization: 'Rp 85 M',
+        deviationText: '-22.7% (KRITIS)',
+        causalFactors: [
+          { label: 'Evaluasi & Verifikasi Administrasi Proyek', percentage: 45 },
+          { label: 'Eskalasi Biaya & Logistik Wilayah', percentage: 35 },
+          { label: 'Faktor Hambatan Cuaca Ekstrem', percentage: 20 },
+        ],
+        priorityRecommendations: [
+          { priority: 'TINGGI', title: 'Percepatan Proses Evaluasi Logistik', pic: 'Dinas PU & BRIDA', deadline: '30 Hari' }
+        ],
+        summary: 'Hasil evaluasi menunjukkan terjadinya deviasi kinerja pada indikator Pendapatan Asli Daerah.'
+      };
+      this.exportAnalyticsPdf(indicator, filename);
+      return;
+    }
+
+    const devVal = compareResult.math?.deviationPercentage ?? compareResult.math?.deviationValue ?? 0;
+    const devSign = devVal > 0 ? '+' : '';
+    const deviationText = `${devSign}${devVal}% (${compareResult.math?.urgencyStatus || 'NORMAL'})`;
+
+    const indicatorData: any = {
       id: 'ind-export',
-      name: 'Pendapatan Asli Daerah (PAD)',
-      sector: 'Fiskal & Ekonomi',
-      baseline: 'Rp 110 M',
-      realization: 'Rp 85 M',
-      deviationPercentage: -22.7,
-      urgencyStatus: 'KRITIS',
-      targetValue: 110,
-      realizationValue: 85,
-      unitPrefix: 'Rp ',
-      unitSuffix: ' M',
+      name: compareResult.math?.indicatorName || 'Analisis Deviasi',
+      sector: compareResult.math?.sector || 'Pembangunan & Kebijakan Daerah',
+      period: 'TA 2026',
+      baseline: compareResult.math?.targetText || '100%',
+      realization: compareResult.math?.realizationText || '0%',
+      deviationText,
+      causalFactors: (compareResult.causal?.causalFactors || []).map((f: any) => ({
+        label: f.factor,
+        percentage: f.weightPercentage,
+      })),
+      priorityRecommendations: (compareResult.causal?.recommendations || []).map((rec: any) => ({
+        priority: rec.priority,
+        title: rec.actionTitle,
+        pic: rec.pic,
+        deadline: rec.deadline,
+      })),
+      summary: compareResult.causal?.summary || 'Tidak ada ringkasan eksekutif.',
     };
-    this.exportAnalyticsPdf(indicator);
+
+    this.exportAnalyticsPdf(indicatorData, filename);
   },
 };
