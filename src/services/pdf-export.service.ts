@@ -2,11 +2,14 @@ import pdfMake from 'pdfmake/build/pdfmake';
 import pdfFonts from 'pdfmake/build/vfs_fonts';
 import htmlToPdfmake from 'html-to-pdfmake'; // Impor pustaka parser HTML [1]
 
-// Inisialisasi sistem berkas virtual pdfMake untuk font Roboto bawaan
+// Inisialisasi VFS pdfMake dengan biner Roboto bawaan — JANGAN pernah dioverwrite seluruhnya
 const vfsFonts = (pdfFonts as any)?.pdfMake?.vfs || (pdfFonts as any)?.vfs || (pdfFonts as any);
 if (vfsFonts) {
   (pdfMake as any).vfs = vfsFonts;
 }
+
+// Cache biner font kustom di memori untuk menghindari HTTP fetch berulang
+const fontVfsCache: Record<string, string> = {};
 
 /**
  * Interface Konfigurasi Tata Letak Halaman PDF Dinamis (OCP) [1]
@@ -20,12 +23,14 @@ export interface PDFFormatConfig {
 
 /**
  * Mengunduh berkas biner font lokal secara asinkron dan mengonversinya ke Base64 [1].
- * Mencegah pembengkakan ukuran bundel aplikasi utama hingga 10-15MB.
+ * Menggunakan cache in-memory untuk mencegah HTTP round-trip ganda pada ekspor berulang.
  */
 async function fetchLocalFontToBase64(url: string): Promise<string> {
+  if (fontVfsCache[url]) return fontVfsCache[url];
+
   const response = await fetch(url);
   if (!response.ok) {
-    throw new Error(`Gagal memuat aset biner font dari jalur server lokal: ${url}`);
+    throw new Error(`Gagal memuat aset biner font dari jalur server lokal: ${url} (HTTP ${response.status})`);
   }
   const blob = await response.blob();
   return new Promise<string>((resolve, reject) => {
@@ -33,6 +38,7 @@ async function fetchLocalFontToBase64(url: string): Promise<string> {
     reader.onloadend = () => {
       const base64String = reader.result as string;
       const base64Data = base64String.split(',')[1]; // Ambil data Base64 mentah
+      fontVfsCache[url] = base64Data; // Simpan ke cache
       resolve(base64Data);
     };
     reader.onerror = reject;
@@ -44,30 +50,28 @@ export const PdfExportService = {
   /**
    * Mengambil draf HTML interaktif, menyuntikkan font kustom secara dinamis,
    * dan mencetak dokumen PDF formal dengan format presisi (WYSIWYG) [1].
+   *
+   * DESAIN ARSITEKTUR: Font kustom didaftarkan HANYA di dalam docDefinition.fonts,
+   * BUKAN melalui mutasi properti global `pdfMake.fonts`, untuk mencegah polusi
+   * state global yang merusak operasi ekspor PDF lain (Bupati Report, Analytics).
    */
   async exportCustomFormattedArticlePdf(
     htmlText: string,
     config: PDFFormatConfig,
     filename: string,
   ): Promise<void> {
-    const fontFolderMap: Record<string, string> = {
-      'Times New Roman': 'times',
-      'Arial': 'arial',
-      'Verdana': 'verdana',
-      'Calibri': 'calibri',
-    };
-
     const fontFileMap: Record<string, { normal: string; bold: string; italics: string; bolditalics: string }> = {
-      times: { normal: 'times.ttf', bold: 'timesbd.ttf', italics: 'timesi.ttf', bolditalics: 'timesbi.ttf' },
-      arial: { normal: 'arial.ttf', bold: 'arialbd.ttf', italics: 'ariali.ttf', bolditalics: 'arialbi.ttf' },
-      verdana: { normal: 'verdana.ttf', bold: 'verdanab.ttf', italics: 'verdanai.ttf', bolditalics: 'verdanaz.ttf' },
-      calibri: { normal: 'calibri.ttf', bold: 'calibrib.ttf', italics: 'calibrii.ttf', bolditalics: 'calibriz.ttf' },
+      'Times New Roman': { normal: 'times.ttf', bold: 'timesbd.ttf', italics: 'timesi.ttf', bolditalics: 'timesbi.ttf' },
+      'Arial':           { normal: 'arial.ttf', bold: 'arialbd.ttf', italics: 'ariali.ttf', bolditalics: 'arialbi.ttf' },
+      'Verdana':         { normal: 'verdana.ttf', bold: 'verdanab.ttf', italics: 'verdanai.ttf', bolditalics: 'verdanaz.ttf' },
+      'Calibri':         { normal: 'calibri.ttf', bold: 'calibrib.ttf', italics: 'calibrii.ttf', bolditalics: 'calibriz.ttf' },
     };
 
-    const folder = fontFolderMap[config.fontFamily] || 'arial';
-    const files = fontFileMap[folder];
+    const files = fontFileMap[config.fontFamily] || fontFileMap['Arial'];
+    // Nama key VFS deterministik berdasarkan nama asli berkas agar tidak menabrak kunci lain
+    const vfsPrefix = files.normal.replace('.ttf', '');
 
-    // 1. Ambil berkas font .ttf fisik secara asinkron dari folder /public/ [1]
+    // 1. Ambil berkas font .ttf secara paralel dari /public/fonts/ dengan dukungan cache [1]
     const [vNormal, vBold, vItalics, vBoldItalics] = await Promise.all([
       fetchLocalFontToBase64(`/fonts/${files.normal}`),
       fetchLocalFontToBase64(`/fonts/${files.bold}`),
@@ -75,52 +79,54 @@ export const PdfExportService = {
       fetchLocalFontToBase64(`/fonts/${files.bolditalics}`),
     ]);
 
-    // 2. Suntikkan font biner Base64 langsung ke VFS (Virtual File System) pdfMake [1]
-    (pdfMake as any).vfs[`${folder}-Regular.ttf`] = vNormal;
-    (pdfMake as any).vfs[`${folder}-Bold.ttf`] = vBold;
-    (pdfMake as any).vfs[`${folder}-Italic.ttf`] = vItalics;
-    (pdfMake as any).vfs[`${folder}-BoldItalic.ttf`] = vBoldItalics;
-
-    // Registrasi struktur keluarga font baru secara dinamis
-    (pdfMake as any).fonts = {
-      Roboto: {
-        normal: 'Roboto-Regular.ttf',
-        bold: 'Roboto-Medium.ttf',
-        italics: 'Roboto-Italic.ttf',
-        bolditalics: 'Roboto-MediumItalic.ttf',
-      },
-      CustomFont: {
-        normal: `${folder}-Regular.ttf`,
-        bold: `${folder}-Bold.ttf`,
-        italics: `${folder}-Italic.ttf`,
-        bolditalics: `${folder}-BoldItalic.ttf`,
-      },
+    // 2. Suntikkan biner font ke VFS pdfMake — TAMBAH ke VFS yang sudah ada, jangan replace seluruhnya [1]
+    const currentVfs = (pdfMake as any).vfs || {};
+    (pdfMake as any).vfs = {
+      ...currentVfs, // Pertahankan Roboto bawaan agar html-to-pdfmake tidak crash
+      [`${vfsPrefix}-Regular.ttf`]:    vNormal,
+      [`${vfsPrefix}-Bold.ttf`]:       vBold,
+      [`${vfsPrefix}-Italic.ttf`]:     vItalics,
+      [`${vfsPrefix}-BoldItalic.ttf`]: vBoldItalics,
     };
 
-    // 3. Konversi satuan margin kertas dari Sentimeter ke Satuan Point pdfMake (1 cm = ~28.3465 pt) [1]
+    // 3. Konversi satuan margin kertas dari Sentimeter ke Satuan Point (1 cm = ~28.3465 pt) [1]
     const marginPoints = Math.round(config.marginCm * 28.3465);
 
     // 4. Terjemahkan draf HTML menjadi representasi JSON AST pdfMake [1]
-    const pdfContent = htmlToPdfmake(htmlText, {
-      window: window,
-    });
+    //    html-to-pdfmake akan menggunakan font Roboto (tersedia di VFS bawaan) sebagai default
+    const pdfContent = htmlToPdfmake(htmlText, { window: window });
 
-    // 5. Susun dokumen definisi pdfMake yang terstruktur
+    // 5. Susun dokumen definisi pdfMake — font kustom didaftarkan di sini, BUKAN secara global
     const docDefinition: any = {
       pageSize: 'A4',
       pageMargins: [marginPoints, marginPoints, marginPoints, marginPoints],
+      // Deklarasi font scoped ke dalam dokumen ini saja — tidak mencemari state global [1]
+      fonts: {
+        Roboto: {
+          normal:      'Roboto-Regular.ttf',
+          bold:        'Roboto-Medium.ttf',
+          italics:     'Roboto-Italic.ttf',
+          bolditalics: 'Roboto-MediumItalic.ttf',
+        },
+        CustomFont: {
+          normal:      `${vfsPrefix}-Regular.ttf`,
+          bold:        `${vfsPrefix}-Bold.ttf`,
+          italics:     `${vfsPrefix}-Italic.ttf`,
+          bolditalics: `${vfsPrefix}-BoldItalic.ttf`,
+        },
+      },
       defaultStyle: {
-        font: 'CustomFont', // Menggunakan font kustom yang dimuat dinamis [1]
-        fontSize: config.fontSize,
+        font:       'CustomFont',
+        fontSize:   config.fontSize,
         lineHeight: config.lineSpacing,
-        alignment: 'justify',
+        alignment:  'justify',
       },
       header: {
-        text: 'BRIDA SMART ANALYSIS — KABUPATEN MIMIKA',
+        text:      'BRIDA SMART ANALYSIS — KABUPATEN MIMIKA',
         alignment: 'right',
-        fontSize: 8,
-        color: '#94a3b8',
-        margin: [marginPoints, 15, marginPoints, 0],
+        fontSize:  8,
+        color:     '#94a3b8',
+        margin:    [marginPoints, 15, marginPoints, 0],
       },
       footer: (currentPage: number, pageCount: number) => ({
         columns: [
@@ -136,6 +142,7 @@ export const PdfExportService = {
     const targetFilename = filename.toLowerCase().endsWith('.pdf') ? filename : `${filename}.pdf`;
     pdfMake.createPdf(docDefinition).download(targetFilename);
   },
+
 
   /**
    * Export Diagnostik Deviasi Indikator ke PDF Vector Pristine (pdfMake)
