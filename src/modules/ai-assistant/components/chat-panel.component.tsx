@@ -11,101 +11,102 @@ import {
   Plus,
   Trash2,
   MessageSquare,
+  // Ikon baru untuk integrasi kartu fallback kesalahan sistem
+  Clock,
+  ShieldAlert,
+  WifiOff,
+  Database,
+  RefreshCw,
+  LogOut,
 } from 'lucide-react';
-import { AiAssistantService } from '../../../services/ai-assistant.service';
+import { AiAssistantService, AiServiceException } from '../../../services/ai-assistant.service';
+import { AiErrorMapper } from '../utils/error-mapper.util';
 
-// Helper formatting functions for Markdown & JSON
-const formatLabel = (str: string) => {
-  return str
-    .replace(/([A-Z])/g, ' $1')
-    .replace(/[_-]/g, ' ')
-    .trim();
-};
+// --- SUB-KOMPONEN 1: PENAMPIL TABEL MARKDOWN DINAMIS (Component-Driven UI) ---
 
-const renderJsonData = (obj: any): React.ReactNode => {
-  if (Array.isArray(obj)) {
-    if (obj.length === 0) return <span className="italic text-slate-500 text-xs">Daftar kosong</span>;
-    const firstItem = obj[0];
-    const columns = typeof firstItem === 'object' && firstItem !== null ? Object.keys(firstItem) : [];
-    
-    if (columns.length === 0) {
-      return (
-        <ul className="list-disc pl-5 space-y-1 my-1 text-xs">
-          {obj.map((item, idx) => <li key={idx}>{String(item)}</li>)}
-        </ul>
-      );
-    }
+interface MarkdownTableRendererProps {
+  rawTable: string;
+}
 
-    return (
-      <div className="overflow-x-auto border border-slate-300 my-2">
-        <table className="min-w-full divide-y divide-slate-300 text-xs font-roboto">
-          <thead className="bg-slate-100 font-bold text-slate-900">
-            <tr>
-              {columns.map((col) => (
-                <th key={col} className="px-3 py-2 text-left uppercase tracking-wider text-[10px]">{formatLabel(col)}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-200 bg-white text-slate-800">
-            {obj.map((row, rIdx) => (
-              <tr key={rIdx} className="hover:bg-slate-50">
-                {columns.map((col) => (
-                  <td key={col} className="px-3 py-2 whitespace-normal">{String(row[col] ?? '')}</td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    );
-  }
+const MarkdownTableRenderer: React.FC<MarkdownTableRendererProps> = ({ rawTable }) => {
+  const lines = rawTable.trim().split('\n');
+  if (lines.length < 2) return null;
 
-  const keys = Object.keys(obj);
-  if (keys.length === 0) return <span className="italic text-slate-500 text-xs">Objek kosong</span>;
+  // Ekstraksi kolom header (baris index 0)
+  const headerLine = lines[0];
+  const headers = headerLine
+    .split('|')
+    .map((h) => h.trim())
+    .filter((_, idx, arr) => idx > 0 && idx < arr.length - 1);
+
+  // Ekstraksi baris data (melewati pembatas baris indeks 1)
+  const rows = lines.slice(2).map((line) => {
+    return line
+      .split('|')
+      .map((cell) => cell.trim())
+      .filter((_, idx, arr) => idx > 0 && idx < arr.length - 1);
+  });
 
   return (
-    <div className="space-y-4 font-roboto text-slate-900 w-full my-2">
-      <div className="border border-slate-300 bg-slate-50 divide-y divide-slate-200">
-        {keys.map((key) => {
-          const val = obj[key];
-          let valStr = '';
-          if (typeof val === 'object' && val !== null) {
-            valStr = JSON.stringify(val, null, 2);
-          } else {
-            valStr = String(val);
-          }
-          return (
-            <div key={key} className="grid grid-cols-1 sm:grid-cols-4 p-3 gap-2 align-top">
-              <span className="font-bold text-slate-700 text-[10px] uppercase tracking-wider">{formatLabel(key)}</span>
-              <span className="sm:col-span-3 text-xs font-medium text-slate-900 whitespace-pre-wrap">{valStr}</span>
-            </div>
-          );
-        })}
-      </div>
+    <div className="overflow-x-auto border border-slate-300 my-3 rounded-none shadow-2xs">
+      <table className="min-w-full divide-y divide-slate-300 text-xs font-roboto">
+        <thead className="bg-slate-100 font-bold text-slate-800 border-b border-slate-300">
+          <tr>
+            {headers.map((h, i) => (
+              <th
+                key={i}
+                className="px-4 py-2.5 text-left uppercase tracking-wider text-[10px] font-extrabold text-teal-900"
+              >
+                {h}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-200 bg-white text-slate-700">
+          {rows.map((row, rIdx) => (
+            <tr key={rIdx} className="hover:bg-slate-50/80 transition-colors">
+              {row.map((cell, cIdx) => (
+                <td key={cIdx} className="px-4 py-2 whitespace-normal font-medium">
+                  {cell}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 };
 
+// --- SUB-KOMPONEN 2: PARSER & RENDERING MARKDOWN KLIEN (SRP) ---
+
 const parseInlineStyles = (lineText: string): React.ReactNode[] => {
   const parts: React.ReactNode[] = [];
   let keyIdx = 0;
-  
+
   const boldParts = lineText.split('**');
   boldParts.forEach((part, index) => {
     const isBold = index % 2 === 1;
     const codeParts = part.split('`');
-    
+
     codeParts.forEach((subPart, subIndex) => {
       const isInlineCode = subIndex % 2 === 1;
-      
+
       if (isInlineCode) {
         parts.push(
-          <code key={keyIdx++} className="px-1.5 py-0.5 bg-slate-100 text-teal-850 font-mono text-[11px] border border-slate-200">
+          <code
+            key={keyIdx++}
+            className="px-1.5 py-0.5 bg-slate-100 text-teal-800 font-mono text-[11px] border border-slate-200"
+          >
             {subPart}
-          </code>
+          </code>,
         );
       } else if (isBold) {
-        parts.push(<strong key={keyIdx++} className="font-bold text-slate-900">{subPart}</strong>);
+        parts.push(
+          <strong key={keyIdx++} className="font-bold text-slate-900">
+            {subPart}
+          </strong>,
+        );
       } else {
         parts.push(subPart);
       }
@@ -115,128 +116,238 @@ const parseInlineStyles = (lineText: string): React.ReactNode[] => {
   return parts;
 };
 
-const renderMarkdown = (text: string): React.ReactNode => {
+interface RichMessageRendererProps {
+  text: string;
+}
+
+const RichMessageRenderer: React.FC<RichMessageRendererProps> = ({ text }) => {
   const lines = text.split('\n');
   const elements: React.ReactNode[] = [];
-  let currentList: React.ReactNode[] = [];
-  let inCodeBlock = false;
-  let codeBlockLines: string[] = [];
 
-  const flushList = (key: string | number) => {
-    if (currentList.length > 0) {
+  let tableBuffer: string[] = [];
+  let insideTable = false;
+  let listBuffer: React.ReactNode[] = [];
+  let keyIdx = 0;
+
+  const flushList = () => {
+    if (listBuffer.length > 0) {
       elements.push(
-        <ul key={`list-${key}`} className="list-disc pl-5 space-y-1 my-2">
-          {currentList}
-        </ul>
+        <ul key={`list-${keyIdx++}`} className="list-disc pl-5 space-y-1.5 my-2">
+          {listBuffer}
+        </ul>,
       );
-      currentList = [];
+      listBuffer = [];
     }
   };
 
-  lines.forEach((line, idx) => {
-    const trimmedLine = line.trim();
+  const flushTable = () => {
+    if (tableBuffer.length > 0) {
+      elements.push(
+        <MarkdownTableRenderer key={`table-${keyIdx++}`} rawTable={tableBuffer.join('\n')} />,
+      );
+      tableBuffer = [];
+      insideTable = false;
+    }
+  };
 
-    if (trimmedLine.startsWith('```')) {
-      if (inCodeBlock) {
-        inCodeBlock = false;
-        elements.push(
-          <pre key={`code-${idx}`} className="bg-slate-900 text-slate-100 p-3.5 font-mono text-xs overflow-x-auto my-3 rounded-none border border-slate-950">
-            <code>{codeBlockLines.join('\n')}</code>
-          </pre>
-        );
-        codeBlockLines = [];
-      } else {
-        flushList(idx);
-        inCodeBlock = true;
-      }
-      return;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmed = line.trim();
+
+    if (trimmed.startsWith('|') && trimmed.endsWith('|')) {
+      flushList();
+      insideTable = true;
+      tableBuffer.push(line);
+      continue;
+    } else if (insideTable) {
+      flushTable();
     }
 
-    if (inCodeBlock) {
-      codeBlockLines.push(line);
-      return;
-    }
-
-    if (trimmedLine.startsWith('### ')) {
-      flushList(idx);
-      elements.push(
-        <h4 key={idx} className="text-xs font-bold text-teal-800 uppercase tracking-wider mt-4 mb-1.5 font-roboto">
-          {parseInlineStyles(trimmedLine.slice(4))}
-        </h4>
-      );
-    } else if (trimmedLine.startsWith('## ')) {
-      flushList(idx);
-      elements.push(
-        <h3 key={idx} className="text-sm font-bold text-slate-900 mt-5 mb-2 border-b border-slate-200 pb-1 font-roboto font-semibold">
-          {parseInlineStyles(trimmedLine.slice(3))}
-        </h3>
-      );
-    } else if (trimmedLine.startsWith('# ')) {
-      flushList(idx);
-      elements.push(
-        <h2 key={idx} className="text-base font-extrabold text-slate-900 mt-6 mb-3 border-b-2 border-slate-300 pb-1.5 font-roboto font-bold">
-          {parseInlineStyles(trimmedLine.slice(2))}
-        </h2>
-      );
-    } else if (trimmedLine.startsWith('- ') || trimmedLine.startsWith('* ') || trimmedLine.startsWith('• ')) {
-      const content = parseInlineStyles(trimmedLine.slice(2));
-      currentList.push(
-        <li key={`li-${idx}`} className="text-xs text-slate-700 leading-relaxed font-roboto">
+    if (trimmed.startsWith('- ') || trimmed.startsWith('* ') || trimmed.startsWith('• ')) {
+      const content = parseInlineStyles(trimmed.slice(2));
+      listBuffer.push(
+        <li key={`li-${keyIdx++}`} className="text-xs text-slate-700 leading-relaxed font-roboto">
           {content}
-        </li>
+        </li>,
       );
-    } else if (/^\d+\.\s/.test(trimmedLine)) {
-      flushList(idx);
-      const match = trimmedLine.match(/^(\d+)\.\s(.*)/);
-      if (match) {
-        elements.push(
-          <div key={idx} className="flex gap-2 text-xs text-slate-700 leading-relaxed font-roboto my-1">
-            <span className="font-bold text-teal-700">{match[1]}.</span>
-            <span>{parseInlineStyles(match[2])}</span>
-          </div>
-        );
-      }
-    } else if (trimmedLine === '') {
-      flushList(idx);
+      continue;
     } else {
-      flushList(idx);
+      flushList();
+    }
+
+    if (trimmed.startsWith('### ')) {
       elements.push(
-        <p key={idx} className="text-xs text-slate-800 font-normal leading-relaxed my-2 font-roboto">
-          {parseInlineStyles(line)}
-        </p>
+        <h4
+          key={keyIdx++}
+          className="text-xs font-bold text-teal-800 uppercase tracking-wider mt-4 mb-1.5 font-roboto"
+        >
+          {parseInlineStyles(trimmed.slice(4))}
+        </h4>,
       );
-    }
-  });
-
-  flushList('end');
-  return <div className="space-y-1 w-full text-left">{elements}</div>;
-};
-
-const renderFormattedContent = (text: string): React.ReactNode => {
-  const trimmed = text.trim();
-  if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
-    try {
-      const obj = JSON.parse(trimmed);
-      return renderJsonData(obj);
-    } catch {
-      // ignore & render as markdown
-    }
-  } else if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
-    try {
-      const obj = JSON.parse(trimmed);
-      return renderJsonData(obj);
-    } catch {
-      // ignore & render as markdown
+    } else if (trimmed.startsWith('## ')) {
+      elements.push(
+        <h3
+          key={keyIdx++}
+          className="text-sm font-bold text-slate-900 mt-5 mb-2 border-b border-slate-200 pb-1 font-roboto"
+        >
+          {parseInlineStyles(trimmed.slice(3))}
+        </h3>,
+      );
+    } else if (trimmed.startsWith('# ')) {
+      elements.push(
+        <h2
+          key={keyIdx++}
+          className="text-base font-extrabold text-slate-900 mt-6 mb-3 border-b-2 border-slate-300 pb-1.5 font-roboto"
+        >
+          {parseInlineStyles(trimmed.slice(2))}
+        </h2>,
+      );
+    } else if (trimmed === '') {
+      continue;
+    } else {
+      elements.push(
+        <p
+          key={keyIdx++}
+          className="text-xs text-slate-800 font-normal leading-relaxed my-2 font-roboto text-justify"
+        >
+          {parseInlineStyles(line)}
+        </p>,
+      );
     }
   }
 
-  return renderMarkdown(text);
+  flushList();
+  flushTable();
+
+  return <div className="space-y-1 w-full text-left">{elements}</div>;
 };
+
+// --- SUB-KOMPONEN 3: SUGGESTION CHIPS (Interactive AI) ---
+
+interface SuggestionChipsProps {
+  suggestions?: string[];
+  onClick: (suggestion: string) => void;
+  disabled: boolean;
+}
+
+const SuggestionChips: React.FC<SuggestionChipsProps> = ({
+  suggestions,
+  onClick,
+  disabled,
+}) => {
+  if (!suggestions || suggestions.length === 0) return null;
+
+  return (
+    <div className="flex flex-wrap gap-2 mt-3 pt-2.5 border-t border-slate-100 no-print">
+      {suggestions.map((s, idx) => (
+        <button
+          key={idx}
+          type="button"
+          onClick={() => onClick(s)}
+          disabled={disabled}
+          className="px-3 py-1.5 bg-teal-50 hover:bg-teal-100 disabled:opacity-50 text-teal-800 hover:text-teal-950 font-bold text-xs border border-teal-200 hover:border-teal-300 rounded-none shadow-2xs transition-colors cursor-pointer disabled:cursor-not-allowed inline-flex items-center gap-1.5"
+        >
+          <span>{s}</span>
+          <ArrowRight size={11} className="text-teal-600 shrink-0 animate-pulse" />
+        </button>
+      ))}
+    </div>
+  );
+};
+
+// --- SUB-KOMPONEN 4: KARTU FALLBACK GANGGUAN SISTEM (Polymorphic Error UX) [5] ---
+
+const iconMap = {
+  AlertCircle,
+  Clock,
+  ShieldAlert,
+  WifiOff,
+  Database,
+};
+
+interface SystemFallbackCardProps {
+  errorType: string;
+  rawErrorMsg: string;
+  onRetry: () => void;
+  onNewSession: () => void;
+  onLogin: () => void;
+}
+
+const SystemFallbackCard: React.FC<SystemFallbackCardProps> = ({
+  errorType,
+  rawErrorMsg,
+  onRetry,
+  onNewSession,
+  onLogin,
+}) => {
+  // Evaluasi tipe kesalahan menggunakan asisten utilitas mapper murni [1]
+  const mapped = AiErrorMapper.map(new AiServiceException(500, errorType, rawErrorMsg));
+  const IconComponent = iconMap[mapped.iconName] || AlertCircle;
+
+  return (
+    <div className="bg-slate-50 border border-slate-300 p-4 my-3 font-roboto w-full text-slate-800 space-y-3 shadow-2xs">
+      <div className="flex items-start gap-3">
+        <div className="p-1.5 bg-white border border-slate-200 shrink-0 text-slate-600">
+          <IconComponent size={18} className="animate-pulse" />
+        </div>
+        <div className="space-y-1">
+          <h4 className="text-xs font-bold uppercase tracking-wider text-slate-900 leading-snug">
+            {mapped.title}
+          </h4>
+          <p className="text-xs font-medium text-slate-600 leading-relaxed text-justify">
+            {mapped.description}
+          </p>
+        </div>
+      </div>
+
+      {/* Render Tombol Aksi Taktis Berdasarkan Rekomendasi Mapper UX [1, 5] */}
+      <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-200/60 no-print">
+        {mapped.actionType === 'RETRY' && (
+          <button
+            type="button"
+            onClick={onRetry}
+            className="px-3 py-1.5 bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs uppercase transition-colors inline-flex items-center gap-1.5 cursor-pointer rounded-none border border-teal-800 shadow-2xs"
+          >
+            <RefreshCw size={12} className="shrink-0" />
+            <span>Coba Kirim Ulang</span>
+          </button>
+        )}
+
+        {mapped.actionType === 'NEW_SESSION' && (
+          <button
+            type="button"
+            onClick={onNewSession}
+            className="px-3 py-1.5 bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs uppercase transition-colors inline-flex items-center gap-1.5 cursor-pointer rounded-none border border-teal-800 shadow-2xs"
+          >
+            <Plus size={12} className="shrink-0" />
+            <span>Mulai Sesi Baru</span>
+          </button>
+        )}
+
+        {mapped.actionType === 'LOGIN' && (
+          <button
+            type="button"
+            onClick={onLogin}
+            className="px-3 py-1.5 bg-slate-900 hover:bg-slate-950 text-white font-bold text-xs uppercase transition-colors inline-flex items-center gap-1.5 cursor-pointer rounded-none border border-slate-950 shadow-2xs"
+          >
+            <LogOut size={12} className="shrink-0" />
+            <span>Masuk Sesi Kembali</span>
+          </button>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// --- KOMPONEN UTAMA: CHAT PANEL ---
 
 interface ChatMessage {
   id: string;
   sender: 'user' | 'ai';
   text: string;
+  status: 'SUCCESS' | 'ERROR'; // Melacak apakah pesan berhasil diproses atau mengalami kegagalan [5]
+  errorType?: string;          // Menyimpan kode kesalahan teknis untuk filter fallback visual [5]
+  suggestions?: string[];
   timestamp: string;
 }
 
@@ -275,15 +386,17 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [sessionError, setSessionError] = useState<string | null>(null);
 
-  // QA Sessions History List State
+  // Cadangan memori kueri terakhir yang gagal dikirim (Fail-Safe Caching) [1, 5]
+  const [lastFailedQuery, setLastFailedQuery] = useState<string | null>(null);
+
   const [qaSessions, setQaSessions] = useState<QaSessionItem[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState<boolean>(false);
   const [showHistorySidebar, setShowHistorySidebar] = useState<boolean>(true);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const activeDocIds = selectedDocumentIds.length > 0 
-    ? selectedDocumentIds 
+  const activeDocIds = selectedDocumentIds.length > 0
+    ? selectedDocumentIds
     : (selectedDocumentId ? [selectedDocumentId] : []);
 
   const activeDocTitles = documentTitles.length > 0
@@ -300,7 +413,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isLoading]);
 
-  // Load QA Chat Sessions History on Mount
   useEffect(() => {
     loadQaSessionsHistory();
   }, []);
@@ -311,7 +423,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       const history = await AiAssistantService.listQaSessions();
       setQaSessions(history || []);
 
-      // Auto-load latest QA session if no active session yet
       if (!sessionId && history && history.length > 0) {
         handleSelectQaSession(history[0].id);
       }
@@ -326,16 +437,45 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const handleSelectQaSession = async (id: string) => {
     setIsLoading(true);
     setSessionError(null);
+    setLastFailedQuery(null);
     try {
       const detail = await AiAssistantService.getQaSessionDetail(id);
       setSessionId(detail.id);
 
-      const formattedMessages: ChatMessage[] = (detail.messages || []).map((m) => ({
-        id: m.id,
-        sender: m.role === 'USER' ? 'user' : 'ai',
-        text: m.content,
-        timestamp: new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      }));
+      // Parsing Defensif untuk riwayat pesan [Defensive Programming]
+      const formattedMessages: ChatMessage[] = (detail.messages || []).map((m) => {
+        const isAi = m.role === 'ASSISTANT';
+        let text = m.content;
+        let suggestions: string[] = [];
+        let status: 'SUCCESS' | 'ERROR' = 'SUCCESS';
+        let errorType: string | undefined = undefined;
+
+        if (isAi) {
+          try {
+            const parsed = JSON.parse(m.content);
+            if (parsed && typeof parsed === 'object') {
+              text = parsed.answer || parsed.fullArticleText || m.content;
+              suggestions = parsed.suggestions || [];
+              if (parsed.status === 'ERROR' || parsed.errorType) {
+                status = 'ERROR';
+                errorType = parsed.errorType;
+              }
+            }
+          } catch {
+            // Data bertipe string warisan (legacy string), abaikan parsing JSON
+          }
+        }
+
+        return {
+          id: m.id,
+          sender: isAi ? 'ai' : 'user',
+          text,
+          status,
+          errorType,
+          suggestions,
+          timestamp: new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        };
+      });
 
       setMessages(formattedMessages);
     } catch (err: any) {
@@ -350,6 +490,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     setMessages([]);
     setSessionError(null);
     setDetectedArticlePrompt(null);
+    setLastFailedQuery(null);
   };
 
   const handleDeleteQaSession = async (e: React.MouseEvent, idToDelete: string) => {
@@ -383,17 +524,20 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     const newSessionId = await AiAssistantService.createSession(
       primaryId,
       sessionTitle,
-      activeDocIds
+      activeDocIds,
     );
     setSessionId(newSessionId);
     return newSessionId;
   };
 
-  const handleSendMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!inputQuery.trim() || activeDocIds.length === 0 || isLoading) return;
+  /**
+   * Pipa Pemrosesan Pengiriman Pesan Utama (Polimorfis)
+   */
+  const executeSendMessage = async (queryText: string) => {
+    if (!queryText.trim() || activeDocIds.length === 0 || isLoading) return;
 
-    const currentQuery = inputQuery;
+    const currentQuery = queryText.trim();
+    setLastFailedQuery(null); // Reset cache kegagalan pada setiap pengiriman baru
 
     if (isArticleIntent(currentQuery) && onArticleIntentDetected) {
       setDetectedArticlePrompt(currentQuery);
@@ -405,6 +549,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       id: Date.now().toString(),
       sender: 'user',
       text: currentQuery,
+      status: 'SUCCESS',
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     };
 
@@ -415,34 +560,60 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
     try {
       const activeSessionId = await getOrCreateSession();
-      const responseText = await AiAssistantService.sendQuery(activeSessionId, currentQuery);
+
+      // Ambil respons bertipe kuat dari layer service [3]
+      const response = await AiAssistantService.sendQuery(activeSessionId, currentQuery);
+
+      const responseText = response.data.answer || response.data.fullArticleText || JSON.stringify(response.data);
+      const responseSuggestions = response.data.suggestions || [];
 
       const aiMsg: ChatMessage = {
         id: (Date.now() + 1).toString(),
         sender: 'ai',
         text: responseText,
+        status: 'SUCCESS',
+        suggestions: responseSuggestions, // Mengisi Quick-Reply Suggestion Chips [1]
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
+
       setMessages((prev) => [...prev, aiMsg]);
       loadQaSessionsHistory();
     } catch (err: any) {
-      const errorText = err.message || 'Gagal terhubung ke engine AI.';
-      setSessionError(errorText);
+      // Isolasi dan identifikasi pengecualian kustom dari layer service [5]
+      let errorType = 'UNKNOWN_ERROR';
+      let displayMsg = err.message || 'Gagal memproses kueri diskusi AI.';
+
+      if (err instanceof AiServiceException) {
+        errorType = err.errorType;
+        displayMsg = err.rawMessage;
+      }
+
+      // Caching kueri yang gagal untuk fungsionalitas tombol Coba Ulang [1, 5]
+      setLastFailedQuery(currentQuery);
+
       const errorMsg: ChatMessage = {
         id: (Date.now() + 1).toString(),
         sender: 'ai',
-        text: `[System Error]: ${errorText}`,
+        text: displayMsg,
+        status: 'ERROR', // Flag visual polimorfis diaktifkan [5]
+        errorType: errorType,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
+
       setMessages((prev) => [...prev, errorMsg]);
     } finally {
       setIsLoading(false);
     }
   };
 
+  const handleFormSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    executeSendMessage(inputQuery);
+  };
+
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 h-[600px] lg:h-[650px]">
-      {/* Sidebar Kiri: Riwayat Percakapan Q&A dari Database */}
+    <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 h-150 lg:h-162.5">
+      { }
       {showHistorySidebar && (
         <div className="bg-white border border-slate-300 flex flex-col rounded-none shadow-xs h-full overflow-hidden">
           <div className="p-3 border-b border-slate-300 bg-slate-100 flex items-center justify-between">
@@ -479,11 +650,10 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                   <div
                     key={s.id}
                     onClick={() => handleSelectQaSession(s.id)}
-                    className={`p-3 text-xs cursor-pointer transition-colors space-y-1 ${
-                      isActive
-                        ? 'bg-teal-50 text-teal-950 font-bold'
-                        : 'bg-white hover:bg-slate-50'
-                    }`}
+                    className={`p-3 text-xs cursor-pointer transition-colors space-y-1 ${isActive
+                      ? 'bg-teal-50 text-teal-950 font-bold'
+                      : 'bg-white hover:bg-slate-50'
+                      }`}
                   >
                     <div className="flex items-center justify-between gap-1">
                       <span className="truncate font-bold text-slate-900 text-[12px]">{s.title}</span>
@@ -508,31 +678,25 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         </div>
       )}
 
-      {/* Main Chat Feed Area (3 Columns when Sidebar open, 4 when closed) */}
+      { }
       <div className={`bg-white border border-slate-300 flex flex-col rounded-none shadow-xs h-full overflow-hidden ${showHistorySidebar ? 'lg:col-span-3' : 'lg:col-span-4'}`}>
-        {/* Panel Header */}
+        { }
         <div className="px-6 py-3 border-b border-slate-300 bg-slate-100 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button
               onClick={() => setShowHistorySidebar(!showHistorySidebar)}
-              className="p-1 text-slate-600 hover:text-slate-900 border border-slate-300 bg-white"
+              className="p-1 text-slate-600 hover:text-slate-900 bg-white"
               title="Toggle Sidebar Riwayat Chat"
             >
               <History size={16} />
             </button>
             <div>
               <h2 className="text-sm font-bold text-slate-900 uppercase">AI Chat Assistant</h2>
-              <p className="font-roboto text-[11px] text-slate-600 font-medium">
-                Sumber Aktif: <span className="text-teal-700 font-bold">{activeDocTitles.length > 0 ? activeDocTitles.join(', ') : 'Dokumen Terpilih'}</span>
-                {sessionId && (
-                  <span className="ml-2 text-emerald-700 font-bold">[ID Sesi: {sessionId.slice(0, 8)}...]</span>
-                )}
-              </p>
             </div>
           </div>
         </div>
 
-        {/* Session Error Banner */}
+        { }
         {sessionError && (
           <div className="p-3 bg-red-50 border-b border-red-200 flex items-center gap-2 text-red-800 text-xs font-semibold">
             <AlertCircle size={14} className="shrink-0" />
@@ -540,7 +704,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           </div>
         )}
 
-        {/* Article Intent Banner */}
+        { }
         {detectedArticlePrompt && onArticleIntentDetected && (
           <div className="p-3 bg-teal-50 border-b border-teal-300 flex items-center justify-between gap-4">
             <div className="flex items-center gap-2 text-teal-900 text-xs font-bold">
@@ -557,7 +721,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           </div>
         )}
 
-        {/* Messages Feed Area */}
+        { }
         <div className="flex-1 overflow-y-auto bg-slate-50 divide-y divide-slate-200">
           {messages.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-center p-6 text-slate-500">
@@ -571,20 +735,18 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             messages.map((msg) => (
               <div
                 key={msg.id}
-                className={`w-full p-5 flex gap-4 items-start transition-colors ${
-                  msg.sender === 'user' ? 'bg-teal-50/30' : 'bg-white'
-                }`}
+                className={`w-full p-5 flex gap-4 items-start transition-colors ${msg.sender === 'user' ? 'bg-teal-50/30' : 'bg-white'
+                  }`}
               >
-                {/* Sender Avatar */}
-                <div className={`w-8 h-8 flex items-center justify-center shrink-0 border rounded-none shadow-2xs ${
-                  msg.sender === 'user' 
-                    ? 'bg-slate-900 border-slate-950 text-white' 
-                    : 'bg-teal-700 border-teal-800 text-white'
-                }`}>
+                { }
+                <div className={`w-8 h-8 flex items-center justify-center shrink-0 border rounded-none shadow-2xs ${msg.sender === 'user'
+                  ? 'bg-slate-900 border-slate-950 text-white'
+                  : 'bg-teal-700 border-teal-800 text-white'
+                  }`}>
                   {msg.sender === 'user' ? <User size={15} /> : <Bot size={15} />}
                 </div>
 
-                {/* Message Content Area (Full-Width) */}
+                { }
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
                     <span className="text-xs font-bold text-slate-800 uppercase tracking-wide font-roboto">
@@ -592,10 +754,27 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                     </span>
                     <span className="text-[10px] text-slate-400 font-medium">{msg.timestamp}</span>
                   </div>
-                  
+
                   <div className="text-xs text-slate-900 font-normal leading-relaxed">
                     {msg.sender === 'ai' ? (
-                      renderFormattedContent(msg.text)
+                      msg.status === 'ERROR' ? (
+                        <SystemFallbackCard
+                          errorType={msg.errorType || 'UNKNOWN_ERROR'}
+                          rawErrorMsg={msg.text}
+                          onRetry={() => executeSendMessage(lastFailedQuery || msg.text)}
+                          onNewSession={handleCreateNewSession}
+                          onLogin={() => window.location.reload()}
+                        />
+                      ) : (
+                        <>
+                          <RichMessageRenderer text={msg.text} />
+                          <SuggestionChips
+                            suggestions={msg.suggestions}
+                            onClick={(suggestion) => executeSendMessage(suggestion)}
+                            disabled={isLoading}
+                          />
+                        </>
+                      )
                     ) : (
                       <p className="whitespace-pre-wrap font-roboto">{msg.text}</p>
                     )}
@@ -613,24 +792,27 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Input Form */}
-        <form onSubmit={handleSendMessage} className="p-4 border-t border-slate-300 bg-white flex gap-2">
-          <input
-            type="text"
-            value={inputQuery}
-            onChange={(e) => setInputQuery(e.target.value)}
-            placeholder={hasSelectedDoc ? 'Ketik pertanyaan analitis Anda di sini...' : 'Pilih dokumen sumber terlebih dahulu...'}
-            disabled={!hasSelectedDoc || isLoading}
-            className="flex-1 bg-slate-50 border border-slate-400 px-4 py-2.5 text-xs text-slate-900 font-semibold focus:outline-none focus:border-teal-600 disabled:opacity-50 rounded-none shadow-xs"
-          />
-          <button
-            type="submit"
-            disabled={!hasSelectedDoc || !inputQuery.trim() || isLoading}
-            className="px-5 py-2.5 bg-teal-700 hover:bg-teal-800 disabled:bg-slate-300 text-white font-bold text-xs uppercase transition-colors disabled:text-slate-500 border border-teal-800 disabled:border-slate-400 rounded-none flex items-center gap-2 shadow-xs"
-          >
-            <span>Kirim</span>
-            <Send size={15} />
-          </button>
+        { }
+        {/* Input Form Obrolan Terintegrasi (Perbaikan Kontras Tombol) */}
+        <form onSubmit={handleFormSubmit} className="p-4 border-t border-slate-300 bg-white no-print">
+          <div className="flex items-center border border-slate-400 focus-within:border-teal-600 bg-slate-50 transition-colors">
+            <input
+              type="text"
+              value={inputQuery}
+              onChange={(e) => setInputQuery(e.target.value)}
+              placeholder={hasSelectedDoc ? 'Ketik pertanyaan analitis Anda di sini...' : 'Pilih dokumen sumber terlebih dahulu...'}
+              disabled={!hasSelectedDoc || isLoading}
+              className="flex-1 bg-transparent px-4 py-3 text-xs text-slate-900 font-semibold focus:outline-none disabled:opacity-50"
+            />
+            <button
+              type="submit"
+              disabled={!hasSelectedDoc || !inputQuery.trim() || isLoading}
+              className="px-5 py-3 bg-teal-700 hover:bg-teal-800 disabled:bg-slate-50 text-white disabled:text-slate-500 font-bold text-xs uppercase transition-colors flex items-center gap-2 cursor-pointer disabled:cursor-not-allowed shrink-0 h-full"
+            >
+              <span>Kirim</span>
+              <Send size={14} className="shrink-0" />
+            </button>
+          </div>
         </form>
       </div>
     </div>

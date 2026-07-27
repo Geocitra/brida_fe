@@ -47,14 +47,14 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
                 >
                   <td className="py-3 px-4">
                     <div className="flex items-center gap-2">
-                      <FileText size={16} className="text-teal-600 shrink-0" />
-                      <span className="font-roboto font-medium text-slate-800 text-sm">{doc.title}</span>
+                      <FileText size={14} className="text-teal-600 shrink-0" />
+                      <span className="font-roboto text-slate-800 text-xs">{doc.title}</span>
                     </div>
                   </td>
-                  <td className="py-3 px-4 text-slate-500 text-xs font-normal">
+                  <td className="py-3 px-4 text-slate-800 text-xs font-normal">
                     {doc.metadata?.category || 'General Report'}
                   </td>
-                  <td className="py-3 px-4 text-slate-500 text-xs font-normal">
+                  <td className="py-3 px-4 text-slate-800 text-xs font-normal">
                     {doc.metadata?.pageCount || 0} Hal / {doc.chunkCount || 0} Chunks
                   </td>
 

@@ -253,11 +253,11 @@ export const DocumentDetailModal: React.FC<DocumentDetailModalProps> = ({ docume
                 <iframe
                   src={`${fileStreamUrl}#toolbar=1&navpanes=0`}
                   title={currentDoc.title}
-                  className="w-full flex-1 min-h-[480px] bg-slate-50"
+                  className="w-full flex-1 min-h-120 bg-slate-50"
                 />
               ) : isDocx ? (
                 /* DOCX Renderer using docx-preview */
-                <div className="flex-1 flex flex-col relative min-h-[460px]">
+                <div className="flex-1 flex flex-col relative min-h-115">
                   {isDocxLoading && (
                     <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-white/90 text-teal-800 space-y-2">
                       <Loader2 size={26} className="animate-spin text-teal-700" />

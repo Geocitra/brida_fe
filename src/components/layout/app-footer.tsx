@@ -24,14 +24,6 @@ export const AppFooter: React.FC = () => {
 
         {/* Right Side: System Telemetry & Operational Health Status */}
         <div className="flex items-center gap-4 divide-x divide-slate-200 text-[11px]">
-          <div className="flex items-center gap-1.5 text-slate-600">
-            <ShieldCheck size={14} className="text-teal-700" />
-            <span className="font-semibold text-slate-700">ISO 27001 Secured</span>
-          </div>
-          <div className="pl-4 flex items-center gap-1.5 text-slate-600">
-            <Database size={14} className="text-emerald-600" />
-            <span className="font-semibold text-slate-700">PostgreSQL Vector DB</span>
-          </div>
           <div className="pl-4 flex items-center gap-1.5 text-slate-600">
             <Cpu size={14} className="text-teal-600" />
             <span className="font-semibold text-slate-700">v1.0.0-dev</span>

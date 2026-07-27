@@ -67,9 +67,6 @@ export const KnowledgeHubView: React.FC = () => {
       <div className="w-full bg-white border border-slate-300 px-6 py-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4 rounded-none shadow-2xs">
         {/* Sisi Kiri: Breadcrumb & Judul Utama H1 */}
         <div className="flex flex-col">
-          <span className="text-[10px] font-bold tracking-widest text-teal-800 uppercase mb-1">
-            Beranda / Repositori Dokumen
-          </span>
           <h1 className="text-xl font-bold uppercase text-slate-900 tracking-tight">
             Repositori Dokumen
           </h1>
