@@ -1,6 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { DeviationSummaryCard } from '../components/deviation-summary-card.component';
 import { CausalFactorChart } from '../components/causal-factor-chart.component';
+
+const stripCitationTokens = (content?: string | null): string => {
+  if (!content) return '';
+
+  return content
+    .replace(/\[(?:[a-f0-9-]{8,}|doc(?:[-_a-z0-9]+)?):\d+\]/gi, '')
+    .replace(/\[(?:[a-f0-9-]{8,}|doc(?:[-_a-z0-9]+)?):\d+\]\[(?:[a-f0-9-]{8,}|doc(?:[-_a-z0-9]+)?):\d+\]/gi, '')
+    .replace(/#{1,6}\s*/g, '')
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/\*(.*?)\*/g, '$1')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+};
 import { RecommendationList } from '../components/recommendation-list.component';
 import {
   AnalysisService,
@@ -188,7 +202,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
                     urgencyStatus: 'WASPADA',
                   },
                   causal: {
-                    summary: r.executiveSummary || 'Sintesis analisis tersimpan di database PostgreSQL.',
+                    summary: stripCitationTokens(r.executiveSummary) || 'Sintesis analisis tersimpan di database PostgreSQL.',
                     causalFactors: [
                       { factor: 'Keterlambatan Evaluasi Teknis Proyek', weightPercentage: 45, category: 'Administrasi', description: 'Keterlambatan pengesahan berkas kelengkapan.' },
                       { factor: 'Eskalasi Biaya Material Daerah', weightPercentage: 35, category: 'Ekonomi', description: 'Fluktuasi harga bahan di Kabupaten Mimika.' },
@@ -379,7 +393,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
             urgencyStatus: 'WASPADA',
           },
           causal: {
-            summary: report.executiveSummary || 'Hasil analisis AI berhasil dimuat langsung dari cache database PostgreSQL.',
+            summary: stripCitationTokens(report.executiveSummary) || 'Hasil analisis AI berhasil dimuat langsung dari cache database PostgreSQL.',
             causalFactors: [
               { factor: 'Evaluasi & Verifikasi Administrasi Proyek', weightPercentage: 45, category: 'Administrasi', description: 'Verifikasi berkas fisik dan kelengkapan dokumen.' },
               { factor: 'Eskalasi Biaya & Logistik Wilayah', weightPercentage: 35, category: 'Ekonomi', description: 'Pengaruh biaya transportasi antar distrik di Mimika.' },
@@ -781,14 +795,14 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
           { }
           <div id="deep-dive-analysis-container" className="space-y-6 bg-white p-4 border border-slate-300">
             { }
-            <div className="p-4 bg-slate-50 border border-slate-300 rounded-none flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
               <div>
-                <span className="text-[10px] font-bold text-teal-800 uppercase tracking-widest block">
-                  BADAN RISET DAN INOVASI DAERAH (BRIDA) KABUPATEN MIMIKA
-                </span>
                 <h2 className="text-base font-bold text-slate-900 uppercase tracking-tight">
-                  NASKAH DIAGNOSTIK ANALISIS DEVIASI INDIKATOR DAERAH
+                  BADAN RISET DAN INOVASI DAERAH (BRIDA) KABUPATEN MIMIKA
                 </h2>
+                <span className="text-[12px] font-bold text-teal-800 uppercase tracking-widest block">
+                  NASKAH DIAGNOSTIK ANALISIS DEVIASI INDIKATOR DAERAH
+                </span>
               </div>
               <div className="text-left sm:text-right">
                 <span className="text-xs font-bold text-slate-700 block">Tahun Anggaran 2026</span>
