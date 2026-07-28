@@ -2,6 +2,20 @@ import pdfMake from 'pdfmake/build/pdfmake';
 import pdfFonts from 'pdfmake/build/vfs_fonts';
 import htmlToPdfmake from 'html-to-pdfmake';
 
+const stripCitationTokens = (content?: string | null): string => {
+  if (!content) return '';
+
+  return content
+    .replace(/\[(?:[a-f0-9-]{8,}|doc(?:[-_a-z0-9]+)?):\d+\]/gi, '')
+    .replace(/\[(?:[a-f0-9-]{8,}|doc(?:[-_a-z0-9]+)?):\d+\]\[(?:[a-f0-9-]{8,}|doc(?:[-_a-z0-9]+)?):\d+\]/gi, '')
+    .replace(/#{1,6}\s*/g, '')
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/\*(.*?)\*/g, '$1')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+};
+
 // Inisialisasi VFS pdfMake dengan biner Roboto bawaan — JANGAN pernah dioverwrite seluruhnya
 const vfsFonts = (pdfFonts as any)?.pdfMake?.vfs || (pdfFonts as any)?.vfs || (pdfFonts as any);
 if (vfsFonts) {
@@ -196,7 +210,7 @@ export const PdfExportService = {
   exportAnalyticsPdf(indicator: any, filename?: string): void {
     const docDefinition: any = {
       pageSize: 'A4',
-      pageMargins: [45, 55, 45, 40],
+      pageMargins: [45, 80, 45, 40],
       defaultStyle: {
         font: 'Roboto',
         fontSize: 10,
@@ -204,17 +218,10 @@ export const PdfExportService = {
         alignment: 'justify',
         color: '#1e293b',
       },
-      header: {
-        text: 'BRIDA SMART ANALYSIS — KABUPATEN MIMIKA',
-        alignment: 'right',
-        fontSize: 8,
-        color: '#64748b',
-        margin: [45, 28, 45, 0],
-      },
       footer: (currentPage: number, pageCount: number) => ({
         columns: [
-          { text: `Tanggal Rilis: ${new Date().toLocaleDateString('id-ID')}`, fontSize: 8, color: '#94a3b8' },
-          { text: `Halaman ${currentPage} dari ${pageCount}`, alignment: 'right', fontSize: 8, color: '#94a3b8' },
+          { text: `Tanggal Rilis: ${new Date().toLocaleDateString('id-ID')}`, fontSize: 8, color: '#565c63' },
+          { text: `Halaman ${currentPage} dari ${pageCount}`, alignment: 'right', fontSize: 8, color: '#565c63' },
         ],
         margin: [45, 12, 45, 0],
       }),
@@ -242,87 +249,112 @@ export const PdfExportService = {
         },
         // ── Seksi 1 ────────────────────────────────────────────────────────────
         {
-          text: '1. RINGKASAN DEVIASI CAPAIAN',
-          style: 'sectionHeader',
-        },
-        {
-          table: {
-            widths: ['*', '*', '*'],
-            body: [
-              [
-                { text: 'Baseline Target', style: 'tableHeader' },
-                { text: 'Realisasi Lapangan', style: 'tableHeader' },
-                { text: 'Deviasi (%)', style: 'tableHeader' },
-              ],
-              [
-                { text: indicator.baseline, fontSize: 13, bold: true, alignment: 'center' },
-                { text: indicator.realization, fontSize: 13, bold: true, alignment: 'center' },
-                { text: indicator.deviationText, fontSize: 13, bold: true, color: '#dc2626', alignment: 'center' },
-              ],
-            ],
-          },
-          layout: 'lightHorizontalLines',
-          margin: [0, 0, 0, 20],
+          keepTogether: true,
+          stack: [
+            {
+              text: '1. RINGKASAN DEVIASI CAPAIAN',
+              style: 'sectionHeader',
+            },
+            {
+              table: {
+                widths: ['*', '*', '*'],
+                body: [
+                  [
+                    { text: 'Baseline Target', style: 'tableHeader' },
+                    { text: 'Realisasi Lapangan', style: 'tableHeader' },
+                    { text: 'Deviasi (%)', style: 'tableHeader' },
+                  ],
+                  [
+                    { text: indicator.baseline, fontSize: 13, bold: true, alignment: 'center' },
+                    { text: indicator.realization, fontSize: 13, bold: true, alignment: 'center' },
+                    { text: indicator.deviationText, fontSize: 13, bold: true, color: '#dc2626', alignment: 'center' },
+                  ],
+                ],
+              },
+              layout: 'lightHorizontalLines',
+              margin: [0, 0, 0, 20],
+            },
+          ],
         },
         // ── Seksi 2 ────────────────────────────────────────────────────────────
         {
-          text: '2. RINGKASAN EKSEKUTIF ANALISIS (AI-SYNTHESIS)',
-          style: 'sectionHeader',
-        },
-        {
-          text: indicator.summary || 'Hasil analisis deskriptif AI belum tersedia.',
-          fontSize: 10,
-          lineHeight: 1.55,
-          alignment: 'justify',
-          color: '#1e293b',
-          margin: [0, 0, 0, 18],
+          keepTogether: true,
+          stack: [
+            {
+              text: '2. RINGKASAN EKSEKUTIF ANALISIS (AI-SYNTHESIS)',
+              style: 'sectionHeader',
+            },
+            {
+              text: stripCitationTokens(indicator.summary) || 'Hasil analisis deskriptif AI belum tersedia.',
+              fontSize: 10,
+              lineHeight: 1.55,
+              alignment: 'justify',
+              color: '#1e293b',
+              margin: [0, 0, 0, 18],
+            },
+          ]
         },
         // ── Seksi 3 ────────────────────────────────────────────────────────────
         {
-          text: '3. ANALISIS FAKTOR PENYEBAB (AI — Causal Inference)',
-          style: 'sectionHeader',
-        },
-        {
-          table: {
-            widths: ['*', 65],
-            body: [
-              [
-                { text: 'Faktor Penyebab Utama', style: 'tableHeader' },
-                { text: 'Kontribusi', style: 'tableHeader' },
-              ],
-              ...indicator.causalFactors.map((f: any, i: number) => [
-                { text: `${i + 1}.  ${f.label}`, fontSize: 9.5, alignment: 'left' },
-                { text: `${f.percentage}%`, fontSize: 9.5, bold: true, alignment: 'center' },
-              ]),
-            ],
-          },
-          layout: 'lightHorizontalLines',
-          margin: [0, 0, 0, 20],
+          keepTogether: true,
+          stack: [
+            {
+              text: '3. ANALISIS FAKTOR PENYEBAB (AI — Causal Inference)',
+              style: 'sectionHeader',
+            },
+            {
+              table: {
+                widths: ['*', 65],
+                body: [
+                  [
+                    { text: 'Faktor Penyebab Utama', style: 'tableHeader' },
+                    { text: 'Kontribusi', style: 'tableHeader' },
+                  ],
+                  ...indicator.causalFactors.map((f: any, i: number) => [
+                    { text: `${i + 1}.  ${f.label}`, fontSize: 9.5, alignment: 'left' },
+                    { text: `${f.percentage}%`, fontSize: 9.5, bold: true, alignment: 'center' },
+                  ]),
+                ],
+              },
+              layout: 'lightHorizontalLines',
+              margin: [0, 0, 0, 20],
+            },
+          ]
         },
         // ── Seksi 4 ────────────────────────────────────────────────────────────
         {
-          text: '4. MATRIKS REKOMENDASI RESPON (ACTION PLAN)',
-          style: 'sectionHeader',
-        },
-        {
-          table: {
-            widths: [85, '*', 90, 75],
-            body: [
-              [
-                { text: 'Tingkat Prioritas', style: 'tableHeader' },
-                { text: 'Rekomendasi Instruksi', style: 'tableHeader' },
-                { text: 'Penanggung Jawab', style: 'tableHeader' },
-                { text: 'Tenggat', style: 'tableHeader' },
-              ],
-              ...indicator.priorityRecommendations.map((rec: any) => [
-                { text: rec.priority, fontSize: 8.5, bold: true, color: '#dc2626', alignment: 'center' },
-                { text: rec.title, fontSize: 8.5, alignment: 'left' },
-                { text: rec.pic, fontSize: 8, alignment: 'left' },
-                { text: rec.deadline, fontSize: 8, alignment: 'center' },
-              ]),
-            ],
+          id: 'section4',
+          keepTogether: true,
+          pageBreakBefore: function (currentNode: any) {
+            return currentNode.id === 'section4';
           },
-          layout: 'lightHorizontalLines',
+          stack: [
+            {
+              text: '4. MATRIKS REKOMENDASI RESPON (ACTION PLAN)',
+              style: 'sectionHeader',
+            },
+            {
+              table: {
+                widths: [85, '*', 90, 75],
+                body: [
+                  [
+                    { text: 'Tingkat Prioritas', style: 'tableHeader' },
+                    { text: 'Rekomendasi Instruksi', style: 'tableHeader' },
+                    { text: 'Penanggung Jawab', style: 'tableHeader' },
+                    { text: 'Tenggat', style: 'tableHeader' },
+                  ],
+                  ...indicator.priorityRecommendations.map((rec: any) => [
+                    { text: rec.priority, fontSize: 8.5, bold: true, color: '#dc2626', alignment: 'center' },
+                    { text: rec.title, fontSize: 8.5, alignment: 'left' },
+                    { text: rec.pic, fontSize: 8, alignment: 'left' },
+                    { text: rec.deadline, fontSize: 8, alignment: 'center' },
+                  ]),
+                ],
+              },
+              layout: 'lightHorizontalLines',
+              margin: [0, 0, 0, 18]
+            },
+          ]
         },
       ],
       styles: {
@@ -354,7 +386,7 @@ export const PdfExportService = {
   exportBupatiReportPdf(report: any): void {
     const docDefinition: any = {
       pageSize: 'A4',
-      pageMargins: [50, 65, 50, 45],
+      pageMargins: [50, 90, 50, 45],
       defaultStyle: {
         font: 'Roboto',
         fontSize: 10,
@@ -362,17 +394,9 @@ export const PdfExportService = {
         alignment: 'justify',
         color: '#1e293b',
       },
-      header: {
-        text: 'BRIDA SMART ANALYSIS — KABUPATEN MIMIKA',
-        alignment: 'right',
-        fontSize: 8,
-        color: '#64748b',
-        margin: [50, 30, 50, 0],
-      },
       footer: (currentPage: number, pageCount: number) => ({
         columns: [
-          { text: 'Dokumen Resmi Pemerintah Kabupaten Mimika', fontSize: 8, color: '#94a3b8' },
-          { text: `Halaman ${currentPage} dari ${pageCount}`, alignment: 'right', fontSize: 8, color: '#94a3b8' },
+          { text: `Halaman ${currentPage} dari ${pageCount}`, alignment: 'right', fontSize: 8, color: '#565c63' },
         ],
         margin: [50, 12, 50, 0],
       }),
@@ -380,41 +404,24 @@ export const PdfExportService = {
         // ── Kop Surat ──────────────────────────────────────────────────────────
         { text: 'PEMERINTAH KABUPATEN MIMIKA', fontSize: 13, bold: true, alignment: 'center', color: '#0f172a' },
         { text: 'BADAN RISET DAN INOVASI DAERAH (BRIDA)', fontSize: 11, bold: true, alignment: 'center', color: '#0d9488', margin: [0, 3, 0, 3] },
-        { text: 'Jl. Cenderawasih No. 1, Timika, Papua Tengah', fontSize: 8.5, alignment: 'center', color: '#64748b', margin: [0, 0, 0, 10] },
+        { text: 'Jl. Cenderawasih No. 1, Timika, Papua Tengah', fontSize: 8.5, alignment: 'center', color: '#565c63', margin: [0, 0, 0, 10] },
         {
           canvas: [{ type: 'line', x1: 0, y1: 0, x2: 495, y2: 0, lineWidth: 2, lineColor: '#0f172a' }],
           margin: [0, 0, 0, 14],
         },
+        // ── Judul Nota ─────────────────────────────────────────────────────────
+        { text: report.title, fontSize: 13, bold: true, alignment: 'left', color: '#0f172a', margin: [0, 0, 0, 14] },
         // ── Metadata Nota ──────────────────────────────────────────────────────
         {
           table: {
             widths: [85, 6, '*'],
             body: [
-              [{ text: 'PENERIMA', bold: true, fontSize: 9, alignment: 'left' }, ':', { text: report.recipient, fontSize: 9, bold: true, alignment: 'left' }],
-              [{ text: 'PENGIRIM', bold: true, fontSize: 9, alignment: 'left' }, ':', { text: report.sender, fontSize: 9, alignment: 'left' }],
-              [{ text: 'PERIODE', bold: true, fontSize: 9, alignment: 'left' }, ':', { text: `${report.period} (Rilis: ${report.date})`, fontSize: 9, alignment: 'left' }],
-              [
-                { text: 'PRIORITAS', bold: true, fontSize: 9, alignment: 'left' },
-                ':',
-                {
-                  text: report.urgency,
-                  fontSize: 9,
-                  bold: true,
-                  alignment: 'left',
-                  color: (report.urgency || '').toLowerCase().includes('utama') || (report.urgency || '').toLowerCase().includes('tinggi')
-                    ? '#dc2626'
-                    : (report.urgency || '').toLowerCase().includes('menengah') || (report.urgency || '').toLowerCase().includes('sedang')
-                      ? '#d97706'
-                      : '#059669',
-                },
-              ],
+              [{ text: 'PERIODE', bold: true, fontSize: 9, alignment: 'left' }, ':', { text: `${report.date}`, fontSize: 9, alignment: 'left' }],
             ],
           },
           layout: 'noBorders',
           margin: [0, 0, 0, 16],
         },
-        // ── Judul Nota ─────────────────────────────────────────────────────────
-        { text: report.title, fontSize: 13, bold: true, alignment: 'center', color: '#0f172a', margin: [0, 0, 0, 14] },
         // ── Ringkasan Eksekutif ────────────────────────────────────────────────
         {
           table: {
@@ -424,7 +431,7 @@ export const PdfExportService = {
                 {
                   text: [
                     { text: 'RINGKASAN EKSEKUTIF:\n', bold: true, fontSize: 9.5, color: '#0369a1' },
-                    { text: report.executiveSummary, fontSize: 9.5, italic: true, alignment: 'justify' },
+                    { text: stripCitationTokens(report.executiveSummary), fontSize: 9.5, italic: true, alignment: 'justify' },
                   ],
                   fillColor: '#f0f9ff',
                   margin: [12, 10, 12, 10],
@@ -436,10 +443,10 @@ export const PdfExportService = {
           margin: [0, 0, 0, 18],
         },
         // ── Seksi 1 ────────────────────────────────────────────────────────────
-        { text: '1. KUMPULAN INDIKATOR DEVIASI SIGNIFIKAN', style: 'sectionHeader' },
+        { text: '1. KUMPULAN INDIKATOR DEVIASI SIGNIFIKAN', style: 'sectionHeader', margin: [0, 20, 0, 8] },
         {
           table: {
-            widths: ['*', 65, 65, 90],
+            widths: ['*', 90, 90, 90],
             body: [
               [
                 { text: 'Indikator Pembangunan', style: 'tableHeader' },
@@ -449,9 +456,9 @@ export const PdfExportService = {
               ],
               ...report.deviations.map((d: any) => [
                 { text: d.title, fontSize: 9, bold: true, alignment: 'left' },
-                { text: d.baseline, fontSize: 8.5, alignment: 'center' },
-                { text: d.realization, fontSize: 8.5, alignment: 'center' },
-                { text: d.deviationText, fontSize: 8.5, bold: true, color: '#dc2626', alignment: 'center' },
+                { text: d.baseline, fontSize: 8.5, alignment: 'left' },
+                { text: d.realization, fontSize: 8.5, alignment: 'left' },
+                { text: d.deviationText, fontSize: 8.5, bold: true, color: '#dc2626', alignment: 'left' },
               ]),
             ],
           },
@@ -459,7 +466,7 @@ export const PdfExportService = {
           margin: [0, 0, 0, 18],
         },
         // ── Seksi 2 ────────────────────────────────────────────────────────────
-        { text: '2. SIMULASI DAMPAK KEBIJAKAN MAKRO / NASIONAL', style: 'sectionHeader' },
+        { text: '2. SIMULASI DAMPAK KEBIJAKAN MAKRO / NASIONAL', style: 'sectionHeader', margin: [0, 20, 0, 8] },
         { text: `Kebijakan: ${report.nationalPolicyImpact.policyName}`, fontSize: 9.5, bold: true, color: '#0d9488', margin: [0, 0, 0, 6] },
         {
           ul: report.nationalPolicyImpact.simulationResults.map((res: string) => ({
@@ -472,10 +479,10 @@ export const PdfExportService = {
           margin: [0, 0, 0, 18],
         },
         // ── Seksi 3 ────────────────────────────────────────────────────────────
-        { text: '3. REKOMENDASI ACTION PLAN BUPATI', style: 'sectionHeader' },
+        { text: '3. REKOMENDASI ACTION PLAN BUPATI', style: 'sectionHeader', margin: [0, 20, 0, 8] },
         {
           ol: report.actionPriorities.map((act: string) => ({
-            text: act,
+            text: stripCitationTokens(act),
             fontSize: 9.5,
             lineHeight: 1.4,
             alignment: 'justify',
