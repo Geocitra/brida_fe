@@ -539,7 +539,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
                   >
                     <Clock size={13} className="text-teal-700 shrink-0" />
                     <div className="flex flex-col">
-                      <span className="truncate max-w-[200px] font-semibold text-slate-900">{session.indicatorName}</span>
+                      <span className="truncate max-w-50 font-semibold text-slate-900">{session.indicatorName}</span>
                       <span className="text-[9px] text-slate-500 font-normal">
                         {session.timestamp} &bull; {session.selectedDocTitles?.length || 1} Dokumen
                       </span>

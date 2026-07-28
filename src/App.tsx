@@ -40,11 +40,23 @@ export function App() {
 
   /**
    * Mengatur navigasi forward aksi lintas modul dengan payload data dokumen terpilih.
+   * Mendukung penangkapan sinyal transisi obrolan dinamis [Two-Pass Pipeline].
    */
   const handleForwardAction = (documentIds: string[], targetRoute: string, promptText?: string) => {
     try {
       sessionStorage.setItem(SESSION_FORWARD_DOCS_KEY, JSON.stringify(documentIds));
       setSharedDocIds(documentIds);
+
+      // --- SINKRONISASI AKTIF UNTUK SENSITIVITAS TRANSISI CHAT KE ARTIKEL [3, 5] ---
+      if (promptText && promptText.startsWith('[TRANSITIONED_SESSION_ID]:')) {
+        const transitionedId = promptText.replace('[TRANSITIONED_SESSION_ID]:', '');
+
+        setActiveSessionId(transitionedId); // Set ID sesi artikel hasil transisi
+        setInitialArticlePrompt(undefined); // Bersihkan prompt transien
+        setActiveRoute('article-editor');   // Alihkan mulus ke editor cetak A4 WYSIWYG [3]
+        return;
+      }
+
       setInitialArticlePrompt(promptText || undefined);
       setActiveRoute(targetRoute);
     } catch (err) {
@@ -72,8 +84,6 @@ export function App() {
     setInitialArticlePrompt(undefined);
     setActiveRoute(route);
   };
-
-
 
   if (!isAuthenticated) {
     return <LoginView onLoginSuccess={() => setIsAuthenticated(true)} />;

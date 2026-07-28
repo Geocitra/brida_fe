@@ -431,11 +431,23 @@ import { AiQaView } from './modules/ai-assistant/views/ai-qa.view';
 import { ArticleGeneratorView } from './modules/ai-assistant/views/article-generator.view';
 import { ArticlePreviewEditorView } from './modules/ai-assistant/views/article-preview-editor.view';
 
+const SESSION_FORWARD_DOCS_KEY = 'brida_forward_doc_ids';
+
 export function App() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(true);
   const [activeRoute, setActiveRoute] = useState('dashboard');
   const [initialArticlePrompt, setInitialArticlePrompt] = useState<string | undefined>(undefined);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+
+  const [sharedDocIds, setSharedDocIds] = useState<string[] | undefined>(() => {
+    try {
+      const stored = sessionStorage.getItem(SESSION_FORWARD_DOCS_KEY);
+      return stored ? JSON.parse(stored) : undefined;
+    } catch (err) {
+      console.warn('[SessionStorage] Gagal menginisialisasi sharedDocIds:', err);
+      return undefined;
+    }
+  });
 
   const pageTitles: Record<string, string> = {
     dashboard: 'Dashboard Spasial & Metrik Perkembangan',
@@ -447,9 +459,30 @@ export function App() {
     'article-editor': 'Pratinjau Cetak & Editor Manual',
   };
 
-  const handleNavigateToGenerator = (promptText?: string) => {
-    setInitialArticlePrompt(promptText);
-    setActiveRoute('generator');
+  const handleForwardAction = (documentIds: string[], targetRoute: string, promptText?: string) => {
+    try {
+      sessionStorage.setItem(SESSION_FORWARD_DOCS_KEY, JSON.stringify(documentIds));
+      setSharedDocIds(documentIds);
+      setInitialArticlePrompt(promptText || undefined);
+      setActiveRoute(targetRoute);
+    } catch (err) {
+      console.error('[Forward Action] Gagal mengamankan state ke SessionStorage:', err);
+    }
+  };
+
+  const handleClearSharedDocIds = () => {
+    try {
+      sessionStorage.removeItem(SESSION_FORWARD_DOCS_KEY);
+      setSharedDocIds(undefined);
+    } catch (err) {
+      console.error('[SessionStorage] Gagal menghapus kunci forward docs:', err);
+    }
+  };
+
+  const handleManualNavigation = (route: string) => {
+    handleClearSharedDocIds();
+    setInitialArticlePrompt(undefined);
+    setActiveRoute(route);
   };
 
   if (!isAuthenticated) {
@@ -461,22 +494,43 @@ export function App() {
       case 'dashboard':
         return <DashboardView />;
       case 'knowledge-hub':
-        return <KnowledgeHubView />;
+        return (
+          <KnowledgeHubView
+            onForward={(docIds, targetRoute, prompt) => handleForwardAction(docIds, targetRoute, prompt)}
+          />
+        );
       case 'analytics':
-        return <AnalyticsView />;
+        return (
+          <AnalyticsView
+            initialSelectedDocIds={sharedDocIds}
+            onClearSharedDocIds={handleClearSharedDocIds}
+            onNavigateToGenerator={(prompt) => handleForwardAction(sharedDocIds || [], 'generator', prompt)}
+          />
+        );
       case 'reports':
-        return <ReportsView />;
+        return (
+          <ReportsView
+            initialSelectedDocIds={sharedDocIds}
+            onClearSharedDocIds={handleClearSharedDocIds}
+            onNavigateToGenerator={(prompt) => handleForwardAction(sharedDocIds || [], 'generator', prompt)}
+            onNavigateToDashboard={() => handleManualNavigation('dashboard')}
+          />
+        );
       case 'ai-request':
         return (
           <AiQaView
-            onNavigateToGenerator={(prompt) => handleNavigateToGenerator(prompt)}
+            initialSelectedDocIds={sharedDocIds}
+            onClearSharedDocIds={handleClearSharedDocIds}
+            onNavigateToGenerator={(prompt) => handleForwardAction(sharedDocIds || [], 'generator', prompt)}
           />
         );
       case 'generator':
         return (
           <ArticleGeneratorView
+            initialSelectedDocIds={sharedDocIds}
+            onClearSharedDocIds={handleClearSharedDocIds}
             initialPrompt={initialArticlePrompt}
-            onNavigateToQa={() => setActiveRoute('ai-request')}
+            onNavigateToQa={() => handleManualNavigation('ai-request')}
             onNavigateToEditor={(sessionId) => {
               setActiveSessionId(sessionId);
               setActiveRoute('article-editor');
@@ -498,7 +552,7 @@ export function App() {
   return (
     <AppShell
       activeRoute={activeRoute}
-      onNavigate={(route) => setActiveRoute(route)}
+      onNavigate={handleManualNavigation}
       pageTitle={pageTitles[activeRoute] || 'Executive Dashboard'}
       onLogout={() => setIsAuthenticated(false)}
     >
@@ -2109,7 +2163,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             <button
               type="submit"
               disabled={!hasSelectedDoc || !inputQuery.trim() || isLoading}
-              className="px-5 py-3 bg-teal-700 hover:bg-teal-800 disabled:bg-slate-55 text-white disabled:text-slate-500 font-bold text-xs uppercase transition-colors flex items-center gap-2 cursor-pointer disabled:cursor-not-allowed shrink-0 h-full"
+              className="px-5 py-3 bg-teal-700 hover:bg-teal-800 disabled:bg-slate-50 text-white disabled:text-slate-500 font-bold text-xs uppercase transition-colors flex items-center gap-2 cursor-pointer disabled:cursor-not-allowed shrink-0 h-full"
             >
               <span>Kirim</span>
               <Send size={14} className="shrink-0" />
@@ -2583,9 +2637,15 @@ import {
 
 interface AiQaViewProps {
   onNavigateToGenerator: (initialPrompt?: string) => void;
+  initialSelectedDocIds?: string[];
+  onClearSharedDocIds?: () => void;
 }
 
-export const AiQaView: React.FC<AiQaViewProps> = ({ onNavigateToGenerator }) => {
+export const AiQaView: React.FC<AiQaViewProps> = ({
+  onNavigateToGenerator,
+  initialSelectedDocIds,
+  onClearSharedDocIds,
+}) => {
   const [documents, setDocuments] = useState<DocumentRecord[]>([]);
   const [selectedDocIds, setSelectedDocIds] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -2598,8 +2658,11 @@ export const AiQaView: React.FC<AiQaViewProps> = ({ onNavigateToGenerator }) => 
     try {
       const docs = await DocumentService.listDocuments();
       setDocuments(docs || []);
-      if (docs && docs.length > 0 && selectedDocIds.length === 0) {
-        setSelectedDocIds([docs[0].id]);
+
+      if (!initialSelectedDocIds || initialSelectedDocIds.length === 0) {
+        if (docs && docs.length > 0 && selectedDocIds.length === 0) {
+          setSelectedDocIds([docs[0].id]);
+        }
       }
     } catch (err: any) {
       setDocuments([]);
@@ -2612,6 +2675,23 @@ export const AiQaView: React.FC<AiQaViewProps> = ({ onNavigateToGenerator }) => 
   useEffect(() => {
     loadDocuments();
   }, []);
+
+  useEffect(() => {
+    if (documents.length > 0) {
+      if (initialSelectedDocIds && initialSelectedDocIds.length > 0) {
+
+        const validIds = initialSelectedDocIds.filter((id) =>
+          documents.some((doc) => doc.id === id)
+        );
+
+        if (validIds.length > 0) {
+          setSelectedDocIds(validIds);
+        }
+
+        onClearSharedDocIds?.();
+      }
+    }
+  }, [initialSelectedDocIds, documents]);
 
   const selectedDocs = documents.filter((d) => selectedDocIds.includes(d.id));
 
@@ -2840,6 +2920,8 @@ export type DraftingStatus = 'IDLE' | 'SUCCESS' | 'ERROR';
 
 export interface ArticleGeneratorViewProps {
   initialPrompt?: string;
+  initialSelectedDocIds?: string[];
+  onClearSharedDocIds?: () => void;
   onNavigateToQa: () => void;
   onNavigateToEditor: (sessionId: string) => void;
 }
@@ -2863,6 +2945,8 @@ const getAssistantMessageSummary = (content: string): string => {
 
 export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
   initialPrompt,
+  initialSelectedDocIds,
+  onClearSharedDocIds,
   onNavigateToQa,
   onNavigateToEditor,
 }) => {
@@ -2934,15 +3018,22 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
     loadHistory();
   }, []);
 
+  /**
+   * Memuat dokumen acuan dari database
+   */
   const loadDocuments = async () => {
     setIsLoadingDocs(true);
     try {
       const fetched = await DocumentService.listDocuments();
       setDocuments(fetched || []);
-      if (fetched && fetched.length > 0 && selectedDocIds.length === 0) {
-        setSelectedDocIds([fetched[0].id]);
-        if (!articleTitle) {
-          setArticleTitle(`Artikel Strategis: ${fetched[0].title}`);
+
+      // HANYA lakukan inisialisasi default jika tidak ada dokumen hasil forward
+      if (!initialSelectedDocIds || initialSelectedDocIds.length === 0) {
+        if (fetched && fetched.length > 0 && selectedDocIds.length === 0) {
+          setSelectedDocIds([fetched[0].id]);
+          if (!articleTitle) {
+            setArticleTitle(`Artikel Strategis: ${fetched[0].title}`);
+          }
         }
       }
     } catch (err: any) {
@@ -2952,6 +3043,33 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
       setIsLoadingDocs(false);
     }
   };
+
+  /**
+   * Mengonsumsi dan memvalidasi silang data dokumen yang diteruskan (Forwarding State sync)
+   */
+  useEffect(() => {
+    if (documents.length > 0) {
+      if (initialSelectedDocIds && initialSelectedDocIds.length > 0) {
+        // Penyaringan defensif: Pastikan ID dokumen yang diteruskan benar-benar ada di database
+        const validIds = initialSelectedDocIds.filter((id) =>
+          documents.some((doc) => doc.id === id)
+        );
+
+        if (validIds.length > 0) {
+          setSelectedDocIds(validIds);
+
+          // Perbarui judul draf secara otomatis berdasarkan judul dokumen utama rujukan
+          const primaryDoc = documents.find((d) => d.id === validIds[0]);
+          if (primaryDoc && !articleTitle) {
+            setArticleTitle(`Artikel Strategis: ${primaryDoc.title}`);
+          }
+        }
+
+        // Segera bersihkan state transien global untuk mencegah tumpang tindih seleksi berikutnya
+        onClearSharedDocIds?.();
+      }
+    }
+  }, [initialSelectedDocIds, documents]);
 
   const loadHistory = async () => {
     try {
@@ -3247,7 +3365,7 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-slate-200">
             {/* Length Selector */}
             <div className="border-r border-slate-200 pr-6">
-               <label className="block text-xs font-bold text-slate-700 uppercase mb-2 tracking-wider">
+              <label className="block text-xs font-bold text-slate-700 uppercase mb-2 tracking-wider">
                 Panjang Teks Keluaran Artikel
               </label>
               <div className="grid grid-cols-3 divide-x divide-slate-200 border-y border-slate-200">
@@ -3731,32 +3849,43 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
   };
 
   const handlePrint = async () => {
-    if (!editableText) {
+    if (!editableText && !sessionId) {
       showToast('⚠️ Tidak ada naskah untuk dicetak. Silakan buka sesi dari halaman generator.');
       return;
     }
     setIsPrinting(true);
 
+    let exportContent = editableText;
+    let exportTitle = articleTitle;
+
     if (sessionId) {
       try {
-        showToast('⏳ Menyinkronkan revisi draf terakhir ke database...');
-        await AiAssistantService.updateArticleSessionContent(
-          sessionId,
-          articleTitle,
-          editableText
-        );
-      } catch (saveErr: any) {
+        showToast('⏳ Mengambil data naskah terbaru dari server untuk ekspor...');
+        const exportData = await AiAssistantService.getArticleExportData(sessionId);
 
-        console.warn('[ArticlePreviewEditor] Silent-save sebelum cetak gagal:', saveErr);
-        showToast('⚠️ Gagal sinkron ke DB, namun PDF tetap diproses...');
+        if (exportData.content) {
+          exportContent = exportData.content;
+        }
+        if (exportData.title) {
+          exportTitle = exportData.title;
+        }
+      } catch (fetchErr: any) {
 
-        await new Promise(res => setTimeout(res, 1500));
+        console.warn('[ArticlePreviewEditor] Gagal ambil export-data dari server, fallback ke konten lokal:', fetchErr);
+        showToast('⚠️ Gagal sinkron dari server, menggunakan naskah lokal untuk PDF...');
+        await new Promise(res => setTimeout(res, 1200));
       }
+    }
+
+    if (!exportContent) {
+      showToast('⚠️ Tidak ada naskah untuk dicetak.');
+      setIsPrinting(false);
+      return;
     }
 
     try {
 
-      const htmlContent = await Promise.resolve(marked.parse(editableText));
+      const htmlContent = await Promise.resolve(marked.parse(exportContent));
 
       showToast('🖨️ Mengonversi dan merakit dokumen PDF resmi...');
       const fontSize = fontFamily === 'Times New Roman' ? 11 : fontFamily === 'Verdana' ? 10 : 11;
@@ -3769,7 +3898,7 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
           lineSpacing,
           marginCm,
         },
-        articleTitle || 'Draf_Artikel_BRIDA_Mimika'
+        exportTitle || 'Draf_Artikel_BRIDA_Mimika'
       );
 
       showToast('✅ Dokumen PDF resmi berhasil diunduh!');
@@ -4389,9 +4518,15 @@ interface SavedAnalysisSession {
 
 interface AnalyticsViewProps {
   onNavigateToGenerator?: (initialPrompt?: string) => void;
+  initialSelectedDocIds?: string[];
+  onClearSharedDocIds?: () => void;
 }
 
-export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenerator }) => {
+export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
+  onNavigateToGenerator,
+  initialSelectedDocIds,
+  onClearSharedDocIds,
+}) => {
   const [compareResult, setCompareResult] = useState<DeviationCompareResult | null>(null);
 
   const [documents, setDocuments] = useState<DocumentRecord[]>([]);
@@ -4408,6 +4543,15 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
 
   const [sessionSearchQuery, setSessionSearchQuery] = useState('');
   const [selectedCalendarDate, setSelectedCalendarDate] = useState<string>('');
+
+  const [isMappingModalOpen, setIsMappingModalOpen] = useState(false);
+  const [modalBaselineId, setModalBaselineId] = useState('');
+  const [modalRealizationId, setModalRealizationId] = useState('');
+  const [modalIndicatorName, setModalIndicatorName] = useState('Analisis Deviasi Dokumen Terpilih');
+  const [modalSector, setModalSector] = useState('Pembangunan & Kebijakan Daerah');
+  const [modalTargetValue, setModalTargetValue] = useState(100);
+  const [modalRealizationValue, setModalRealizationValue] = useState(84.5);
+  const [modalUnitSuffix, setModalUnitSuffix] = useState('%');
 
   const filteredSavedSessions = savedSessions.filter((session) => {
 
@@ -4457,7 +4601,11 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
         const docs = await DocumentService.listDocuments().catch(() => []);
         setDocuments(docs || []);
 
-        if (docs && docs.length > 0) {
+        if (initialSelectedDocIds && initialSelectedDocIds.length > 0) {
+          setSelectedDocIds(initialSelectedDocIds);
+
+          onClearSharedDocIds?.();
+        } else if (docs && docs.length > 0) {
           setSelectedDocIds(docs.map((d) => d.id));
         }
 
@@ -4539,7 +4687,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
     };
 
     loadInitialData();
-  }, []);
+  }, [initialSelectedDocIds]);
 
   const saveSessionToStorage = (newSessions: SavedAnalysisSession[]) => {
     setSavedSessions(newSessions);
@@ -4564,32 +4712,44 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
     }
   };
 
-  const handleExecuteMultiAnalysis = async () => {
+  const handleOpenMappingModal = () => {
     if (selectedDocIds.length === 0) {
       alert('Silakan pilih minimal 1 dokumen acuan di atas.');
       return;
     }
 
+    const autoBaseline = documents.find(
+      (d) => selectedDocIds.includes(d.id) && d.metadata?.docType === 'BASELINE'
+    );
+    const autoRealization = documents.find(
+      (d) => selectedDocIds.includes(d.id) && d.metadata?.docType === 'REALIZATION'
+    );
+    const firstSelected = documents.find((d) => selectedDocIds.includes(d.id));
+
+    setModalBaselineId(autoBaseline?.id || firstSelected?.id || '');
+    setModalRealizationId(autoRealization?.id || firstSelected?.id || '');
+    setIsMappingModalOpen(true);
+  };
+
+  const handleConfirmExecuteAnalysis = async () => {
+    setIsMappingModalOpen(false);
     setIsComparing(true);
 
     try {
-      const baselineDoc = documents.find((d) => selectedDocIds.includes(d.id) && d.metadata?.docType === 'BASELINE');
-      const realizationDoc = documents.find((d) => selectedDocIds.includes(d.id) && d.metadata?.docType === 'REALIZATION');
-      const fallbackDoc = documents.find((d) => selectedDocIds.includes(d.id));
-
       const selectedDocTitles = documents
         .filter((d) => selectedDocIds.includes(d.id))
         .map((d) => d.title);
 
       const res = await AnalysisService.compareDeviation({
-        indicatorName: 'Analisis Deviasi Dokumen Terpilih',
-        targetValue: 100,
-        realizationValue: 84.5,
-        sector: 'Pembangunan & Kebijakan Daerah',
-        unitPrefix: '',
-        unitSuffix: '%',
-        baselineDocId: baselineDoc?.id || fallbackDoc?.id,
-        realizationDocId: realizationDoc?.id || fallbackDoc?.id,
+        indicatorName: modalIndicatorName,
+        targetValue: Number(modalTargetValue),
+        realizationValue: Number(modalRealizationValue),
+        sector: modalSector,
+        unitPrefix: modalUnitSuffix === 'Miliar' || modalUnitSuffix === 'Juta' ? 'Rp ' : '',
+        unitSuffix: modalUnitSuffix === 'Miliar' ? ' Miliar' : modalUnitSuffix === 'Juta' ? ' Juta' : modalUnitSuffix,
+        baselineDocId: modalBaselineId,
+        realizationDocId: modalRealizationId,
+        documentIds: selectedDocIds,
       });
 
       setCompareResult(res);
@@ -4608,7 +4768,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
         id: `sess-${Date.now()}`,
         timestamp: dateStr,
         createdAtISO: nowIso,
-        indicatorName: res.math?.indicatorName || 'Analisis Deviasi Multidokumen',
+        indicatorName: res.math?.indicatorName || modalIndicatorName,
         selectedDocTitles,
         compareResult: res,
       };
@@ -4617,7 +4777,8 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
       saveSessionToStorage(updatedSessions);
       setActiveSessionId(newSession.id);
     } catch (err: any) {
-      console.error('Error executing multi-analysis:', err);
+      console.error('Gagal memproses analisis multidokumen:', err);
+      alert(`Gagal mengeksekusi analisis: ${err.message || 'Koneksi API bermasalah'}`);
     } finally {
       setIsComparing(false);
     }
@@ -4702,9 +4863,11 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
   const isAllRealizationSelected = realizationDocs.length > 0 && realizationDocs.every((d) => selectedDocIds.includes(d.id));
   const isAllGeneralSelected = generalDocs.length > 0 && generalDocs.every((d) => selectedDocIds.includes(d.id));
 
+  const selectedDocumentsList = documents.filter((d) => selectedDocIds.includes(d.id));
+
   return (
-    <div className="flex flex-col w-full bg-slate-100/70 p-6 space-y-6 font-roboto">
-      {}
+    <div className="flex flex-col w-full bg-slate-100/70 p-6 space-y-6 font-roboto relative">
+      { }
       <div className="w-full bg-white border border-slate-300 px-6 py-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4 rounded-none shadow-2xs">
         <div className="flex flex-col">
           <h1 className="text-xl font-bold uppercase text-slate-900 tracking-tight">
@@ -4715,7 +4878,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
           </p>
         </div>
 
-        {}
+        { }
         <div className="flex items-center md:pl-6">
           <div className="px-1 py-2 flex flex-col justify-center rounded-none">
             <span className="text-[9px] uppercase font-bold text-slate-500 tracking-wider">
@@ -4728,7 +4891,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
         </div>
       </div>
 
-      {}
+      { }
       {cacheStatus?.isCached && (
         <div className="bg-teal-50 border border-teal-300 p-4 rounded-none flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs font-roboto">
           <div className="flex items-center gap-2.5">
@@ -4753,10 +4916,10 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
         </div>
       )}
 
-      {}
+      { }
       {savedSessions.length > 0 && (
         <div className="bg-white border border-slate-300 p-4 rounded-none shadow-2xs space-y-3 font-roboto">
-          {}
+          { }
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 border-b border-slate-200 pb-2.5">
             <div className="flex items-center gap-2">
               <History size={16} className="text-teal-700 shrink-0" />
@@ -4765,9 +4928,9 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
               </span>
             </div>
 
-            {}
+            { }
             <div className="flex flex-wrap items-center gap-2">
-              {}
+              { }
               <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-300 px-2 py-1 text-xs">
                 <Calendar size={13} className="text-teal-700 shrink-0" />
                 <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wider hidden sm:inline">
@@ -4790,7 +4953,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
                 )}
               </div>
 
-              {}
+              { }
               <div className="relative w-full sm:w-56">
                 <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
@@ -4813,7 +4976,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
             </div>
           </div>
 
-          {}
+          { }
           {filteredSavedSessions.length === 0 ? (
             <p className="text-xs text-slate-500 py-2 italic font-normal">
               Tidak ada cache sesi analisis yang cocok dengan filter kata kunci "{sessionSearchQuery}".
@@ -4826,15 +4989,14 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
                   <div
                     key={session.id}
                     onClick={() => handleSelectHistorySession(session)}
-                    className={`px-3.5 py-2 border text-xs cursor-pointer flex items-center gap-2.5 shrink-0 transition-all rounded-none ${
-                      isActive
-                        ? 'bg-teal-50 border-teal-600 text-teal-950 font-bold shadow-2xs'
-                        : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
-                    }`}
+                    className={`px-3.5 py-2 border text-xs cursor-pointer flex items-center gap-2.5 shrink-0 transition-all rounded-none ${isActive
+                      ? 'bg-teal-50 border-teal-600 text-teal-950 font-bold shadow-2xs'
+                      : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                      }`}
                   >
                     <Clock size={13} className="text-teal-700 shrink-0" />
                     <div className="flex flex-col">
-                      <span className="truncate max-w-[200px] font-semibold text-slate-900">{session.indicatorName}</span>
+                      <span className="truncate max-w-50 font-semibold text-slate-900">{session.indicatorName}</span>
                       <span className="text-[9px] text-slate-500 font-normal">
                         {session.timestamp} &bull; {session.selectedDocTitles?.length || 1} Dokumen
                       </span>
@@ -4854,7 +5016,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
         </div>
       )}
 
-      {}
+      { }
       <div className="bg-white border border-slate-200 p-6 rounded-none shadow-xs space-y-4 font-roboto">
         <div className="flex items-center justify-between border-b border-slate-200 pb-3">
           <div className="flex items-center gap-2">
@@ -4883,7 +5045,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-slate-200 border-y border-slate-200 py-2">
-            {}
+            { }
             <div className="p-3 space-y-2.5">
               <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                 <span className="text-xs font-semibold text-slate-800 flex items-center gap-1.5">
@@ -4913,9 +5075,8 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
                       <div
                         key={doc.id}
                         onClick={() => toggleDocumentSelection(doc.id)}
-                        className={`p-2 text-xs cursor-pointer flex items-start gap-2 transition-colors ${
-                          isSelected ? 'bg-teal-50/80 font-semibold text-slate-900' : 'hover:bg-slate-50 text-slate-600'
-                        }`}
+                        className={`p-2 text-xs cursor-pointer flex items-start gap-2 transition-colors ${isSelected ? 'bg-teal-50/80 font-semibold text-slate-900' : 'hover:bg-slate-50 text-slate-600'
+                          }`}
                       >
                         {isSelected ? <CheckSquare size={15} className="text-teal-700 shrink-0 mt-0.5" /> : <Square size={15} className="text-slate-400 shrink-0 mt-0.5" />}
                         <span className="truncate">{doc.title}</span>
@@ -4926,7 +5087,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
               </div>
             </div>
 
-            {}
+            { }
             <div className="p-3 space-y-2.5">
               <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                 <span className="text-xs font-semibold text-slate-800 flex items-center gap-1.5">
@@ -4956,9 +5117,8 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
                       <div
                         key={doc.id}
                         onClick={() => toggleDocumentSelection(doc.id)}
-                        className={`p-2 text-xs cursor-pointer flex items-start gap-2 transition-colors ${
-                          isSelected ? 'bg-teal-50/80 font-semibold text-slate-900' : 'hover:bg-slate-50 text-slate-600'
-                        }`}
+                        className={`p-2 text-xs cursor-pointer flex items-start gap-2 transition-colors ${isSelected ? 'bg-teal-50/80 font-semibold text-slate-900' : 'hover:bg-slate-50 text-slate-600'
+                          }`}
                       >
                         {isSelected ? <CheckSquare size={15} className="text-teal-700 shrink-0 mt-0.5" /> : <Square size={15} className="text-slate-400 shrink-0 mt-0.5" />}
                         <span className="truncate">{doc.title}</span>
@@ -4969,7 +5129,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
               </div>
             </div>
 
-            {}
+            { }
             <div className="p-3 space-y-2.5">
               <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                 <span className="text-xs font-semibold text-slate-800 flex items-center gap-1.5">
@@ -4999,9 +5159,8 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
                       <div
                         key={doc.id}
                         onClick={() => toggleDocumentSelection(doc.id)}
-                        className={`p-2 text-xs cursor-pointer flex items-start gap-2 transition-colors ${
-                          isSelected ? 'bg-teal-50/80 font-semibold text-slate-900' : 'hover:bg-slate-50 text-slate-600'
-                        }`}
+                        className={`p-2 text-xs cursor-pointer flex items-start gap-2 transition-colors ${isSelected ? 'bg-teal-50/80 font-semibold text-slate-900' : 'hover:bg-slate-50 text-slate-600'
+                          }`}
                       >
                         {isSelected ? <CheckSquare size={15} className="text-teal-700 shrink-0 mt-0.5" /> : <Square size={15} className="text-slate-400 shrink-0 mt-0.5" />}
                         <span className="truncate">{doc.title}</span>
@@ -5014,10 +5173,10 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
           </div>
         )}
 
-        {}
+        { }
         <div className="pt-2 flex justify-end">
           <button
-            onClick={handleExecuteMultiAnalysis}
+            onClick={handleOpenMappingModal}
             disabled={isComparing || selectedDocIds.length === 0}
             className="px-5 py-2.5 bg-teal-700 hover:bg-teal-800 disabled:bg-slate-300 text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-2 border border-teal-900 shadow-sm"
           >
@@ -5031,10 +5190,10 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
         </div>
       </div>
 
-      {}
+      { }
       {(isComparing || compareResult) && (
         <div className="space-y-4">
-          {}
+          { }
           <div className="flex items-center justify-between bg-white border border-slate-300 p-3 rounded-none">
             <span className="text-xs font-bold text-slate-900 uppercase tracking-wider">
               Hasil Diagnostik Deviasi: {compareResult?.math?.indicatorName || 'Analisis Multidokumen'}
@@ -5076,9 +5235,9 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
             </div>
           </div>
 
-          {}
+          { }
           <div id="deep-dive-analysis-container" className="space-y-6 bg-white p-4 border border-slate-300">
-            {}
+            { }
             <div className="p-4 bg-slate-50 border border-slate-300 rounded-none flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
               <div>
                 <span className="text-[10px] font-bold text-teal-800 uppercase tracking-widest block">
@@ -5096,7 +5255,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
               </div>
             </div>
 
-            {}
+            { }
             {compareResult && (
               <>
                 <hr className="border-slate-200" />
@@ -5111,7 +5270,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
               </>
             )}
 
-            {}
+            { }
             {isComparing ? (
               <div className="bg-white border border-slate-300 p-12 text-center text-slate-600 space-y-2">
                 <Loader2 size={28} className="animate-spin text-teal-700 mx-auto" />
@@ -5129,7 +5288,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
               </>
             ) : null}
 
-            {}
+            { }
             {compareResult && (
               <>
                 <hr className="border-slate-200" />
@@ -5141,6 +5300,166 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
           </div>
         </div>
       )}
+
+      {}
+      {isMappingModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-300 shadow-2xl max-w-lg w-full p-6 rounded-none space-y-4 font-roboto">
+
+            {}
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+              <div className="flex items-center gap-2 text-slate-900">
+                <BarChart3 size={18} className="text-teal-700" />
+                <h3 className="text-sm font-bold uppercase">Pemetaan Peran &amp; Parameter Analisis</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsMappingModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {}
+            <div className="space-y-4">
+              {}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                  Pilih Dokumen Target (Baseline) [3]
+                </label>
+                <select
+                  value={modalBaselineId}
+                  onChange={(e) => setModalBaselineId(e.target.value)}
+                  className="w-full text-xs p-2.5 border border-slate-300 focus:outline-none focus:border-teal-700 bg-white font-semibold rounded-none"
+                >
+                  <option value="">-- Pilih Dokumen Target --</option>
+                  {selectedDocumentsList.map((doc) => (
+                    <option key={doc.id} value={doc.id}>
+                      [{doc.metadata?.category || 'Umum'}] {doc.title}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                  Pilih Dokumen Capaian (Realisasi) [3]
+                </label>
+                <select
+                  value={modalRealizationId}
+                  onChange={(e) => setModalRealizationId(e.target.value)}
+                  className="w-full text-xs p-2.5 border border-slate-300 focus:outline-none focus:border-teal-700 bg-white font-semibold rounded-none"
+                >
+                  <option value="">-- Pilih Dokumen Realisasi --</option>
+                  {selectedDocumentsList.map((doc) => (
+                    <option key={doc.id} value={doc.id}>
+                      [{doc.metadata?.category || 'Umum'}] {doc.title}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                    Nama Indikator Daerah
+                  </label>
+                  <input
+                    type="text"
+                    value={modalIndicatorName}
+                    onChange={(e) => setModalIndicatorName(e.target.value)}
+                    required
+                    className="w-full text-xs p-2.5 border border-slate-300 focus:outline-none focus:border-teal-700 rounded-none font-semibold"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                    Sektor Kebijakan
+                  </label>
+                  <input
+                    type="text"
+                    value={modalSector}
+                    onChange={(e) => setModalSector(e.target.value)}
+                    required
+                    className="w-full text-xs p-2.5 border border-slate-300 focus:outline-none focus:border-teal-700 rounded-none font-semibold"
+                  />
+                </div>
+              </div>
+
+              {}
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                    Nilai Target
+                  </label>
+                  <input
+                    type="number"
+                    step="any"
+                    value={modalTargetValue}
+                    onChange={(e) => setModalTargetValue(Number(e.target.value))}
+                    required
+                    className="w-full text-xs p-2.5 border border-slate-300 focus:outline-none focus:border-teal-700 rounded-none font-semibold"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                    Nilai Realisasi
+                  </label>
+                  <input
+                    type="number"
+                    step="any"
+                    value={modalRealizationValue}
+                    onChange={(e) => setModalRealizationValue(Number(e.target.value))}
+                    required
+                    className="w-full text-xs p-2.5 border border-slate-300 focus:outline-none focus:border-teal-700 rounded-none font-semibold"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                    Satuan Indikator
+                  </label>
+                  <select
+                    value={modalUnitSuffix}
+                    onChange={(e) => setModalUnitSuffix(e.target.value)}
+                    className="w-full text-xs p-2.5 border border-slate-300 focus:outline-none focus:border-teal-700 bg-white font-semibold rounded-none"
+                  >
+                    <option value="%">% (Persentase)</option>
+                    <option value="Miliar">Rupiah (Miliar)</option>
+                    <option value="Juta">Rupiah (Juta)</option>
+                    <option value="Km">Km (Panjang)</option>
+                    <option value="Jiwa">Jiwa (Penduduk)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {}
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200">
+              <button
+                type="button"
+                onClick={() => setIsMappingModalOpen(false)}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs uppercase rounded-none border border-slate-300 cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmExecuteAnalysis}
+                disabled={!modalBaselineId || !modalRealizationId}
+                className="px-4 py-2 bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-2 border border-teal-850 shadow-xs cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Play size={14} />
+                <span>Proses Analisis Deviasi</span>
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };
@@ -6175,17 +6494,21 @@ export const DocumentDetailModal: React.FC<DocumentDetailModalProps> = ({ docume
 
 --- FILE: src\modules\knowledge-hub\components\document-table.tsx ---
 import React from 'react';
-import { FileText, Eye, Download, Trash2 } from 'lucide-react';
+import { FileText, Eye, Download, Trash2, Clock } from 'lucide-react';
 import type { DocumentRecord } from '../../../services/document.service';
 
 interface DocumentTableProps {
   documents: DocumentRecord[];
+  selectedDocIds: string[];
+  onSelectionChange: (selectedIds: string[]) => void;
   onViewDetail: (doc: DocumentRecord) => void;
   onDeleteDocument: (doc: DocumentRecord) => void;
 }
 
 export const DocumentTable: React.FC<DocumentTableProps> = ({
   documents,
+  selectedDocIds,
+  onSelectionChange,
   onViewDetail,
   onDeleteDocument,
 }) => {
@@ -6198,32 +6521,119 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
     );
   }
 
+  const selectableDocs = documents.filter((doc) => doc.status === 'READY');
+  const isAllSelectableSelected =
+    selectableDocs.length > 0 &&
+    selectableDocs.every((doc) => selectedDocIds.includes(doc.id));
+
+  const handleSelectAllToggle = () => {
+    const selectableIds = selectableDocs.map((d) => d.id);
+    if (isAllSelectableSelected) {
+
+      onSelectionChange(selectedDocIds.filter((id) => !selectableIds.includes(id)));
+    } else {
+
+      onSelectionChange(Array.from(new Set([...selectedDocIds, ...selectableIds])));
+    }
+  };
+
+  const handleRowToggle = (docId: string) => {
+    if (selectedDocIds.includes(docId)) {
+      onSelectionChange(selectedDocIds.filter((id) => id !== docId));
+    } else {
+      onSelectionChange([...selectedDocIds, docId]);
+    }
+  };
+
+  const renderStatusBadge = (status: string) => {
+    switch (status) {
+      case 'READY':
+        return (
+          <span className="inline-block text-[10px] bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.5 font-bold uppercase tracking-wider rounded-none">
+            Ready
+          </span>
+        );
+      case 'PROCESSING':
+        return (
+          <span className="inline-flex items-center gap-1 text-[10px] bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 font-bold uppercase tracking-wider rounded-none">
+            <Clock size={10} className="animate-spin text-amber-600" /> Ingesting
+          </span>
+        );
+      case 'FAILED':
+        return (
+          <span className="inline-block text-[10px] bg-red-50 text-red-800 border border-red-200 px-2 py-0.5 font-bold uppercase tracking-wider rounded-none">
+            Failed
+          </span>
+        );
+      default:
+        return (
+          <span className="inline-block text-[10px] bg-slate-50 text-slate-800 border border-slate-200 px-2 py-0.5 font-bold uppercase tracking-wider rounded-none">
+            Pending
+          </span>
+        );
+    }
+  };
+
   return (
     <div className="bg-white border border-slate-200 rounded-none overflow-hidden shadow-xs">
       <div className="px-6 py-3.5 border-b border-slate-200 bg-slate-50/50">
-        <h2 className="text-base font-bold text-slate-900">Daftar Dokumen</h2>
+        <h2 className="text-base font-bold text-slate-900">Daftar Dokumen Repositori</h2>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="border-b border-slate-200 bg-slate-100/70 font-roboto text-sm text-slate-900 font-bold tracking-wide">
+              {}
+              <th className="py-3 px-4 w-12 text-center">
+                <input
+                  type="checkbox"
+                  checked={isAllSelectableSelected}
+                  onChange={handleSelectAllToggle}
+                  disabled={selectableDocs.length === 0}
+                  className="rounded-none border-slate-300 text-teal-700 focus:ring-teal-500 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed w-4 h-4"
+                  title="Pilih semua dokumen yang siap digunakan"
+                />
+              </th>
               <th className="py-3 px-4 font-bold text-slate-900">Judul Dokumen</th>
               <th className="py-3 px-4 font-bold text-slate-900">Kategori</th>
               <th className="py-3 px-4 font-bold text-slate-900">Jumlah Halaman &amp; Chunks</th>
+              <th className="py-3 px-4 font-bold text-slate-900">Status</th>
               <th className="py-3 px-4 font-bold text-slate-900 text-center">Aksi</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {documents.map((doc) => {
+              const isSelected = selectedDocIds.includes(doc.id);
+              const isSelectable = doc.status === 'READY';
+
               return (
                 <tr
                   key={doc.id}
-                  className="transition-colors hover:bg-slate-50/80"
+                  className={`transition-colors font-roboto ${isSelected ? 'bg-teal-50/30 font-semibold' : 'hover:bg-slate-50/80'
+                    } ${!isSelectable ? 'opacity-65 bg-slate-50/30' : ''}`}
                 >
+                  {}
+                  <td className="py-3 px-4 text-center">
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => handleRowToggle(doc.id)}
+                      disabled={!isSelectable}
+                      className="rounded-none border-slate-300 text-teal-700 focus:ring-teal-500 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed w-4 h-4"
+                      title={
+                        isSelectable
+                          ? 'Pilih dokumen ini'
+                          : 'Dokumen sedang diproses atau gagal dianalisis oleh AI'
+                      }
+                    />
+                  </td>
+
                   <td className="py-3 px-4">
                     <div className="flex items-center gap-2">
                       <FileText size={14} className="text-teal-600 shrink-0" />
-                      <span className="font-roboto text-slate-800 text-xs">{doc.title}</span>
+                      <span className="text-slate-800 text-xs truncate max-w-sm" title={doc.title}>
+                        {doc.title}
+                      </span>
                     </div>
                   </td>
                   <td className="py-3 px-4 text-slate-800 text-xs font-normal">
@@ -6231,6 +6641,9 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
                   </td>
                   <td className="py-3 px-4 text-slate-800 text-xs font-normal">
                     {doc.metadata?.pageCount || 0} Hal / {doc.chunkCount || 0} Chunks
+                  </td>
+                  <td className="py-3 px-4 text-xs">
+                    {renderStatusBadge(doc.status)}
                   </td>
 
                   <td className="py-3 px-4 text-center">
@@ -6271,7 +6684,6 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
                 </tr>
               );
             })}
-
           </tbody>
         </table>
       </div>
@@ -6279,6 +6691,110 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
   );
 };
 
+--- FILE: src\modules\knowledge-hub\components\floating-action-bar.component.tsx ---
+import React from 'react';
+import {
+    MessageSquareCode,
+    BarChart3,
+    FileText,
+    PenTool,
+    X,
+} from 'lucide-react';
+
+export interface FloatingActionBarProps {
+    selectedCount: number;
+    onClearSelection: () => void;
+    onForward: (targetRoute: string) => void;
+}
+
+export const FloatingActionBar: React.FC<FloatingActionBarProps> = ({
+    selectedCount,
+    onClearSelection,
+    onForward,
+}) => {
+
+    const actionItems = [
+        {
+            id: 'ai-request',
+            label: 'Tanya AI Chat',
+            icon: MessageSquareCode,
+            isPrimary: true,
+        },
+        {
+            id: 'analytics',
+            label: 'Analisis Deviasi',
+            icon: BarChart3,
+            isPrimary: false,
+        },
+        {
+            id: 'reports',
+            label: 'Nota Dinas Bupati',
+            icon: FileText,
+            isPrimary: false,
+        },
+        {
+            id: 'generator',
+            label: 'Generate Artikel',
+            icon: PenTool,
+            isPrimary: false,
+        },
+    ];
+
+    return (
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-3rem)] max-w-5xl bg-zinc-950/95 backdrop-blur-md text-zinc-100 border border-zinc-800 p-4 md:py-3 md:px-5 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.8)] flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 rounded-none animate-in fade-in slide-in-from-bottom-3 duration-250 no-print font-roboto">
+
+            {}
+            <div className="flex items-center justify-between lg:justify-start gap-4">
+                <div className="flex items-center gap-1.5 text-xs">
+                    <span className="font-extrabold text-sm text-white bg-zinc-900 border border-zinc-800 px-2 py-0.5 rounded-none">
+                        {selectedCount}
+                    </span>
+                    <span className="font-bold text-zinc-300 uppercase tracking-widest text-[10px]">
+                        Dokumen Terpilih
+                    </span>
+                    <span className="hidden sm:inline text-zinc-600 font-normal">|</span>
+                    <span className="hidden sm:inline text-[11px] text-zinc-400 font-medium">
+                        Siap diteruskan ke modul AI [3]
+                    </span>
+                </div>
+
+                {}
+                <button
+                    onClick={onClearSelection}
+                    className="text-zinc-500 hover:text-zinc-200 transition-colors duration-150 cursor-pointer inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest"
+                    title="Batalkan semua pilihan"
+                >
+                    <X size={11} />
+                    <span>Batal</span>
+                </button>
+            </div>
+
+            {}
+            <div className="grid grid-cols-2 sm:flex sm:items-center gap-1.5 shrink-0">
+                {actionItems.map((item) => {
+                    const IconComponent = item.icon;
+                    return (
+                        <button
+                            key={item.id}
+                            onClick={() => onForward(item.id)}
+                            className={`
+                px-3.5 py-2 text-[10px] font-bold uppercase tracking-widest transition-all duration-150 cursor-pointer rounded-none flex items-center justify-center gap-1.5
+                ${item.isPrimary
+                                    ? 'bg-white hover:bg-zinc-200 text-zinc-950 font-extrabold border border-white'
+                                    : 'bg-transparent hover:bg-zinc-900 text-zinc-300 hover:text-white border border-zinc-800'
+                                }
+              `}
+                            title={`Forward ke ${item.label}`}
+                        >
+                            <IconComponent size={12} className="shrink-0" />
+                            <span>{item.label}</span>
+                        </button>
+                    );
+                })}
+            </div>
+        </div>
+    );
+};
 
 --- FILE: src\modules\knowledge-hub\components\upload-dropzone.tsx ---
 import React, { useState, useRef } from 'react';
@@ -6519,12 +7035,18 @@ import React, { useState, useEffect } from 'react';
 import { UploadDropzone } from '../components/upload-dropzone';
 import { DocumentTable } from '../components/document-table';
 import { DocumentDetailModal } from '../components/document-detail-modal.component';
+import { FloatingActionBar } from '../components/floating-action-bar.component';
 import { DocumentService, type DocumentRecord } from '../../../services/document.service';
 import { MOCK_DATA } from '../../../services/mock-data.service';
 import { Loader2, AlertCircle, RefreshCw, Trash2 } from 'lucide-react';
 
-export const KnowledgeHubView: React.FC = () => {
+interface KnowledgeHubViewProps {
+  onForward: (documentIds: string[], targetRoute: string, promptText?: string) => void;
+}
+
+export const KnowledgeHubView: React.FC<KnowledgeHubViewProps> = ({ onForward }) => {
   const [documents, setDocuments] = useState<DocumentRecord[]>([]);
+  const [selectedDocIds, setSelectedDocIds] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isUsingMock, setIsUsingMock] = useState(false);
@@ -6537,7 +7059,7 @@ export const KnowledgeHubView: React.FC = () => {
     setLoadError(null);
     try {
       const docs = await DocumentService.listDocuments();
-      setDocuments(docs);
+      setDocuments(docs || []);
       setIsUsingMock(false);
     } catch {
 
@@ -6552,6 +7074,11 @@ export const KnowledgeHubView: React.FC = () => {
   useEffect(() => {
     loadDocuments();
   }, []);
+
+  useEffect(() => {
+    const activeIds = documents.map((d) => d.id);
+    setSelectedDocIds((prev) => prev.filter((id) => activeIds.includes(id)));
+  }, [documents]);
 
   const handleUploadSuccess = (newDoc: DocumentRecord) => {
     setDocuments((prev) => [newDoc, ...prev]);
@@ -6575,8 +7102,18 @@ export const KnowledgeHubView: React.FC = () => {
     }
   };
 
+  const handleExecuteForward = (targetRoute: string) => {
+
+    if (selectedDocIds.length > 3) {
+      alert('Batas Maksimal Terlampaui: Anda hanya dapat memilih maksimal 3 dokumen acuan untuk diteruskan demi kestabilan pemrosesan AI.');
+      return;
+    }
+
+    onForward(selectedDocIds, targetRoute);
+  };
+
   return (
-    <div className="flex flex-col w-full bg-slate-100/70 p-6 space-y-6 font-roboto">
+    <div className="flex flex-col w-full bg-slate-100/70 p-6 space-y-6 font-roboto relative pb-24">
       {}
       <div className="w-full bg-white border border-slate-300 px-6 py-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4 rounded-none shadow-2xs">
         {}
@@ -6636,8 +7173,19 @@ export const KnowledgeHubView: React.FC = () => {
       ) : (
         <DocumentTable
           documents={documents}
+          selectedDocIds={selectedDocIds}
+          onSelectionChange={setSelectedDocIds}
           onViewDetail={(doc) => setDetailDoc(doc)}
           onDeleteDocument={(doc) => setDeleteConfirmDoc(doc)}
+        />
+      )}
+
+      {}
+      {selectedDocIds.length > 0 && (
+        <FloatingActionBar
+          selectedCount={selectedDocIds.length}
+          onClearSelection={() => setSelectedDocIds([])}
+          onForward={handleExecuteForward}
         />
       )}
 
@@ -6720,11 +7268,15 @@ import {
 interface ReportsViewProps {
   onNavigateToGenerator?: (initialPrompt?: string) => void;
   onNavigateToDashboard?: () => void;
+  initialSelectedDocIds?: string[];
+  onClearSharedDocIds?: () => void;
 }
 
 export const ReportsView: React.FC<ReportsViewProps> = ({
   onNavigateToGenerator,
   onNavigateToDashboard,
+  initialSelectedDocIds,
+  onClearSharedDocIds,
 }) => {
 
   const [documents, setDocuments] = useState<DocumentRecord[]>([]);
@@ -6794,9 +7346,12 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
     try {
       const fetchedDocs = await DocumentService.listDocuments();
       setDocuments(fetchedDocs || []);
-      if (fetchedDocs && fetchedDocs.length > 0 && selectedDocIds.length === 0) {
 
-        setSelectedDocIds([fetchedDocs[0].id]);
+      if (!initialSelectedDocIds || initialSelectedDocIds.length === 0) {
+        if (fetchedDocs && fetchedDocs.length > 0 && selectedDocIds.length === 0) {
+
+          setSelectedDocIds([fetchedDocs[0].id]);
+        }
       }
     } catch (err: any) {
       console.error('Gagal memuat dokumen dari database:', err);
@@ -6806,6 +7361,23 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
       setIsLoadingDocs(false);
     }
   };
+
+  useEffect(() => {
+    if (documents.length > 0) {
+      if (initialSelectedDocIds && initialSelectedDocIds.length > 0) {
+
+        const validIds = initialSelectedDocIds.filter((id) =>
+          documents.some((doc) => doc.id === id)
+        );
+
+        if (validIds.length > 0) {
+          setSelectedDocIds(validIds);
+        }
+
+        onClearSharedDocIds?.();
+      }
+    }
+  }, [initialSelectedDocIds, documents]);
 
   const loadHistory = async () => {
     setIsLoadingHistory(true);
@@ -7154,7 +7726,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
             <div className="border-b-2 border-slate-900 pb-4">
               <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 mb-2">
                 <div>
-                  <span className="text-xs font-bold text-teal-800 uppercase tracking-widest block mb-1 flex items-center gap-1.5">
+                  <span className="text-xs font-bold text-teal-800 uppercase tracking-widest block mb-1 items-center gap-1.5">
                     <Building2 size={14} className="text-teal-700" />
                     <span>PEMERINTAH KABUPATEN MIMIKA &bull; BRIDA SMART ANALYSIS</span>
                   </span>
@@ -7170,8 +7742,8 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                   const bgClass = isHigh
                     ? 'bg-red-50 text-red-800 border border-red-200'
                     : isMedium
-                    ? 'bg-amber-50 text-amber-800 border border-amber-200'
-                    : 'bg-emerald-50 text-emerald-800 border border-emerald-200';
+                      ? 'bg-amber-50 text-amber-800 border border-amber-200'
+                      : 'bg-emerald-50 text-emerald-800 border border-emerald-200';
 
                   return (
                     <span className={`px-3 py-1 text-xs font-bold uppercase rounded-none flex items-center gap-1.5 shrink-0 self-start ${bgClass}`}>
@@ -7205,7 +7777,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
 
             {}
             <div className="border-teal-700 pl-4 py-2.5 bg-slate-50/70 text-slate-900 font-normal leading-relaxed italic text-sm text-justify pr-4">
-              <strong className="block text-xs uppercase tracking-wider text-teal-900 font-bold mb-1.5 not-italic flex items-center gap-1.5">
+              <strong className="block text-xs uppercase tracking-wider text-teal-900 font-bold mb-1.5 not-italic items-center gap-1.5">
                 <FileText size={14} className="text-teal-700" />
                 <span>RINGKASAN EKSEKUTIF</span>
               </strong>
@@ -7737,6 +8309,18 @@ export const AiAssistantService = {
     });
   },
 
+  async getArticleExportData(id: string): Promise<{
+    title: string;
+    content: string;
+    tone: string;
+    generatedAt: string;
+  }> {
+    const result = await safeFetch(`${API_BASE_URL}/assistant/article/sessions/${id}/export-data`, {
+      method: 'GET',
+    });
+    return result.data;
+  },
+
   async listQaSessions(): Promise<Array<{
     id: string;
     title: string;
@@ -7872,6 +8456,7 @@ export const AnalysisService = {
     unitSuffix?: string;
     baselineDocId?: string;
     realizationDocId?: string;
+    documentIds?: string[];
   }): Promise<DeviationCompareResult> {
     try {
       const response = await fetch(`${API_BASE_URL}/analysis/compare`, {
@@ -8258,8 +8843,17 @@ import htmlToPdfmake from 'html-to-pdfmake';
 
 const vfsFonts = (pdfFonts as any)?.pdfMake?.vfs || (pdfFonts as any)?.vfs || (pdfFonts as any);
 if (vfsFonts) {
-  (pdfMake as any).vfs = vfsFonts;
+  (pdfMake as any).addVirtualFileSystem(vfsFonts);
 }
+
+const defaultFonts = {
+  Roboto: {
+    normal:      'Roboto-Regular.ttf',
+    bold:        'Roboto-Medium.ttf',
+    italics:     'Roboto-Italic.ttf',
+    bolditalics: 'Roboto-MediumItalic.ttf',
+  }
+};
 
 const fontVfsCache: Record<string, string> = {};
 
@@ -8316,49 +8910,49 @@ export const PdfExportService = {
       fetchLocalFontToBase64(`/fonts/${files.bolditalics}`),
     ]);
 
-    const currentVfs = (pdfMake as any).vfs || {};
-    (pdfMake as any).vfs = {
-      ...currentVfs,
+    const customVfs = {
       [`${vfsPrefix}-Regular.ttf`]:    vNormal,
       [`${vfsPrefix}-Bold.ttf`]:       vBold,
       [`${vfsPrefix}-Italic.ttf`]:     vItalics,
       [`${vfsPrefix}-BoldItalic.ttf`]: vBoldItalics,
     };
+    (pdfMake as any).addVirtualFileSystem(customVfs);
 
     const marginPoints = Math.round(config.marginCm * 28.3465);
 
-    const pdfContent = htmlToPdfmake(htmlText, { window: window });
+    let sanitizedHtml = htmlText.trim();
+    const trailingEmptyRegex = /(?:<p>\s*<\/p>|<p>\s*<br\s*\/?>\s*<\/p>|<p>&nbsp;<\/p>|<br\s*\/?>)+$/i;
+    sanitizedHtml = sanitizedHtml.replace(trailingEmptyRegex, '').trim();
+
+    const pdfContent = htmlToPdfmake(sanitizedHtml, {
+      window: window,
+      ignoreStyles: ['font-family'],
+      removeExtraBlanks: true,
+    });
+
+    const fontDefinitions: any = {
+      Roboto: {
+        normal:      'Roboto-Regular.ttf',
+        bold:        'Roboto-Medium.ttf',
+        italics:     'Roboto-Italic.ttf',
+        bolditalics: 'Roboto-MediumItalic.ttf',
+      },
+      CustomFont: {
+        normal:      `${vfsPrefix}-Regular.ttf`,
+        bold:        `${vfsPrefix}-Bold.ttf`,
+        italics:     `${vfsPrefix}-Italic.ttf`,
+        bolditalics: `${vfsPrefix}-BoldItalic.ttf`,
+      },
+    };
 
     const docDefinition: any = {
       pageSize: 'A4',
       pageMargins: [marginPoints, marginPoints, marginPoints, marginPoints],
-
-      fonts: {
-        Roboto: {
-          normal:      'Roboto-Regular.ttf',
-          bold:        'Roboto-Medium.ttf',
-          italics:     'Roboto-Italic.ttf',
-          bolditalics: 'Roboto-MediumItalic.ttf',
-        },
-        CustomFont: {
-          normal:      `${vfsPrefix}-Regular.ttf`,
-          bold:        `${vfsPrefix}-Bold.ttf`,
-          italics:     `${vfsPrefix}-Italic.ttf`,
-          bolditalics: `${vfsPrefix}-BoldItalic.ttf`,
-        },
-      },
       defaultStyle: {
         font:       'CustomFont',
         fontSize:   config.fontSize,
         lineHeight: config.lineSpacing,
         alignment:  'justify',
-      },
-      header: {
-        text:      'BRIDA SMART ANALYSIS — KABUPATEN MIMIKA',
-        alignment: 'right',
-        fontSize:  8,
-        color:     '#94a3b8',
-        margin:    [marginPoints, 15, marginPoints, 0],
       },
       footer: (currentPage: number, pageCount: number) => ({
         columns: [
@@ -8370,21 +8964,15 @@ export const PdfExportService = {
       content: pdfContent,
     };
 
+    (pdfMake as any).setFonts(fontDefinitions);
     const targetFilename = filename.toLowerCase().endsWith('.pdf') ? filename : `${filename}.pdf`;
-    pdfMake.createPdf(docDefinition).download(targetFilename);
+    (pdfMake as any).createPdf(docDefinition).download(targetFilename);
   },
 
   exportAnalyticsPdf(indicator: any, filename?: string): void {
     const docDefinition: any = {
       pageSize: 'A4',
       pageMargins: [30, 30, 30, 30],
-      header: {
-        text: 'BRIDA SMART ANALYSIS — KABUPATEN MIMIKA',
-        alignment: 'right',
-        fontSize: 8,
-        color: '#64748b',
-        margin: [30, 15, 30, 0],
-      },
       footer: (currentPage: number, pageCount: number) => ({
         columns: [
           { text: `Tanggal Rilis: ${new Date().toLocaleDateString('id-ID')}`, fontSize: 8, color: '#64748b' },
@@ -8514,21 +9102,15 @@ export const PdfExportService = {
       },
     };
 
+    (pdfMake as any).setFonts(defaultFonts);
     const targetFilename = filename || `Analisis_Deviasi_${indicator.id.toUpperCase()}_Mimika.pdf`;
-    pdfMake.createPdf(docDefinition).download(targetFilename);
+    (pdfMake as any).createPdf(docDefinition).download(targetFilename);
   },
 
   exportBupatiReportPdf(report: any): void {
     const docDefinition: any = {
       pageSize: 'A4',
       pageMargins: [35, 35, 35, 35],
-      header: {
-        text: 'BRIDA SMART ANALYSIS — KABUPATEN MIMIKA',
-        alignment: 'right',
-        fontSize: 8,
-        color: '#64748b',
-        margin: [35, 18, 35, 0],
-      },
       footer: (currentPage: number, pageCount: number) => ({
         columns: [
           { text: 'Dokumen Resmi Pemerintah Kabupaten Mimika', fontSize: 8, color: '#64748b' },
@@ -8657,7 +9239,8 @@ export const PdfExportService = {
       },
     };
 
-    pdfMake.createPdf(docDefinition).download('Nota_Dinas_Resmi_Bupati_Mimika_Maret_2026.pdf');
+    (pdfMake as any).setFonts(defaultFonts);
+    (pdfMake as any).createPdf(docDefinition).download('Nota_Dinas_Resmi_Bupati_Mimika_Maret_2026.pdf');
   },
 
   async exportElementToPdf(_elementId: string, filename: string, compareResult?: any): Promise<void> {

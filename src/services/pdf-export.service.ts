@@ -5,8 +5,18 @@ import htmlToPdfmake from 'html-to-pdfmake'; // Impor pustaka parser HTML [1]
 // Inisialisasi VFS pdfMake dengan biner Roboto bawaan — JANGAN pernah dioverwrite seluruhnya
 const vfsFonts = (pdfFonts as any)?.pdfMake?.vfs || (pdfFonts as any)?.vfs || (pdfFonts as any);
 if (vfsFonts) {
-  (pdfMake as any).vfs = vfsFonts;
+  (pdfMake as any).addVirtualFileSystem(vfsFonts);
 }
+
+// Default font definitions untuk Roboto
+const defaultFonts = {
+  Roboto: {
+    normal:      'Roboto-Regular.ttf',
+    bold:        'Roboto-Medium.ttf',
+    italics:     'Roboto-Italic.ttf',
+    bolditalics: 'Roboto-MediumItalic.ttf',
+  }
+};
 
 // Cache biner font kustom di memori untuk menghindari HTTP fetch berulang
 const fontVfsCache: Record<string, string> = {};
@@ -51,7 +61,7 @@ export const PdfExportService = {
    * Mengambil draf HTML interaktif, menyuntikkan font kustom secara dinamis,
    * dan mencetak dokumen PDF formal dengan format presisi (WYSIWYG) [1].
    *
-   * DESAIN ARSITEKTUR: Font kustom didaftarkan HANYA di dalam docDefinition.fonts,
+   * DESAIN ARSITEKTUR: Font kustom didaftarkan melalui parameter createPdf,
    * BUKAN melalui mutasi properti global `pdfMake.fonts`, untuk mencegah polusi
    * state global yang merusak operasi ekspor PDF lain (Bupati Report, Analytics).
    */
@@ -79,54 +89,56 @@ export const PdfExportService = {
       fetchLocalFontToBase64(`/fonts/${files.bolditalics}`),
     ]);
 
-    // 2. Suntikkan biner font ke VFS pdfMake — TAMBAH ke VFS yang sudah ada, jangan replace seluruhnya [1]
-    const currentVfs = (pdfMake as any).vfs || {};
-    (pdfMake as any).vfs = {
-      ...currentVfs, // Pertahankan Roboto bawaan agar html-to-pdfmake tidak crash
+    // 2. Daftarkan file font kustom ke Virtual File System (VFS) pdfMake secara lokal
+    const customVfs = {
       [`${vfsPrefix}-Regular.ttf`]:    vNormal,
       [`${vfsPrefix}-Bold.ttf`]:       vBold,
       [`${vfsPrefix}-Italic.ttf`]:     vItalics,
       [`${vfsPrefix}-BoldItalic.ttf`]: vBoldItalics,
     };
+    (pdfMake as any).addVirtualFileSystem(customVfs);
 
     // 3. Konversi satuan margin kertas dari Sentimeter ke Satuan Point (1 cm = ~28.3465 pt) [1]
     const marginPoints = Math.round(config.marginCm * 28.3465);
 
     // 4. Terjemahkan draf HTML menjadi representasi JSON AST pdfMake [1]
-    //    html-to-pdfmake akan menggunakan font Roboto (tersedia di VFS bawaan) sebagai default
-    const pdfContent = htmlToPdfmake(htmlText, { window: window });
+    // Bersihkan whitespace dan tag kosong di akhir konten HTML untuk mencegah halaman kosong tambahan di akhir PDF
+    let sanitizedHtml = htmlText.trim();
+    const trailingEmptyRegex = /(?:<p>\s*<\/p>|<p>\s*<br\s*\/?>\s*<\/p>|<p>&nbsp;<\/p>|<br\s*\/?>)+$/i;
+    sanitizedHtml = sanitizedHtml.replace(trailingEmptyRegex, '').trim();
 
-    // 5. Susun dokumen definisi pdfMake — font kustom didaftarkan di sini, BUKAN secara global
+    // Abaikan style font-family bawaan agar tidak memicu error pencarian font di pdfMake VFS
+    const pdfContent = htmlToPdfmake(sanitizedHtml, {
+      window: window,
+      ignoreStyles: ['font-family'],
+      removeExtraBlanks: true,
+    });
+
+    // 5. Susun font definitions — WAJIB dikirim sebagai argumen ke-3 createPdf(), BUKAN di dalam docDefinition.
+    const fontDefinitions: any = {
+      Roboto: {
+        normal:      'Roboto-Regular.ttf',
+        bold:        'Roboto-Medium.ttf',
+        italics:     'Roboto-Italic.ttf',
+        bolditalics: 'Roboto-MediumItalic.ttf',
+      },
+      CustomFont: {
+        normal:      `${vfsPrefix}-Regular.ttf`,
+        bold:        `${vfsPrefix}-Bold.ttf`,
+        italics:     `${vfsPrefix}-Italic.ttf`,
+        bolditalics: `${vfsPrefix}-BoldItalic.ttf`,
+      },
+    };
+
+    // 6. Susun docDefinition — fonts TIDAK disertakan di sini
     const docDefinition: any = {
       pageSize: 'A4',
       pageMargins: [marginPoints, marginPoints, marginPoints, marginPoints],
-      // Deklarasi font scoped ke dalam dokumen ini saja — tidak mencemari state global [1]
-      fonts: {
-        Roboto: {
-          normal:      'Roboto-Regular.ttf',
-          bold:        'Roboto-Medium.ttf',
-          italics:     'Roboto-Italic.ttf',
-          bolditalics: 'Roboto-MediumItalic.ttf',
-        },
-        CustomFont: {
-          normal:      `${vfsPrefix}-Regular.ttf`,
-          bold:        `${vfsPrefix}-Bold.ttf`,
-          italics:     `${vfsPrefix}-Italic.ttf`,
-          bolditalics: `${vfsPrefix}-BoldItalic.ttf`,
-        },
-      },
       defaultStyle: {
         font:       'CustomFont',
         fontSize:   config.fontSize,
         lineHeight: config.lineSpacing,
         alignment:  'justify',
-      },
-      header: {
-        text:      'BRIDA SMART ANALYSIS — KABUPATEN MIMIKA',
-        alignment: 'right',
-        fontSize:  8,
-        color:     '#94a3b8',
-        margin:    [marginPoints, 15, marginPoints, 0],
       },
       footer: (currentPage: number, pageCount: number) => ({
         columns: [
@@ -138,9 +150,10 @@ export const PdfExportService = {
       content: pdfContent,
     };
 
-    // 6. Jalankan perakitan dokumen dan unduh file PDF
+    // 7. Render PDF: Set definitions ke instance pdfMake secara lokal dan buat PDF
+    (pdfMake as any).setFonts(fontDefinitions);
     const targetFilename = filename.toLowerCase().endsWith('.pdf') ? filename : `${filename}.pdf`;
-    pdfMake.createPdf(docDefinition).download(targetFilename);
+    (pdfMake as any).createPdf(docDefinition).download(targetFilename);
   },
 
 
@@ -151,13 +164,6 @@ export const PdfExportService = {
     const docDefinition: any = {
       pageSize: 'A4',
       pageMargins: [30, 30, 30, 30],
-      header: {
-        text: 'BRIDA SMART ANALYSIS — KABUPATEN MIMIKA',
-        alignment: 'right',
-        fontSize: 8,
-        color: '#64748b',
-        margin: [30, 15, 30, 0],
-      },
       footer: (currentPage: number, pageCount: number) => ({
         columns: [
           { text: `Tanggal Rilis: ${new Date().toLocaleDateString('id-ID')}`, fontSize: 8, color: '#64748b' },
@@ -287,8 +293,9 @@ export const PdfExportService = {
       },
     };
 
+    (pdfMake as any).setFonts(defaultFonts);
     const targetFilename = filename || `Analisis_Deviasi_${indicator.id.toUpperCase()}_Mimika.pdf`;
-    pdfMake.createPdf(docDefinition).download(targetFilename);
+    (pdfMake as any).createPdf(docDefinition).download(targetFilename);
   },
 
   /**
@@ -298,13 +305,6 @@ export const PdfExportService = {
     const docDefinition: any = {
       pageSize: 'A4',
       pageMargins: [35, 35, 35, 35],
-      header: {
-        text: 'BRIDA SMART ANALYSIS — KABUPATEN MIMIKA',
-        alignment: 'right',
-        fontSize: 8,
-        color: '#64748b',
-        margin: [35, 18, 35, 0],
-      },
       footer: (currentPage: number, pageCount: number) => ({
         columns: [
           { text: 'Dokumen Resmi Pemerintah Kabupaten Mimika', fontSize: 8, color: '#64748b' },
@@ -433,7 +433,8 @@ export const PdfExportService = {
       },
     };
 
-    pdfMake.createPdf(docDefinition).download('Nota_Dinas_Resmi_Bupati_Mimika_Maret_2026.pdf');
+    (pdfMake as any).setFonts(defaultFonts);
+    (pdfMake as any).createPdf(docDefinition).download('Nota_Dinas_Resmi_Bupati_Mimika_Maret_2026.pdf');
   },
 
   /**

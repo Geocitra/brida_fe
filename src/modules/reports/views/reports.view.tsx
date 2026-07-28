@@ -509,7 +509,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
             <div className="border-b-2 border-slate-900 pb-4">
               <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 mb-2">
                 <div>
-                  <span className="text-xs font-bold text-teal-800 uppercase tracking-widest block mb-1 flex items-center gap-1.5">
+                  <span className="text-xs font-bold text-teal-800 uppercase tracking-widest block mb-1 items-center gap-1.5">
                     <Building2 size={14} className="text-teal-700" />
                     <span>PEMERINTAH KABUPATEN MIMIKA &bull; BRIDA SMART ANALYSIS</span>
                   </span>
@@ -560,7 +560,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
 
             {/* Ringkasan Eksekutif (Executive Summary - Clean Left Accent - Zero Nested Box) */}
             <div className="border-teal-700 pl-4 py-2.5 bg-slate-50/70 text-slate-900 font-normal leading-relaxed italic text-sm text-justify pr-4">
-              <strong className="block text-xs uppercase tracking-wider text-teal-900 font-bold mb-1.5 not-italic flex items-center gap-1.5">
+              <strong className="block text-xs uppercase tracking-wider text-teal-900 font-bold mb-1.5 not-italic items-center gap-1.5">
                 <FileText size={14} className="text-teal-700" />
                 <span>RINGKASAN EKSEKUTIF</span>
               </strong>

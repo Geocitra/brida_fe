@@ -124,35 +124,46 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
   };
 
   const handlePrint = async () => {
-    if (!editableText) {
+    if (!editableText && !sessionId) {
       showToast('⚠️ Tidak ada naskah untuk dicetak. Silakan buka sesi dari halaman generator.');
       return;
     }
     setIsPrinting(true);
 
-    // 1. Silent Save ke DB — non-blocking: tetap cetak PDF walau save gagal
+    // 1. Ambil data artikel terbaru dari endpoint export-data backend
+    let exportContent = editableText;
+    let exportTitle = articleTitle;
+
     if (sessionId) {
       try {
-        showToast('⏳ Menyinkronkan revisi draf terakhir ke database...');
-        await AiAssistantService.updateArticleSessionContent(
-          sessionId,
-          articleTitle,
-          editableText
-        );
-      } catch (saveErr: any) {
-        // Tampilkan peringatan tapi JANGAN hentikan proses PDF
-        console.warn('[ArticlePreviewEditor] Silent-save sebelum cetak gagal:', saveErr);
-        showToast('⚠️ Gagal sinkron ke DB, namun PDF tetap diproses...');
-        // Tunggu sebentar agar toast terlihat pengguna
-        await new Promise(res => setTimeout(res, 1500));
+        showToast('⏳ Mengambil data naskah terbaru dari server untuk ekspor...');
+        const exportData = await AiAssistantService.getArticleExportData(sessionId);
+        // Gunakan konten dari server (paling up-to-date), fallback ke local jika kosong
+        if (exportData.content) {
+          exportContent = exportData.content;
+        }
+        if (exportData.title) {
+          exportTitle = exportData.title;
+        }
+      } catch (fetchErr: any) {
+        // Fallback ke konten lokal jika endpoint gagal
+        console.warn('[ArticlePreviewEditor] Gagal ambil export-data dari server, fallback ke konten lokal:', fetchErr);
+        showToast('⚠️ Gagal sinkron dari server, menggunakan naskah lokal untuk PDF...');
+        await new Promise(res => setTimeout(res, 1200));
       }
+    }
+
+    if (!exportContent) {
+      showToast('⚠️ Tidak ada naskah untuk dicetak.');
+      setIsPrinting(false);
+      return;
     }
 
     try {
       // 2. Konversi Markdown → HTML
-      const htmlContent = await Promise.resolve(marked.parse(editableText));
+      const htmlContent = await Promise.resolve(marked.parse(exportContent));
 
-      // 3. Export PDF
+      // 3. Export PDF menggunakan PdfExportService dengan konfigurasi format dari panel
       showToast('🖨️ Mengonversi dan merakit dokumen PDF resmi...');
       const fontSize = fontFamily === 'Times New Roman' ? 11 : fontFamily === 'Verdana' ? 10 : 11;
 
@@ -164,7 +175,7 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
           lineSpacing,
           marginCm,
         },
-        articleTitle || 'Draf_Artikel_BRIDA_Mimika'
+        exportTitle || 'Draf_Artikel_BRIDA_Mimika'
       );
 
       showToast('✅ Dokumen PDF resmi berhasil diunduh!');
@@ -350,7 +361,7 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
         <div className="lg:col-span-3 bg-white border border-slate-300 p-6 flex flex-col h-185 overflow-hidden">
           <div className="border-b border-slate-200 pb-3 mb-4 shrink-0 flex items-center justify-between">
             <h3 className="text-xs font-bold text-teal-800 uppercase tracking-wider">
-              Pratinjau Halaman A4 Resmi (WYSIWYG)
+              Pratinjau Halaman A4 Resmi
             </h3>
             <span className="text-[10px] text-slate-400 font-semibold italic">
               *Tampilan menyerupai cetak fisik PDF
@@ -366,11 +377,6 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
             />
           </div>
         </div>
-      </div>
-
-      {/* Footer Note */}
-      <div className="text-center text-xs text-slate-500 font-medium pt-4">
-        BRIDA SMART Editorial Workspace &bull; Terintegrasi Storage Database PostgreSQL &amp; Engine Generative AI Mimika
       </div>
     </div>
   );

@@ -176,6 +176,25 @@ export const AiAssistantService = {
     return result.data;
   },
 
+  /**
+   * Mentransisikan sesi obrolan QA panjang lebar menjadi sesi pembuatan artikel independen baru [Two-Pass Pipeline].
+   * Endpoint: POST /assistant/article/transition
+   */
+  async transitionToArticle(req: {
+    sessionId: string; // ID sesi QA obrolan asal
+    articleTitle: string;
+    targetLength?: 'SHORT' | 'MEDIUM' | 'LONG';
+    tone?: string;
+    userInstruction?: string;
+  }): Promise<ArticleSessionDetail> {
+    const result = await safeFetch(`${API_BASE_URL}/assistant/article/transition`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req),
+    });
+    return result.data;
+  },
+
   async interactArticle(sessionId: string, userInstruction: string): Promise<ArticleSessionDetail> {
     const result = await safeFetch(`${API_BASE_URL}/assistant/article/interact`, {
       method: 'POST',
@@ -220,6 +239,22 @@ export const AiAssistantService = {
     await safeFetch(`${API_BASE_URL}/assistant/article/sessions/${id}`, {
       method: 'DELETE',
     });
+  },
+
+  /**
+   * Mengambil data artikel dari endpoint export-data backend untuk keperluan cetak PDF.
+   * Endpoint: GET /assistant/article/sessions/:id/export-data
+   */
+  async getArticleExportData(id: string): Promise<{
+    title: string;
+    content: string;
+    tone: string;
+    generatedAt: string;
+  }> {
+    const result = await safeFetch(`${API_BASE_URL}/assistant/article/sessions/${id}/export-data`, {
+      method: 'GET',
+    });
+    return result.data;
   },
 
   // --- Metode Manajemen Sesi Obrolan Q&A ---
