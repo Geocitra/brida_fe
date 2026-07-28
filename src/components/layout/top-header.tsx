@@ -19,11 +19,11 @@ interface TopHeaderProps {
 export const TopHeader: React.FC<TopHeaderProps> = ({ activeRoute, onNavigate, onLogout }) => {
   const navItems = [
     { id: 'dashboard', label: 'Dashboard Spasial', icon: LayoutDashboard },
-    { id: 'knowledge-hub', label: 'Repositori Dokumen', icon: FolderOpen },
+    { id: 'generator', label: 'Article Generator', icon: PenTool },
+    { id: 'ai-request', label: 'AI Chat', icon: MessageSquareCode },
     { id: 'analytics', label: 'Analisis', icon: BarChart3 },
     { id: 'reports', label: 'Laporan Terstruktur', icon: FileText },
-    { id: 'ai-request', label: 'AI Chat', icon: MessageSquareCode },
-    { id: 'generator', label: 'Article Generator', icon: PenTool },
+    { id: 'knowledge-hub', label: 'Repositori Dokumen', icon: FolderOpen },
   ];
 
   return (
@@ -56,10 +56,9 @@ export const TopHeader: React.FC<TopHeaderProps> = ({ activeRoute, onNavigate, o
                 onClick={() => onNavigate(item.id)}
                 className={`
                   flex items-center gap-1.5 px-2.5 sm:px-3 py-2 text-xs font-roboto whitespace-nowrap transition-all cursor-pointer
-                  ${
-                    isActive
-                      ? 'border-b-2 border-teal-400 text-teal-300 font-extrabold bg-teal-950/40'
-                      : 'text-slate-300 hover:text-white hover:bg-slate-800/60 font-semibold border-b-2 border-transparent'
+                  ${isActive
+                    ? 'border-b-2 border-teal-400 text-teal-300 font-extrabold bg-teal-950/40'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-800/60 font-semibold border-b-2 border-transparent'
                   }
                 `}
               >

@@ -23,8 +23,10 @@
   --radius-none: 0px;
 }
 
-/* 1. ENFORSEMEN GLOBAL ROUNDED-NONE & FONT ROBOTO */
-/* Menjamin kepatuhan total terhadap tata letak bersudut siku tajam di seluruh elemen UI */
+/* ============================================================================
+   1. ENFORSEMEN GLOBAL ROUNDED-NONE & FONT ROBOTO
+   Menjamin kepatuhan total terhadap tata letak bersudut siku tajam di seluruh elemen UI
+   ============================================================================ */
 * {
   border-radius: var(--radius-none) !important;
   font-family: 'Roboto', sans-serif;
@@ -54,8 +56,10 @@ dialog {
   border-radius: 0px !important;
 }
 
-/* 2. PENONAKTIFAN BROWSER-DEFAULT FOCUS OUTLINES & DOUBLE BORDERS */
-/* Menghilangkan visual ganda atau outline kotak bawaan browser saat elemen difokuskan */
+/* ============================================================================
+   2. PENONAKTIFAN BROWSER-DEFAULT FOCUS OUTLINES & DOUBLE BORDERS
+   Menghilangkan visual ganda atau outline kotak bawaan browser saat elemen difokuskan
+   ============================================================================ */
 input:focus,
 select:focus,
 textarea:focus,
@@ -116,8 +120,11 @@ p,
   color: #334155;
 }
 
-/* 3. EXCEPTION: LEAFLET UI ONLY */
-/* Pengecualian khusus Leaflet untuk memastikan penanda peta merender koordinat lingkaran dengan benar */
+/* ============================================================================
+   3. EXCEPTION: LEAFLET UI & MARKER CLUSTERS
+   Pengecualian khusus untuk menjamin penanda geospasial tetap bulat sempurna 
+   dan tidak terpengaruh oleh paksaan enforsemen global rounded-none.
+   ============================================================================ */
 .leaflet-marker-icon,
 .leaflet-marker-shadow,
 .leaflet-div-icon,
@@ -129,8 +136,13 @@ p,
   border-radius: unset !important;
 }
 
-/* Menjaga penanda titik geospasial lingkaran murni */
-.leaflet-marker-icon div {
+/* Mengamankan pembulatan 50% untuk div marker kustom & klaster Leaflet */
+.leaflet-marker-icon div,
+.custom-pin-icon div,
+.custom-cluster-icon div,
+.custom-cluster-icon,
+.custom-map-marker div,
+.leaflet-marker-icon.custom-map-marker div {
   border-radius: 50% !important;
 }
 
@@ -147,7 +159,33 @@ path.leaflet-interactive:focus-visible {
   box-shadow: none !important;
 }
 
-/* 4. PRINT & PDF EXPORT RULES */
+/* ============================================================================
+   4. SEAMLESS FLAT SCROLLBARS (Pilar Estetika GFW)
+   Mengganti scrollbar tebal bawaan OS dengan scrollbar flat tipis tanpa radius melengkung
+   ============================================================================ */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  /* Slate 300 */
+  border-radius: 0px !important;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+  /* Slate 400 */
+}
+
+/* ============================================================================
+   5. PRINT & PDF EXPORT RULES
+   ============================================================================ */
 @media print {
 
   aside,

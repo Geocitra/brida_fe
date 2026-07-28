@@ -9,6 +9,12 @@ import { AiQaView } from './modules/ai-assistant/views/ai-qa.view';
 import { ArticleGeneratorView } from './modules/ai-assistant/views/article-generator.view';
 import { ArticlePreviewEditorView } from './modules/ai-assistant/views/article-preview-editor.view';
 
+// ============================================================================
+// IMPORTS NEW VIEW: GisExplorerView (Pusat Pengendali Spasial GFW-Style)
+// Diimpor secara default dari direktori modular dashboard [Vite SPA Ready]
+// ============================================================================
+import GisExplorerView from './modules/dashboard/views/gis-explorer.view';
+
 const SESSION_FORWARD_DOCS_KEY = 'brida_forward_doc_ids';
 
 export function App() {
@@ -30,11 +36,12 @@ export function App() {
 
   const pageTitles: Record<string, string> = {
     dashboard: 'Dashboard Spasial & Metrik Perkembangan',
+    'gis-explorer': 'Pusat Pengendali Spasial Kabupaten Mimika',
     'knowledge-hub': 'Knowledge Hub & Manajer Dokumen',
     analytics: 'Analisis Deterministik Statis',
     reports: 'Laporan Terstruktur & Matriks Rekap',
     'ai-request': 'AI Request & Asisten Obrolan Q&A',
-    generator: 'Collaborative Workspace & AI Co-Writer (A4 Canvas)', // Diperbarui agar selaras dengan nama workspace baru [5]
+    generator: 'Collaborative Workspace & AI Co-Writer (A4 Canvas)',
     'article-editor': 'Pratinjau Cetak & Editor Manual',
   };
 
@@ -47,13 +54,13 @@ export function App() {
       sessionStorage.setItem(SESSION_FORWARD_DOCS_KEY, JSON.stringify(documentIds));
       setSharedDocIds(documentIds);
 
-      // --- SINKRONISASI AKTIF UNTUK SENSITIVITAS TRANSISI CHAT KE ARTIKEL [3, 5] ---
+      // --- SINKRONISASI AKTIF UNTUK SENSITIVITAS TRANSISI CHAT KE ARTIKEL [Two-Pass Pipeline] ---
       if (promptText && promptText.startsWith('[TRANSITIONED_SESSION_ID]:')) {
         const transitionedId = promptText.replace('[TRANSITIONED_SESSION_ID]:', '');
 
         setActiveSessionId(transitionedId); // Set ID sesi artikel hasil transisi
         setInitialArticlePrompt(undefined); // Bersihkan prompt transien
-        setActiveRoute('article-editor');   // Alihkan mulus ke editor cetak A4 WYSIWYG [3]
+        setActiveRoute('article-editor');   // Alihkan mulus ke editor cetak A4 WYSIWYG
         return;
       }
 
@@ -82,6 +89,7 @@ export function App() {
   const handleManualNavigation = (route: string) => {
     handleClearSharedDocIds();
     setInitialArticlePrompt(undefined);
+    setActiveSessionId(null);
     setActiveRoute(route);
   };
 
@@ -89,10 +97,23 @@ export function App() {
     return <LoginView onLoginSuccess={() => setIsAuthenticated(true)} />;
   }
 
+  // Merender konten halaman berdasarkan rute yang aktif
   const renderContent = () => {
     switch (activeRoute) {
       case 'dashboard':
-        return <DashboardView />;
+        return (
+          <DashboardView
+            onNavigate={handleManualNavigation}
+            onLogout={() => setIsAuthenticated(false)}
+          />
+        );
+      case 'gis-explorer':
+        return (
+          <GisExplorerView
+            onNavigate={handleManualNavigation}
+            onLogout={() => setIsAuthenticated(false)}
+          />
+        );
       case 'knowledge-hub':
         return (
           <KnowledgeHubView
@@ -146,10 +167,25 @@ export function App() {
           />
         );
       default:
-        return <DashboardView />;
+        return (
+          <DashboardView
+            onNavigate={handleManualNavigation}
+            onLogout={() => setIsAuthenticated(false)}
+          />
+        );
     }
   };
 
+  // ===========================================================================
+  // INTERACTION GUARD & LAYOUT BYPASS
+  // Jika rute aktif adalah pusat pengendali spasial ('gis-explorer'),
+  // langsung render rute tanpa dibungkus AppShell global demi mencapai full-bleed 100dvh.
+  // ===========================================================================
+  if (activeRoute === 'gis-explorer') {
+    return renderContent();
+  }
+
+  // Modul lainnya dirender menggunakan layout terstruktur standar Bappeda/BRIDA
   return (
     <AppShell
       activeRoute={activeRoute}

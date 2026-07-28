@@ -1,0 +1,622 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import {
+    MapPin,
+    Users,
+    Maximize2,
+    History,
+    FileText,
+    AlertCircle,
+    TrendingUp,
+    X
+} from "lucide-react";
+import { useExplorerStore } from "../../store/useExplorerStore";
+import ImageCarousel from "../../../../components/ui/ImageCarousel";
+
+// ============================================================================
+// SOLID LOCAL SEEDING: Detail Drilldown 18 Distrik Kabupaten Mimika
+// Berisi data factual lengkap & rasional spasial sektoral Mimika [Fase 5]
+// ============================================================================
+const MOCK_DRILLDOWN_DETAILS: Record<number, {
+    district_id: number;
+    district_name: string;
+    profile: {
+        luas_wilayah: number;
+        jumlah_penduduk: number;
+        deskripsi: string;
+        batas_wilayah: string;
+        images: string[];
+    };
+    categories: Array<{
+        category_id: number;
+        name: string;
+        total: number;
+    }>;
+    last_updated: string;
+}> = {
+    1: {
+        district_id: 1,
+        district_name: "Mimika Baru",
+        profile: {
+            luas_wilayah: 2216,
+            jumlah_penduduk: 142000,
+            deskripsi: "Distrik Mimika Baru berpusat di kota Timika, berfungsi sebagai episentrum aktivitas perekonomian, perbankan, industri kreatif, serta pusat pemerintahan Kabupaten Mimika. Kepadatan infrastruktur dasar di distrik ini merupakan yang paling maju di seluruh kabupaten.",
+            batas_wilayah: "Utara: Kuala Kencana, Selatan: Wania, Barat: Iwaka, Timur: Mimika Timur",
+            images: ["https://picsum.photos/seed/m-baru-d1/320/180", "https://picsum.photos/seed/m-baru-d2/320/180"]
+        },
+        categories: [
+            { category_id: 1, name: "Kesehatan & Pendidikan", total: 45 },
+            { category_id: 2, name: "Infrastruktur & Pekerjaan Umum", total: 32 },
+            { category_id: 3, name: "Sosial & Logistik", total: 18 }
+        ],
+        last_updated: "2026-07-28T09:00:00Z"
+    },
+    2: {
+        district_id: 2,
+        district_name: "Kuala Kencana",
+        profile: {
+            luas_wilayah: 840,
+            jumlah_penduduk: 28000,
+            deskripsi: "Distrik Kuala Kencana merupakan kota modern terencana yang dikelola secara eksklusif berkolaborasi dengan pihak swasta pertambangan. Memiliki tata kota ramah lingkungan, jaringan kabel bawah tanah, dan kualitas sanitasi berstandar internasional.",
+            batas_wilayah: "Utara: Tembagapura, Selatan: Mimika Baru, Barat: Iwaka, Timur: Kwamki Narama",
+            images: ["https://picsum.photos/seed/kuala-k-d1/320/180", "https://picsum.photos/seed/kuala-k-d2/320/180"]
+        },
+        categories: [
+            { category_id: 1, name: "Kesehatan & Pendidikan", total: 22 },
+            { category_id: 2, name: "Infrastruktur & Pekerjaan Umum", total: 15 },
+            { category_id: 3, name: "Sosial & Logistik", total: 9 }
+        ],
+        last_updated: "2026-07-28T09:00:00Z"
+    },
+    3: {
+        district_id: 3,
+        district_name: "Tembagapura",
+        profile: {
+            luas_wilayah: 1452,
+            jumlah_penduduk: 23000,
+            deskripsi: "Distrik Tembagapura terletak di wilayah pegunungan tinggi bersuhu dingin. Merupakan pusat operasi penambangan emas dan tembaga utama. Distrik ini memiliki tantangan geografis berupa lereng terjal dan risiko tanah longsor tinggi.",
+            batas_wilayah: "Utara: Kabupaten Puncak, Selatan: Kuala Kencana, Barat: Alama, Timur: Hoya",
+            images: ["https://picsum.photos/seed/temb-d1/320/180", "https://picsum.photos/seed/temb-d2/320/180"]
+        },
+        categories: [
+            { category_id: 1, name: "Kesehatan & Pendidikan", total: 14 },
+            { category_id: 2, name: "Infrastruktur & Pekerjaan Umum", total: 28 },
+            { category_id: 3, name: "Sosial & Logistik", total: 12 }
+        ],
+        last_updated: "2026-07-28T09:00:00Z"
+    },
+    4: {
+        district_id: 4,
+        district_name: "Wania",
+        profile: {
+            luas_wilayah: 195,
+            jumlah_penduduk: 61000,
+            deskripsi: "Distrik Wania dikembangkan sebagai kawasan penyangga pemukiman perkotaan Timika. Memiliki konsentrasi pemukiman transmigrasi yang padat, pasar sentral regional, dan perkembangan ruko komersial menengah yang sangat pesat.",
+            batas_wilayah: "Utara: Mimika Baru, Selatan: Mimika Timur, Barat: Iwaka, Timur: Mimika Tengah",
+            images: ["https://picsum.photos/seed/wania-d1/320/180"]
+        },
+        categories: [
+            { category_id: 1, name: "Kesehatan & Pendidikan", total: 31 },
+            { category_id: 2, name: "Infrastruktur & Pekerjaan Umum", total: 19 },
+            { category_id: 3, name: "Sosial & Logistik", total: 14 }
+        ],
+        last_updated: "2026-07-28T09:00:00Z"
+    },
+    5: {
+        district_id: 5,
+        district_name: "Iwaka",
+        profile: {
+            luas_wilayah: 742,
+            jumlah_penduduk: 12000,
+            deskripsi: "Distrik Iwaka didominasi dataran rendah subur yang dimanfaatkan sebagai kawasan perkebunan buah, penangkaran sagu lokal, serta menjadi area perlintasan utama koridor logistik berat menuju pelabuhan dan tambang.",
+            batas_wilayah: "Utara: Kuala Kencana, Selatan: Amar, Barat: Mimika Barat Tengah, Timur: Mimika Baru",
+            images: ["https://picsum.photos/seed/iwaka-d1/320/180"]
+        },
+        categories: [
+            { category_id: 1, name: "Kesehatan & Pendidikan", total: 15 },
+            { category_id: 2, name: "Infrastruktur & Pekerjaan Umum", total: 18 },
+            { category_id: 3, name: "Sosial & Logistik", total: 6 }
+        ],
+        last_updated: "2026-07-28T09:00:00Z"
+    },
+    6: {
+        district_id: 6,
+        district_name: "Kwamki Narama",
+        profile: {
+            luas_wilayah: 45,
+            jumlah_penduduk: 15000,
+            deskripsi: "Distrik Kwamki Narama merupakan kawasan pemukiman adat yang padat. Pemerintah daerah memprioritaskan distrik ini untuk program asimilasi sosial, peningkatan literasi pendidikan dasar, dan pemberdayaan perkebunan rakyat.",
+            batas_wilayah: "Utara: Kuala Kencana, Selatan: Mimika Baru, Barat: Kuala Kencana, Timur: Mimika Tengah",
+            images: ["https://picsum.photos/seed/kwamki-d1/320/180"]
+        },
+        categories: [
+            { category_id: 1, name: "Kesehatan & Pendidikan", total: 24 },
+            { category_id: 2, name: "Infrastruktur & Pekerjaan Umum", total: 11 },
+            { category_id: 3, name: "Sosial & Logistik", total: 8 }
+        ],
+        last_updated: "2026-07-28T09:00:00Z"
+    },
+    7: {
+        district_id: 7,
+        district_name: "Mimika Timur",
+        profile: {
+            luas_wilayah: 211,
+            jumlah_penduduk: 11000,
+            deskripsi: "Distrik Mimika Timur merupakan pintu gerbang jalur logistik kelautan utama Mimika. Berpusat di Mapurujaya, distrik ini melayani operasional pelabuhan nasional Pomako dan industri pengolahan hasil laut laut.",
+            batas_wilayah: "Utara: Mimika Baru, Selatan: Laut Arafura, Barat: Wania, Timur: Mimika Timur Jauh",
+            images: ["https://picsum.photos/seed/m-tim-d1/320/180"]
+        },
+        categories: [
+            { category_id: 1, name: "Kesehatan & Pendidikan", total: 19 },
+            { category_id: 2, name: "Infrastruktur & Pekerjaan Umum", total: 22 },
+            { category_id: 3, name: "Sosial & Logistik", total: 11 }
+        ],
+        last_updated: "2026-07-28T09:00:00Z"
+    },
+    8: {
+        district_id: 8,
+        district_name: "Mimika Tengah",
+        profile: {
+            luas_wilayah: 341,
+            jumlah_penduduk: 5500,
+            deskripsi: "Distrik Mimika Tengah didominasi oleh bentang alam perairan payau dan muara sungai pesisir selatan. Mata pencaharian utama penduduknya adalah nelayan kepiting bakau dan budidaya tambak ikan tradisional.",
+            batas_wilayah: "Utara: Kwamki Narama, Selatan: Laut Arafura, Barat: Wania, Timur: Jita",
+            images: ["https://picsum.photos/seed/m-teng-d1/320/180"]
+        },
+        categories: [
+            { category_id: 1, name: "Kesehatan & Pendidikan", total: 8 },
+            { category_id: 2, name: "Infrastruktur & Pekerjaan Umum", total: 14 },
+            { category_id: 3, name: "Sosial & Logistik", total: 5 }
+        ],
+        last_updated: "2026-07-28T09:00:00Z"
+    },
+    9: {
+        district_id: 9,
+        district_name: "Mimika Barat",
+        profile: {
+            luas_wilayah: 1021,
+            jumlah_penduduk: 4200,
+            deskripsi: "Distrik Mimika Barat berpusat di Kokonao. Merupakan kawasan administratif bersejarah yang menyimpan rekam jejak misionaris pendidikan awal di pesisir Papua. Fokus pada pelestarian peninggalan budaya lokal.",
+            batas_wilayah: "Utara: Mimika Barat Tengah, Selatan: Laut Arafura, Barat: Mimika Barat Jauh, Timur: Amar",
+            images: ["https://picsum.photos/seed/m-barat-d1/320/180"]
+        },
+        categories: [
+            { category_id: 1, name: "Kesehatan & Pendidikan", total: 13 },
+            { category_id: 2, name: "Infrastruktur & Pekerjaan Umum", total: 9 },
+            { category_id: 3, name: "Sosial & Logistik", total: 7 }
+        ],
+        last_updated: "2026-07-28T09:00:00Z"
+    },
+    10: {
+        district_id: 10,
+        district_name: "Agimuga",
+        profile: {
+            luas_wilayah: 4124,
+            jumlah_penduduk: 3800,
+            deskripsi: "Distrik Agimuga merupakan kawasan dataran rendah timur Mimika yang dilalui banyak aliran sungai besar. Pembangunan infrastruktur jalan darat penghubung terus diupayakan untuk mengikis isolasi logistik antar wilayah.",
+            batas_wilayah: "Utara: Jila, Selatan: Laut Arafura, Barat: Jita, Timur: Mimika Timur Jauh",
+            images: ["https://picsum.photos/seed/agimuga-d1/320/180", "https://picsum.photos/seed/agimuga-d2/320/180"]
+        },
+        categories: [
+            { category_id: 1, name: "Kesehatan & Pendidikan", total: 11 },
+            { category_id: 2, name: "Infrastruktur & Pekerjaan Umum", total: 34 },
+            { category_id: 3, name: "Sosial & Logistik", total: 6 }
+        ],
+        last_updated: "2026-07-28T09:00:00Z"
+    },
+    11: {
+        district_id: 11,
+        district_name: "Jila",
+        profile: {
+            luas_wilayah: 6011,
+            jumlah_penduduk: 4500,
+            deskripsi: "Distrik Jila membentang luas di kaki jajaran pegunungan tengah Mimika. Topografi berbukit curam dan lereng batu mempersulit jaringan telekomunikasi dan pembangunan jalan trans-kabupaten.",
+            batas_wilayah: "Utara: Kabupaten Puncak, Selatan: Agimuga, Barat: Hoya, Timur: Jita",
+            images: ["https://picsum.photos/seed/jila-d1/320/180"]
+        },
+        categories: [
+            { category_id: 1, name: "Kesehatan & Pendidikan", total: 9 },
+            { category_id: 2, name: "Infrastruktur & Pekerjaan Umum", total: 18 },
+            { category_id: 3, name: "Sosial & Logistik", total: 5 }
+        ],
+        last_updated: "2026-07-28T09:00:00Z"
+    },
+    12: {
+        district_id: 12,
+        district_name: "Jita",
+        profile: {
+            luas_wilayah: 4121,
+            jumlah_penduduk: 2800,
+            deskripsi: "Distrik Jita merupakan kawasan pedalaman berawa di timur Mimika. Sirkulasi mobilitas masyarakat sangat bergantung pada transportasi sungai, perahu kayu tradisional (*perahu jonson*), dan pasang surut air laut.",
+            batas_wilayah: "Utara: Jila, Selatan: Laut Arafura, Barat: Mimika Tengah, Timur: Agimuga",
+            images: ["https://picsum.photos/seed/jita-d1/320/180"]
+        },
+        categories: [
+            { category_id: 1, name: "Kesehatan & Pendidikan", total: 7 },
+            { category_id: 2, name: "Infrastruktur & Pekerjaan Umum", total: 12 },
+            { category_id: 3, name: "Sosial & Logistik", total: 4 }
+        ],
+        last_updated: "2026-07-28T09:00:00Z"
+    },
+    13: {
+        district_id: 13,
+        district_name: "Mimika Timur Jauh",
+        profile: {
+            luas_wilayah: 2112,
+            jumlah_penduduk: 3200,
+            deskripsi: "Distrik Mimika Timur Jauh terletak di pesisir muara sungai ujung timur Mimika yang berbatasan langsung dengan Kabupaten Asmat. Mayoritas penduduk bekerja mencari ikan dan mengolah sagu hutan alami.",
+            batas_wilayah: "Utara: Agimuga, Selatan: Laut Arafura, Barat: Mimika Timur, Timur: Kabupaten Asmat",
+            images: ["https://picsum.photos/seed/mtimj-d1/320/180"]
+        },
+        categories: [
+            { category_id: 1, name: "Kesehatan & Pendidikan", total: 12 },
+            { category_id: 2, name: "Infrastruktur & Pekerjaan Umum", total: 15 },
+            { category_id: 3, name: "Sosial & Logistik", total: 8 }
+        ],
+        last_updated: "2026-07-28T09:00:00Z"
+    },
+    14: {
+        district_id: 14,
+        district_name: "Mimika Barat Jauh",
+        profile: {
+            luas_wilayah: 2122,
+            jumlah_penduduk: 2100,
+            deskripsi: "Distrik Mimika Barat Jauh berpusat di rumpun pesisir pantai Yaraya-Ipaya. Terkenal dengan potensi pasir pantai putih kelapa rakyat, dan pemanfaatan kincir angin skala mikro untuk listrik kampung pesisir.",
+            batas_wilayah: "Utara: Mimika Barat Tengah, Selatan: Laut Arafura, Barat: Kabupaten Kaimana, Timur: Mimika Barat",
+            images: ["https://picsum.photos/seed/mbarj-d1/320/180"]
+        },
+        categories: [
+            { category_id: 1, name: "Kesehatan & Pendidikan", total: 10 },
+            { category_id: 2, name: "Infrastruktur & Pekerjaan Umum", total: 14 },
+            { category_id: 3, name: "Sosial & Logistik", total: 4 }
+        ],
+        last_updated: "2026-07-28T09:00:00Z"
+    },
+    15: {
+        district_id: 15,
+        district_name: "Mimika Barat Tengah",
+        profile: {
+            luas_wilayah: 1842,
+            jumlah_penduduk: 2400,
+            deskripsi: "Distrik Mimika Barat Tengah melayani rute penghubung transportasi laut logistik ringan antar pesisir barat. Memiliki bentang muara yang luas dan dilindungi ekosistem hutan bakau (*mangrove*) tebal alami.",
+            batas_wilayah: "Utara: Kabupaten Deiyai, Selatan: Mimika Barat, Barat: Mimika Barat Jauh, Timur: Iwaka",
+            images: ["https://picsum.photos/seed/mbar-t-d1/320/180"]
+        },
+        categories: [
+            { category_id: 1, name: "Kesehatan & Pendidikan", total: 11 },
+            { category_id: 2, name: "Infrastruktur & Pekerjaan Umum", total: 13 },
+            { category_id: 3, name: "Sosial & Logistik", total: 5 }
+        ],
+        last_updated: "2026-07-28T09:00:00Z"
+    },
+    16: {
+        district_id: 16,
+        district_name: "Amar",
+        profile: {
+            luas_wilayah: 1221,
+            jumlah_penduduk: 1800,
+            deskripsi: "Distrik Amar merupakan kawasan pesisir rawa dengan mayoritas vegetasi nipa dan hutan payau. Sentra andalan daerah untuk penangkapan kepiting bakau (*Scylla serrata*) berkualitas ekspor.",
+            batas_wilayah: "Utara: Iwaka, Selatan: Laut Arafura, Barat: Mimika Barat, Timur: Mimika Barat Tengah",
+            images: ["https://picsum.photos/seed/amar-d1/320/180"]
+        },
+        categories: [
+            { category_id: 1, name: "Kesehatan & Pendidikan", total: 6 },
+            { category_id: 2, name: "Infrastruktur & Pekerjaan Umum", total: 11 },
+            { category_id: 3, name: "Sosial & Logistik", total: 5 }
+        ],
+        last_updated: "2026-07-28T09:00:00Z"
+    },
+    17: {
+        district_id: 17,
+        district_name: "Hoya",
+        profile: {
+            luas_wilayah: 2450,
+            jumlah_penduduk: 1200,
+            deskripsi: "Distrik Hoya terletak jauh di lembah sempit terdalam pegunungan Mimika. Akses jalan darat sama sekali tidak tersedia, membuat wilayah ini memiliki tantangan keterisolasian yang tinggi dalam pemenuhan kesehatan, logistik dasar, dan guru ajar.",
+            batas_wilayah: "Utara: Kabupaten Intan Jaya, Selatan: Jila, Barat: Tembagapura, Timur: Alama",
+            images: ["https://picsum.photos/seed/hoya-d1/320/180", "https://picsum.photos/seed/hoya-d2/320/180"]
+        },
+        categories: [
+            { category_id: 1, name: "Kesehatan & Pendidikan", total: 14 },
+            { category_id: 2, name: "Infrastruktur & Pekerjaan Umum", total: 29 },
+            { category_id: 3, name: "Sosial & Logistik", total: 11 }
+        ],
+        last_updated: "2026-07-28T09:00:00Z"
+    },
+    18: {
+        district_id: 18,
+        district_name: "Alama",
+        profile: {
+            luas_wilayah: 4110,
+            jumlah_penduduk: 1600,
+            deskripsi: "Distrik Alama terletak di ujung timur laut pegunungan terjal Mimika. Memiliki kepadatan penduduk paling kecil dengan sebaran perkampungan adat tradisional di lembah-lembah perbukitan terpencil.",
+            batas_wilayah: "Utara: Kabupaten Lanny Jaya, Selatan: Jita, Barat: Hoya, Timur: Kabupaten Nduga",
+            images: ["https://picsum.photos/seed/alama-d1/320/180"]
+        },
+        categories: [
+            { category_id: 1, name: "Kesehatan & Pendidikan", total: 8 },
+            { category_id: 2, name: "Infrastruktur & Pekerjaan Umum", total: 15 },
+            { category_id: 3, name: "Sosial & Logistik", total: 4 }
+        ],
+        last_updated: "2026-07-28T09:00:00Z"
+    }
+};
+
+type TabType = "umum" | "analisis";
+
+export interface DetailPanelProps {
+    districtId: number | string;
+    districtName: string;
+    panelId: string;
+}
+
+export default function DetailPanel({
+    districtId,
+    districtName,
+    panelId
+}: DetailPanelProps) {
+    const { closePanel } = useExplorerStore();
+    const [data, setData] = useState<any | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+
+    // State Pengatur Tab Visual
+    const [activeTab, setActiveTab] = useState<TabType>("umum");
+    const [animateBars, setAnimateBars] = useState(false);
+
+    // Memuat profil detail wilayah instan secara lokal
+    useEffect(() => {
+        let isMounted = true;
+        setAnimateBars(false);
+        setLoading(true);
+        setError(null);
+
+        const timer = setTimeout(() => {
+            if (!isMounted) return;
+
+            const matchedData = MOCK_DRILLDOWN_DETAILS[Number(districtId)];
+            if (matchedData) {
+                setData(matchedData);
+            } else {
+                setError("Data profil distrik tidak terdaftar di database.");
+            }
+            setLoading(false);
+        }, 120);
+
+        return () => {
+            isMounted = false;
+            clearTimeout(timer);
+        };
+    }, [districtId]);
+
+    // Memicu animasi bar chart saat beralih ke tab analisis
+    useEffect(() => {
+        if (activeTab === "analisis" && data) {
+            const delay = setTimeout(() => setAnimateBars(true), 50);
+            return () => clearTimeout(delay);
+        } else {
+            setAnimateBars(false);
+        }
+    }, [activeTab, data]);
+
+    const totalDatasets = data ? data.categories.reduce((acc: number, curr: any) => acc + curr.total, 0) : 0;
+    const maxCategoryValue = data && data.categories.length > 0
+        ? Math.max(...data.categories.map((c: any) => c.total))
+        : 1;
+
+    // Klasifikasi pewarnaan diagram batang sektoral (Pilar 3 compliant)
+    const getCategoryColor = (name: string) => {
+        const lowerName = name.toLowerCase();
+        if (lowerName.includes('kesehatan') || lowerName.includes('pendidikan')) return 'bg-rose-500';
+        if (lowerName.includes('sosial') || lowerName.includes('logistik')) return 'bg-indigo-500';
+        if (lowerName.includes('infrastruktur') || lowerName.includes('pekerjaan umum')) return 'bg-amber-500';
+        return 'bg-slate-500';
+    };
+
+    if (loading) {
+        return (
+            <div className="space-y-4 animate-pulse px-4 py-5 bg-white h-full w-full select-none">
+                <div className="h-6 w-full bg-slate-200" />
+                <div className="h-3 w-3/4 bg-slate-200" />
+                <div className="h-3 w-full bg-slate-200" />
+            </div>
+        );
+    }
+
+    if (error || !data) {
+        return (
+            <div className="flex flex-col items-center justify-center py-12 text-center px-4 bg-white h-full w-full select-none">
+                <AlertCircle className="text-rose-600 mb-3" size={28} />
+                <p className="text-[12px] font-bold text-slate-700">{error || "Sistem Gagal Memuat Data"}</p>
+                {panelId && (
+                    <button
+                        onClick={() => closePanel(panelId)}
+                        className="mt-4 px-3 py-1.5 border border-slate-300 text-[10px] font-bold uppercase tracking-wider text-slate-600 hover:bg-slate-50 cursor-pointer"
+                    >
+                        Tutup Panel
+                    </button>
+                )}
+            </div>
+        );
+    }
+
+    const profileImages = data.profile.images || [];
+
+    return (
+        <div className="flex flex-col w-full h-full bg-white relative text-slate-800">
+
+            {/* SECTION 1: HEADER & TAB - Rapat Siku (Anti Nested-Box) */}
+            <div className="flex flex-col border-b border-slate-200 bg-white sticky top-0 z-10 shadow-sm select-none">
+                {/* Title Bar */}
+                <div className="flex items-center justify-between px-4 py-2 border-b border-slate-200 bg-slate-50">
+                    <div className="flex flex-col text-left">
+                        <span className="text-[9px] font-bold text-teal-700 uppercase tracking-widest leading-none">
+                            Profil Wilayah
+                        </span>
+                        <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider truncate mt-1">
+                            {districtName}
+                        </h3>
+                    </div>
+
+                    {panelId && (
+                        <button
+                            onClick={() => closePanel(panelId)}
+                            className="p-1.5 text-slate-400 hover:bg-slate-200 hover:text-slate-900 transition-colors rounded-none cursor-pointer shrink-0"
+                            title="Tutup Panel"
+                        >
+                            <X size={14} strokeWidth={2.5} />
+                        </button>
+                    )}
+                </div>
+
+                {/* Tab Navigator */}
+                <div className="flex bg-white">
+                    <button
+                        onClick={() => setActiveTab("umum")}
+                        className={`flex-1 py-2.5 text-[10px] font-bold uppercase tracking-wider transition-colors cursor-pointer ${activeTab === "umum"
+                            ? "border-b-2 border-teal-700 text-teal-800 bg-teal-50/30"
+                            : "border-b-2 border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50"
+                            }`}
+                    >
+                        Data Umum
+                    </button>
+                    <button
+                        onClick={() => setActiveTab("analisis")}
+                        className={`flex-1 py-2.5 text-[10px] font-bold uppercase tracking-wider transition-colors cursor-pointer ${activeTab === "analisis"
+                            ? "border-b-2 border-teal-700 text-teal-800 bg-teal-50/30"
+                            : "border-b-2 border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50"
+                            }`}
+                    >
+                        Analitik Data
+                    </button>
+                </div>
+            </div>
+
+            {/* TAB CONTENT A: DATA UMUM */}
+            {activeTab === "umum" && (
+                <div className="flex flex-col pb-6 bg-white animate-in fade-in duration-200">
+                    {/* Hero Image Slider */}
+                    <ImageCarousel images={profileImages} altText={`Visualisasi Wilayah ${districtName}`} />
+
+                    {/* Geografi & Kependudukan (High-Density Row) */}
+                    <div className="flex flex-col border-b border-slate-200 py-3 px-4 gap-2.5 bg-white select-none">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2 text-slate-500">
+                                <Maximize2 size={13} strokeWidth={2.5} className="text-teal-700" />
+                                <span className="text-[10px] font-bold uppercase tracking-wider">Luas Wilayah</span>
+                            </div>
+                            <div className="text-right flex items-baseline gap-1">
+                                <span className="text-[13px] font-bold tracking-tight text-slate-800">
+                                    {data.profile.luas_wilayah.toLocaleString('id-ID')}
+                                </span>
+                                <span className="text-[9px] text-slate-500 font-bold uppercase">km²</span>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2 text-slate-500">
+                                <Users size={13} strokeWidth={2.5} className="text-teal-700" />
+                                <span className="text-[10px] font-bold uppercase tracking-wider">Total Populasi</span>
+                            </div>
+                            <div className="text-right flex items-baseline gap-1">
+                                <span className="text-[13px] font-bold tracking-tight text-slate-800">
+                                    {data.profile.jumlah_penduduk.toLocaleString('id-ID')}
+                                </span>
+                                <span className="text-[9px] text-slate-500 font-bold uppercase">Jiwa</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Deskripsi Gambaran Umum */}
+                    <div className="flex flex-col border-b border-slate-200 py-3 px-4 gap-1.5 bg-white text-left">
+                        <div className="flex items-center gap-2 text-slate-500 mb-0.5 select-none">
+                            <FileText size={13} strokeWidth={2.5} className="text-teal-700" />
+                            <h4 className="text-[10px] font-bold uppercase tracking-wider">Gambaran Umum</h4>
+                        </div>
+                        <p className="text-[11px] text-slate-700 font-normal leading-relaxed text-justify">
+                            {data.profile.deskripsi}
+                        </p>
+                    </div>
+
+                    {/* Batas Batas Wilayah */}
+                    <div className="flex flex-col border-b border-slate-200 py-3 px-4 gap-1.5 bg-white text-left">
+                        <div className="flex items-center gap-2 text-slate-500 mb-0.5 select-none">
+                            <MapPin size={13} strokeWidth={2.5} className="text-teal-700" />
+                            <h4 className="text-[10px] font-bold uppercase tracking-wider">Batas Administrasi</h4>
+                        </div>
+                        <p className="text-[11px] text-slate-800 font-bold leading-relaxed">
+                            {data.profile.batas_wilayah}
+                        </p>
+                    </div>
+                </div>
+            )}
+
+            {/* TAB CONTENT B: DATA ANALISIS */}
+            {activeTab === "analisis" && (
+                <div className="flex flex-col pb-6 bg-white animate-in fade-in duration-200">
+                    {/* Summary Header */}
+                    <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 py-2.5 px-4 select-none">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Sebaran Dataset Sektoral</span>
+                        <div className="flex items-center gap-1.5 bg-white border border-slate-200 px-2 py-1 shadow-sm">
+                            <TrendingUp size={12} className="text-teal-700" strokeWidth={2.5} />
+                            <span className="text-[9px] font-black text-teal-800 uppercase tracking-wider">
+                                {totalDatasets} Dataset
+                            </span>
+                        </div>
+                    </div>
+
+                    {/* Sectoral Progress Bar list - Flush List (No Cards) */}
+                    <div className="flex flex-col bg-white">
+                        {data.categories.map((cat: any) => {
+                            const barPercentage = maxCategoryValue > 0 ? (cat.total / maxCategoryValue) * 100 : 0;
+                            const totalPercentage = totalDatasets > 0 ? ((cat.total / totalDatasets) * 100).toFixed(1) : 0;
+                            const barColor = getCategoryColor(cat.name);
+
+                            return (
+                                <div key={cat.category_id} className="flex flex-col border-b border-slate-100 py-2.5 px-4 gap-1.5 hover:bg-slate-50 transition-colors bg-white text-left">
+                                    <div className="flex justify-between items-end">
+                                        <div className="flex flex-col gap-0.5">
+                                            <span className="text-[11px] font-bold text-slate-700 uppercase tracking-tight">
+                                                {cat.name}
+                                            </span>
+                                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
+                                                {totalPercentage}% dari total wilayah
+                                            </span>
+                                        </div>
+                                        <div className="text-right flex items-baseline gap-1 select-none">
+                                            <span className="text-[13px] font-bold tracking-tight text-slate-800 font-mono">
+                                                {cat.total}
+                                            </span>
+                                            <span className="text-[9px] text-slate-500 font-bold uppercase">Set</span>
+                                        </div>
+                                    </div>
+
+                                    {/* Progress Bar - Siku Siku Tajam */}
+                                    <div className="w-full h-1 bg-slate-100 rounded-none overflow-hidden mt-0.5 select-none">
+                                        <div
+                                            className={`h-full ${barColor} rounded-none transition-all ease-out duration-1000`}
+                                            style={{ width: animateBars ? `${Math.max(barPercentage, 1)}%` : '0%' }}
+                                        />
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
+
+            {/* SECTION 4: FOOTER UPDATE TIMESTAMP */}
+            <div className="py-2.5 px-4 bg-slate-50 text-slate-500 flex items-center justify-between border-t border-slate-200 mt-auto select-none">
+                <div className="flex items-center gap-2">
+                    <History size={12} strokeWidth={2} />
+                    <span className="text-[9px] font-bold uppercase tracking-wider">Sinkronisasi Terakhir</span>
+                </div>
+                <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider font-mono">
+                    {data.last_updated ? new Date(data.last_updated).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }) : "-"}
+                </span>
+            </div>
+
+        </div>
+    );
+}
