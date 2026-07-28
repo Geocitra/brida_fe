@@ -429,11 +429,25 @@ import { AnalyticsView } from './modules/analytics/views/analytics.view';
 import { ReportsView } from './modules/reports/views/reports.view';
 import { AiQaView } from './modules/ai-assistant/views/ai-qa.view';
 import { ArticleGeneratorView } from './modules/ai-assistant/views/article-generator.view';
+import { ArticlePreviewEditorView } from './modules/ai-assistant/views/article-preview-editor.view';
+
+const SESSION_FORWARD_DOCS_KEY = 'brida_forward_doc_ids';
 
 export function App() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(true);
   const [activeRoute, setActiveRoute] = useState('dashboard');
   const [initialArticlePrompt, setInitialArticlePrompt] = useState<string | undefined>(undefined);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+
+  const [sharedDocIds, setSharedDocIds] = useState<string[] | undefined>(() => {
+    try {
+      const stored = sessionStorage.getItem(SESSION_FORWARD_DOCS_KEY);
+      return stored ? JSON.parse(stored) : undefined;
+    } catch (err) {
+      console.warn('[SessionStorage] Gagal menginisialisasi sharedDocIds:', err);
+      return undefined;
+    }
+  });
 
   const pageTitles: Record<string, string> = {
     dashboard: 'Dashboard Spasial & Metrik Perkembangan',
@@ -442,11 +456,43 @@ export function App() {
     reports: 'Laporan Terstruktur & Matriks Rekap',
     'ai-request': 'AI Request & Asisten Obrolan Q&A',
     generator: 'Article Generator & Public Drafting (CoT)',
+    'article-editor': 'Pratinjau Cetak & Editor Manual',
   };
 
-  const handleNavigateToGenerator = (promptText?: string) => {
-    setInitialArticlePrompt(promptText);
-    setActiveRoute('generator');
+  const handleForwardAction = (documentIds: string[], targetRoute: string, promptText?: string) => {
+    try {
+      sessionStorage.setItem(SESSION_FORWARD_DOCS_KEY, JSON.stringify(documentIds));
+      setSharedDocIds(documentIds);
+
+      if (promptText && promptText.startsWith('[TRANSITIONED_SESSION_ID]:')) {
+        const transitionedId = promptText.replace('[TRANSITIONED_SESSION_ID]:', '');
+
+        setActiveSessionId(transitionedId);
+        setInitialArticlePrompt(undefined);
+        setActiveRoute('article-editor');
+        return;
+      }
+
+      setInitialArticlePrompt(promptText || undefined);
+      setActiveRoute(targetRoute);
+    } catch (err) {
+      console.error('[Forward Action] Gagal mengamankan state ke SessionStorage:', err);
+    }
+  };
+
+  const handleClearSharedDocIds = () => {
+    try {
+      sessionStorage.removeItem(SESSION_FORWARD_DOCS_KEY);
+      setSharedDocIds(undefined);
+    } catch (err) {
+      console.error('[SessionStorage] Gagal menghapus kunci forward docs:', err);
+    }
+  };
+
+  const handleManualNavigation = (route: string) => {
+    handleClearSharedDocIds();
+    setInitialArticlePrompt(undefined);
+    setActiveRoute(route);
   };
 
   if (!isAuthenticated) {
@@ -458,22 +504,54 @@ export function App() {
       case 'dashboard':
         return <DashboardView />;
       case 'knowledge-hub':
-        return <KnowledgeHubView />;
+        return (
+          <KnowledgeHubView
+            onForward={(docIds, targetRoute, prompt) => handleForwardAction(docIds, targetRoute, prompt)}
+          />
+        );
       case 'analytics':
-        return <AnalyticsView />;
+        return (
+          <AnalyticsView
+            initialSelectedDocIds={sharedDocIds}
+            onClearSharedDocIds={handleClearSharedDocIds}
+            onNavigateToGenerator={(prompt) => handleForwardAction(sharedDocIds || [], 'generator', prompt)}
+          />
+        );
       case 'reports':
-        return <ReportsView />;
+        return (
+          <ReportsView
+            initialSelectedDocIds={sharedDocIds}
+            onClearSharedDocIds={handleClearSharedDocIds}
+            onNavigateToGenerator={(prompt) => handleForwardAction(sharedDocIds || [], 'generator', prompt)}
+            onNavigateToDashboard={() => handleManualNavigation('dashboard')}
+          />
+        );
       case 'ai-request':
         return (
           <AiQaView
-            onNavigateToGenerator={(prompt) => handleNavigateToGenerator(prompt)}
+            initialSelectedDocIds={sharedDocIds}
+            onClearSharedDocIds={handleClearSharedDocIds}
+            onNavigateToGenerator={(prompt) => handleForwardAction(sharedDocIds || [], 'generator', prompt)}
           />
         );
       case 'generator':
         return (
           <ArticleGeneratorView
+            initialSelectedDocIds={sharedDocIds}
+            onClearSharedDocIds={handleClearSharedDocIds}
             initialPrompt={initialArticlePrompt}
-            onNavigateToQa={() => setActiveRoute('ai-request')}
+            onNavigateToQa={() => handleManualNavigation('ai-request')}
+            onNavigateToEditor={(sessionId) => {
+              setActiveSessionId(sessionId);
+              setActiveRoute('article-editor');
+            }}
+          />
+        );
+      case 'article-editor':
+        return (
+          <ArticlePreviewEditorView
+            sessionId={activeSessionId}
+            onBack={() => setActiveRoute('generator')}
           />
         );
       default:
@@ -484,7 +562,7 @@ export function App() {
   return (
     <AppShell
       activeRoute={activeRoute}
-      onNavigate={(route) => setActiveRoute(route)}
+      onNavigate={handleManualNavigation}
       pageTitle={pageTitles[activeRoute] || 'Executive Dashboard'}
       onLogout={() => setIsAuthenticated(false)}
     >
@@ -1286,7 +1364,7 @@ export const ArticlePreviewWorkspace: React.FC<ArticlePreviewWorkspaceProps> = (
                 </label>
                 <div className="flex-1 overflow-y-auto border border-slate-300 bg-slate-200/50 p-6 flex justify-center no-print">
                     <div
-                        className={`bg-white shadow-lg border border-slate-300 text-slate-800 text-justify text-left prose max-w-none prose-slate prose-xs focus:outline-none transition-all ${fontStyles[fontFamily]}`}
+                        className={`bg-white shadow-lg border border-slate-300 text-slate-800 text-justify prose max-w-none prose-slate prose-xs focus:outline-none transition-all ${fontStyles[fontFamily]}`}
                         style={{
                             lineHeight: lineSpacing,
                             padding: `${marginCm}cm`,
@@ -1318,7 +1396,7 @@ import {
   Plus,
   Trash2,
   MessageSquare,
-
+  X,
   Clock,
   ShieldAlert,
   WifiOff,
@@ -1512,7 +1590,7 @@ export const RichMessageRenderer: React.FC<RichMessageRendererProps> = ({ text }
           className="text-xs text-slate-800 font-normal leading-relaxed my-2 font-roboto text-justify"
         >
           {parseInlineStyles(line)}
-        </p>,
+        </p>
       );
     }
   }
@@ -1686,6 +1764,13 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const [qaSessions, setQaSessions] = useState<QaSessionItem[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState<boolean>(false);
   const [showHistorySidebar, setShowHistorySidebar] = useState<boolean>(true);
+
+  const [isTransitionModalOpen, setIsTransitionModalOpen] = useState(false);
+  const [transitionTitle, setTransitionTitle] = useState('');
+  const [transitionTone, setTransitionTone] = useState('solutif');
+  const [transitionLength, setTransitionLength] = useState<'SHORT' | 'MEDIUM' | 'LONG'>('MEDIUM');
+  const [transitionInstruction, setTransitionInstruction] = useState('');
+  const [isTransitioning, setIsTransitioning] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -1899,6 +1984,40 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     executeSendMessage(inputQuery);
   };
 
+  const handleOpenTransitionModal = () => {
+    if (!sessionId) return;
+    const activeSession = qaSessions.find((s) => s.id === sessionId);
+    const baseTitle = activeSession ? activeSession.title : 'Hasil Diskusi';
+    setTransitionTitle(`Artikel Hasil: ${baseTitle}`);
+    setTransitionInstruction('');
+    setIsTransitionModalOpen(true);
+  };
+
+  const handleTransitionSubmit = async () => {
+    if (!sessionId || isTransitioning) return;
+
+    setIsTransitioning(true);
+    try {
+      const result = await AiAssistantService.transitionToArticle({
+        sessionId,
+        articleTitle: transitionTitle,
+        tone: transitionTone,
+        targetLength: transitionLength,
+        userInstruction: transitionInstruction,
+      });
+
+      setIsTransitionModalOpen(false);
+
+      if (onArticleIntentDetected) {
+        onArticleIntentDetected(`[TRANSITIONED_SESSION_ID]:${result.id}`);
+      }
+    } catch (err: any) {
+      alert(`Gagal mentransisikan diskusi ke draf naskah: ${err.message || err}`);
+    } finally {
+      setIsTransitioning(false);
+    }
+  };
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 h-150 lg:h-162.5">
       { }
@@ -1982,6 +2101,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
               <h2 className="text-sm font-bold text-slate-900 uppercase">AI Chat Assistant</h2>
             </div>
           </div>
+
         </div>
 
         { }
@@ -2083,26 +2203,171 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         { }
         {}
         <form onSubmit={handleFormSubmit} className="p-4 border-t border-slate-300 bg-white no-print">
-          <div className="flex items-center border border-slate-400 focus-within:border-teal-600 bg-slate-50 transition-colors">
-            <input
-              type="text"
-              value={inputQuery}
-              onChange={(e) => setInputQuery(e.target.value)}
-              placeholder={hasSelectedDoc ? 'Ketik pertanyaan analitis Anda di sini...' : 'Pilih dokumen sumber terlebih dahulu...'}
-              disabled={!hasSelectedDoc || isLoading}
-              className="flex-1 bg-transparent px-4 py-3 text-xs text-slate-900 font-semibold focus:outline-none disabled:opacity-50"
-            />
-            <button
-              type="submit"
-              disabled={!hasSelectedDoc || !inputQuery.trim() || isLoading}
-              className="px-5 py-3 bg-teal-700 hover:bg-teal-800 disabled:bg-slate-55 text-white disabled:text-slate-500 font-bold text-xs uppercase transition-colors flex items-center gap-2 cursor-pointer disabled:cursor-not-allowed shrink-0 h-full"
-            >
-              <span>Kirim</span>
-              <Send size={14} className="shrink-0" />
-            </button>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="flex-1 flex items-center border border-slate-400 focus-within:border-teal-600 bg-slate-50 transition-colors">
+              <input
+                type="text"
+                value={inputQuery}
+                onChange={(e) => setInputQuery(e.target.value)}
+                placeholder={hasSelectedDoc ? 'Ketik pertanyaan analitis Anda di sini...' : 'Pilih dokumen sumber terlebih dahulu...'}
+                disabled={!hasSelectedDoc || isLoading}
+                className="flex-1 bg-transparent px-4 py-3 text-xs text-slate-900 font-semibold focus:outline-none disabled:opacity-50"
+              />
+              <button
+                type="submit"
+                disabled={!hasSelectedDoc || !inputQuery.trim() || isLoading}
+                className="px-5 py-3 bg-teal-700 hover:bg-teal-800 disabled:bg-slate-50 text-white disabled:text-slate-500 font-bold text-xs uppercase transition-colors flex items-center gap-2 cursor-pointer disabled:cursor-not-allowed shrink-0 h-full"
+              >
+                <span>Kirim</span>
+                <Send size={14} className="shrink-0" />
+              </button>
+            </div>
+
+            {sessionId && (
+              <button
+                type="button"
+                onClick={handleOpenTransitionModal}
+                disabled={isLoading || messages.length === 0}
+                className="px-5 py-3 bg-teal-700 hover:bg-teal-850 disabled:bg-slate-300 text-white disabled:text-slate-500 font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-1.5 border border-teal-800 shadow-2xs cursor-pointer disabled:cursor-not-allowed transition-all shrink-0 justify-center"
+                title="Konversi transkrip percakapan aktif secara terintegrasi menjadi draf naskah rilis baru"
+              >
+                <PenTool size={14} className="shrink-0" />
+                <span>Jadikan Artikel</span>
+              </button>
+            )}
           </div>
         </form>
       </div>
+
+      {}
+      {isTransitionModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-300 shadow-2xl max-w-lg w-full p-6 rounded-none space-y-4 font-roboto text-left">
+
+            {}
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+              <div className="flex items-center gap-2 text-slate-900">
+                <PenTool size={18} className="text-teal-700 shrink-0" />
+                <h3 className="text-xs font-bold uppercase tracking-wider">Transisikan Diskusi ke draf naskah</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsTransitionModalOpen(false)}
+                disabled={isTransitioning}
+                className="text-slate-400 hover:text-slate-700 cursor-pointer p-0.5"
+                title="Tutup Panel"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {}
+            <div className="space-y-4">
+              <p className="text-xs text-slate-600 leading-relaxed font-semibold text-justify">
+                AI Engine akan mengambil seluruh riwayat tanya-jawab dalam sesi diskusi ini secara kronologis, men-distilasi konsensus obrolan, kemudian melahirkan sesi draf artikel baru yang independen dengan mengamankan keterkaitan sitasi dokumen asal.
+              </p>
+
+              {}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide">
+                  Judul Artikel Baru
+                </label>
+                <input
+                  type="text"
+                  value={transitionTitle}
+                  onChange={(e) => setTransitionTitle(e.target.value)}
+                  required
+                  disabled={isTransitioning}
+                  placeholder="Masukkan judul draf publikasi..."
+                  className="w-full text-xs p-2.5 border border-slate-300 focus:outline-none focus:border-teal-700 rounded-none font-semibold bg-slate-50 focus:bg-white"
+                />
+              </div>
+
+              {}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide">
+                    Gaya Bahasa (Tone)
+                  </label>
+                  <select
+                    value={transitionTone}
+                    onChange={(e) => setTransitionTone(e.target.value)}
+                    disabled={isTransitioning}
+                    className="w-full text-xs p-2.5 border border-slate-300 focus:outline-none focus:border-teal-700 bg-white font-semibold rounded-none"
+                  >
+                    <option value="solutif">SOLUTIF</option>
+                    <option value="kritis">KRITIS</option>
+                    <option value="akademis">AKADEMIS</option>
+                    <option value="populer">POPULER</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide">
+                    Panjang Target Teks
+                  </label>
+                  <select
+                    value={transitionLength}
+                    onChange={(e) => setTransitionLength(e.target.value as any)}
+                    disabled={isTransitioning}
+                    className="w-full text-xs p-2.5 border border-slate-300 focus:outline-none focus:border-teal-700 bg-white font-semibold rounded-none"
+                  >
+                    <option value="SHORT">Ringkas (~700 Kata)</option>
+                    <option value="MEDIUM">Sedang (~1000 Kata)</option>
+                    <option value="LONG">Mendalam (~1500 Kata)</option>
+                  </select>
+                </div>
+              </div>
+
+              {}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide">
+                  Instruksi Khusus Tambahan (Opsional)
+                </label>
+                <textarea
+                  value={transitionInstruction}
+                  onChange={(e) => setTransitionInstruction(e.target.value)}
+                  disabled={isTransitioning}
+                  placeholder="Contoh: Fokuskan pembahasan pada aspek fiskal pendapatan daerah Mimika dan kurangi bahasan jembatan..."
+                  className="w-full text-xs p-2.5 border border-slate-300 focus:outline-none focus:border-teal-700 rounded-none font-semibold bg-slate-50 focus:bg-white h-20 resize-none leading-relaxed"
+                />
+              </div>
+            </div>
+
+            {}
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200">
+              <button
+                type="button"
+                onClick={() => setIsTransitionModalOpen(false)}
+                disabled={isTransitioning}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs uppercase border border-slate-300 rounded-none cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleTransitionSubmit}
+                disabled={isTransitioning || !transitionTitle.trim()}
+                className="px-4 py-2 bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs uppercase tracking-wider border border-teal-850 rounded-none inline-flex items-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                {isTransitioning ? (
+                  <>
+                    <Loader2 size={13} className="animate-spin" />
+                    <span>Memproses Sesi...</span>
+                  </>
+                ) : (
+                  <>
+                    <PenTool size={13} />
+                    <span>Mulai Transisi Sesi</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };
@@ -2159,10 +2424,10 @@ export const FormatControlPanel: React.FC<FormatControlPanelProps> = ({
                     disabled={disabled || isSaving || isPrinting}
                     className="w-full bg-white border border-slate-400 text-xs font-bold px-2.5 py-2 rounded-none focus:outline-none focus:border-teal-600 shadow-xs cursor-pointer disabled:opacity-50"
                 >
-                    <option value="Calibri">Geocitra (Calibri)</option>
-                    <option value="Times New Roman">Geocitra (TNR 11pt)</option>
-                    <option value="Verdana">Geocitra (Verdana 10pt)</option>
-                    <option value="Arial">Geocitra (Arial 11pt)</option>
+                    <option value="Calibri">Calibri</option>
+                    <option value="Times New Roman">Times New Roman</option>
+                    <option value="Verdana">Verdana 10pt</option>
+                    <option value="Arial">Arial 11pt</option>
                 </select>
             </div>
 
@@ -2402,7 +2667,7 @@ export const InteractivePaperSheet: React.FC<InteractivePaperSheetProps> = ({
         <div className="flex justify-center bg-slate-200/50 p-6 overflow-x-auto select-none no-print w-full">
             {}
             <div
-                className={`bg-white shadow-lg border border-slate-300 text-slate-800 text-justify text-left prose max-w-none prose-slate prose-xs focus:outline-none transition-all ${fontStyles[fontFamily]}`}
+                className={`bg-white shadow-lg border border-slate-300 text-slate-800 text-justify prose max-w-none prose-slate prose-xs focus:outline-none transition-all ${fontStyles[fontFamily]}`}
                 style={{
                     lineHeight: lineSpacing,
                     padding: `${marginCm}cm`,
@@ -2569,9 +2834,15 @@ import {
 
 interface AiQaViewProps {
   onNavigateToGenerator: (initialPrompt?: string) => void;
+  initialSelectedDocIds?: string[];
+  onClearSharedDocIds?: () => void;
 }
 
-export const AiQaView: React.FC<AiQaViewProps> = ({ onNavigateToGenerator }) => {
+export const AiQaView: React.FC<AiQaViewProps> = ({
+  onNavigateToGenerator,
+  initialSelectedDocIds,
+  onClearSharedDocIds,
+}) => {
   const [documents, setDocuments] = useState<DocumentRecord[]>([]);
   const [selectedDocIds, setSelectedDocIds] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -2584,8 +2855,11 @@ export const AiQaView: React.FC<AiQaViewProps> = ({ onNavigateToGenerator }) => 
     try {
       const docs = await DocumentService.listDocuments();
       setDocuments(docs || []);
-      if (docs && docs.length > 0 && selectedDocIds.length === 0) {
-        setSelectedDocIds([docs[0].id]);
+
+      if (!initialSelectedDocIds || initialSelectedDocIds.length === 0) {
+        if (docs && docs.length > 0 && selectedDocIds.length === 0) {
+          setSelectedDocIds([docs[0].id]);
+        }
       }
     } catch (err: any) {
       setDocuments([]);
@@ -2598,6 +2872,23 @@ export const AiQaView: React.FC<AiQaViewProps> = ({ onNavigateToGenerator }) => 
   useEffect(() => {
     loadDocuments();
   }, []);
+
+  useEffect(() => {
+    if (documents.length > 0) {
+      if (initialSelectedDocIds && initialSelectedDocIds.length > 0) {
+
+        const validIds = initialSelectedDocIds.filter((id) =>
+          documents.some((doc) => doc.id === id)
+        );
+
+        if (validIds.length > 0) {
+          setSelectedDocIds(validIds);
+        }
+
+        onClearSharedDocIds?.();
+      }
+    }
+  }, [initialSelectedDocIds, documents]);
 
   const selectedDocs = documents.filter((d) => selectedDocIds.includes(d.id));
 
@@ -2710,7 +3001,6 @@ export const AiWorkspaceView: React.FC = () => {
 
 --- FILE: src\modules\ai-assistant\views\article-generator.view.tsx ---
 import React, { useState, useEffect } from 'react';
-import { marked } from 'marked';
 import { DocumentService } from '../../../services/document.service';
 import type { DocumentRecord } from '../../../services/document.service';
 import { AiAssistantService, AiServiceException } from '../../../services/ai-assistant.service';
@@ -2718,7 +3008,6 @@ import type { ArticleSessionDetail } from '../../../services/ai-assistant.servic
 import { CategorizedDocumentSelector } from '../../../components/common/categorized-document-selector.component';
 import { AiErrorMapper } from '../utils/error-mapper.util';
 import { RichMessageRenderer } from '../components/chat-panel.component';
-import { PdfExportService } from '../../../services/pdf-export.service';
 import {
   MessageSquareCode,
   Sparkles,
@@ -2743,8 +3032,6 @@ import {
   WifiOff,
   Plus,
   LogOut,
-  Save,
-  Download,
 } from 'lucide-react';
 
 const iconMap = {
@@ -2826,198 +3113,64 @@ const DraftingFallbackCard: React.FC<DraftingFallbackCardProps> = ({
   );
 };
 
-interface FormatControlPanelProps {
-  fontFamily: 'Calibri' | 'Times New Roman' | 'Verdana' | 'Arial';
-  setFontFamily: (f: any) => void;
-  lineSpacing: number;
-  setLineSpacing: (s: number) => void;
-  marginCm: number;
-  setMarginCm: (m: number) => void;
-  onSave: () => void;
-  onPrint: () => void;
-  isSaving: boolean;
-  isPrinting: boolean;
-}
-
-const FormatControlPanel: React.FC<FormatControlPanelProps> = ({
-  fontFamily,
-  setFontFamily,
-  lineSpacing,
-  setLineSpacing,
-  marginCm,
-  setMarginCm,
-  onSave,
-  onPrint,
-  isSaving,
-  isPrinting,
-}) => {
-  return (
-    <div className="bg-slate-50 border border-slate-300 p-4 space-y-4 rounded-none shadow-2xs">
-      <h3 className="text-xs font-bold uppercase text-slate-800 tracking-wider border-b border-slate-200 pb-2">
-        Kontrol Tampilan Kertas (A4)
-      </h3>
-
-      {}
-      <div className="space-y-1">
-        <label className="block text-[11px] font-bold text-slate-600 uppercase">Tipe Huruf (Font)</label>
-        <select
-          value={fontFamily}
-          onChange={(e) => setFontFamily(e.target.value as any)}
-          className="w-full bg-white border border-slate-300 text-xs font-semibold px-2.5 py-1.5 rounded-none focus:outline-none focus:border-teal-600 shadow-xs"
-        >
-          <option value="Calibri">Geocitra (Calibri)</option>
-          <option value="Times New Roman">Geocitra (TNR 11pt)</option>
-          <option value="Verdana">Geocitra (Verdana 10pt)</option>
-          <option value="Arial">Geocitra (Arial 11pt)</option>
-        </select>
-      </div>
-
-      {}
-      <div className="space-y-1">
-        <label className="block text-[11px] font-bold text-slate-600 uppercase">Jarak Baris (Spasi)</label>
-        <div className="grid grid-cols-2 divide-x divide-slate-300 border border-slate-300 bg-white">
-          <button
-            type="button"
-            onClick={() => setLineSpacing(1.18)}
-            className={`py-1 text-xs font-bold transition-colors ${lineSpacing === 1.18 ? 'bg-teal-700 text-white' : 'hover:bg-slate-50 text-slate-700'}`}
-          >
-            1.18 (Nota Dinas)
-          </button>
-          <button
-            type="button"
-            onClick={() => setLineSpacing(1.5)}
-            className={`py-1 text-xs font-bold transition-colors ${lineSpacing === 1.5 ? 'bg-teal-700 text-white' : 'hover:bg-slate-50 text-slate-700'}`}
-          >
-            1.50 (Laporan)
-          </button>
-        </div>
-      </div>
-
-      {}
-      <div className="space-y-1">
-        <label className="block text-[11px] font-bold text-slate-600 uppercase">Margin Sisi Kertas (cm)</label>
-        <div className="grid grid-cols-2 divide-x divide-slate-300 border border-slate-300 bg-white">
-          <button
-            type="button"
-            onClick={() => setMarginCm(2.5)}
-            className={`py-1 text-xs font-bold transition-colors ${marginCm === 2.5 ? 'bg-teal-700 text-white' : 'hover:bg-slate-50 text-slate-700'}`}
-          >
-            2.5 cm (Standar)
-          </button>
-          <button
-            type="button"
-            onClick={() => setMarginCm(3.0)}
-            className={`py-1 text-xs font-bold transition-colors ${marginCm === 3.0 ? 'bg-teal-700 text-white' : 'hover:bg-slate-50 text-slate-700'}`}
-          >
-            3.0 cm (Longgar)
-          </button>
-        </div>
-      </div>
-
-      {}
-      <div className="pt-2 space-y-2 border-t border-slate-200">
-        <button
-          type="button"
-          onClick={onSave}
-          disabled={isSaving}
-          className="w-full px-4 py-2 bg-slate-900 hover:bg-slate-950 text-white font-bold text-xs uppercase tracking-wider rounded-none flex items-center justify-center gap-2 border border-slate-950 shadow-xs cursor-pointer"
-        >
-          {isSaving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
-          <span>Simpan Perubahan DB</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={onPrint}
-          disabled={isPrinting}
-          className="w-full px-4 py-2 bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs uppercase tracking-wider rounded-none flex items-center justify-center gap-2 border border-teal-850 shadow-xs cursor-pointer"
-        >
-          {isPrinting ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
-          <span>Cetak PDF Resmi</span>
-        </button>
-      </div>
-    </div>
-  );
-};
-
-interface InteractivePaperSheetProps {
-  htmlContent: string;
-  fontFamily: 'Calibri' | 'Times New Roman' | 'Verdana' | 'Arial';
-  lineSpacing: number;
-  marginCm: number;
-}
-
-const fontStyles: Record<string, string> = {
-  'Calibri': 'font-sans',
-  'Times New Roman': 'font-serif',
-  'Verdana': 'font-sans tracking-tight',
-  'Arial': 'font-sans tracking-tight',
-};
-
-const InteractivePaperSheet: React.FC<InteractivePaperSheetProps> = ({
-  htmlContent,
-  fontFamily,
-  lineSpacing,
-  marginCm,
-}) => {
-  const fontSize = fontFamily === 'Times New Roman' ? '11pt' : fontFamily === 'Verdana' ? '10pt' : '11pt';
-
-  return (
-    <div className="flex justify-center bg-slate-200/50 p-6 overflow-x-auto select-none no-print">
-      <div
-        className={`bg-white shadow-lg border border-slate-300 text-slate-800 text-justify text-left prose max-w-none prose-slate prose-xs focus:outline-none transition-all ${fontStyles[fontFamily]}`}
-        style={{
-          lineHeight: lineSpacing,
-          padding: `${marginCm}cm`,
-          minHeight: '29.7cm',
-          width: '21.0cm',
-          fontSize,
-        }}
-        dangerouslySetInnerHTML={{ __html: htmlContent }}
-      />
-    </div>
-  );
-};
-
 export type DraftingStatus = 'IDLE' | 'SUCCESS' | 'ERROR';
 
 export interface ArticleGeneratorViewProps {
   initialPrompt?: string;
+  initialSelectedDocIds?: string[];
+  onClearSharedDocIds?: () => void;
   onNavigateToQa: () => void;
+  onNavigateToEditor: (sessionId: string) => void;
 }
+
+const getAssistantMessageSummary = (content: string): string => {
+  if (!content) return '';
+
+  let clean = content
+    .replace(/#+\s+.+/g, '')
+    .replace(/[*_`]/g, '')    // Hapus format bold/italic/code
+    .replace(/\s+/g, ' ')     // Ubah spasi berlebih menjadi spasi tunggal
+    .trim();
+
+  if (clean.length > 180) {
+    return clean.substring(0, 180) + '...';
+  }
+  return clean;
+};
+
+// --- KOMPONEN UTAMA: ARTICLE GENERATOR VIEW ---
 
 export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
   initialPrompt,
+  initialSelectedDocIds,
+  onClearSharedDocIds,
   onNavigateToQa,
+  onNavigateToEditor,
 }) => {
-
+  // Pengelolaan State Pilihan Dokumen
   const [documents, setDocuments] = useState<DocumentRecord[]>([]);
   const [selectedDocIds, setSelectedDocIds] = useState<string[]>([]);
   const [isLoadingDocs, setIsLoadingDocs] = useState<boolean>(true);
 
+  // Parameter Konfigurasi Artikel
   const [articleTitle, setArticleTitle] = useState<string>('');
   const [tone, setTone] = useState<string>('solutif');
   const [targetLength, setTargetLength] = useState<'SHORT' | 'MEDIUM' | 'LONG'>('MEDIUM');
   const [userInstruction, _setUserInstruction] = useState<string>(initialPrompt || '');
 
-  const [fontFamily, setFontFamily] = useState<'Calibri' | 'Times New Roman' | 'Verdana' | 'Arial'>('Calibri');
-  const [lineSpacing, setLineSpacing] = useState<number>(1.18);
-  const [marginCm, setMarginCm] = useState<number>(2.5);
-
+  // Pengelolaan State Sesi & Editor Aktif
   const [activeSession, setActiveSession] = useState<ArticleSessionDetail | null>(null);
-  const [editableText, setEditableText] = useState<string>('');
   const [articleSessionsHistory, setArticleSessionsHistory] = useState<ArticleSessionDetail[]>([]);
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [followUpQuery, setFollowUpQuery] = useState<string>('');
   const [isSendingFollowUp, setIsSendingFollowUp] = useState<boolean>(false);
 
-  const [isSavingManual, setIsSavingManual] = useState<boolean>(false);
-  const [isPrinting, setIsPrinting] = useState<boolean>(false);
-
+  // Status Siklus Hidup Editor Artikel (State Machine) [5]
   const [draftingStatus, setDraftingStatus] = useState<DraftingStatus>('IDLE');
   const [draftingErrorType, setDraftingErrorType] = useState<string>('UNKNOWN_ERROR');
   const [draftingErrorMsg, setDraftingErrorMsg] = useState<string>('');
 
+  // Cadangan memori parameter input yang gagal diproses (Fail-Safe Caching) [1, 5]
   const [lastFailedConfig, setLastFailedConfig] = useState<{
     documentIds: string[];
     articleTitle: string;
@@ -3026,6 +3179,7 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
     userInstruction?: string;
   } | null>(null);
 
+  // Parameter Filter Riwayat Artikel
   const [historySearchQuery, setHistorySearchQuery] = useState('');
   const [historyCalendarDate, setHistoryCalendarDate] = useState('');
 
@@ -3061,15 +3215,22 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
     loadHistory();
   }, []);
 
+  /**
+   * Memuat dokumen acuan dari database
+   */
   const loadDocuments = async () => {
     setIsLoadingDocs(true);
     try {
       const fetched = await DocumentService.listDocuments();
       setDocuments(fetched || []);
-      if (fetched && fetched.length > 0 && selectedDocIds.length === 0) {
-        setSelectedDocIds([fetched[0].id]);
-        if (!articleTitle) {
-          setArticleTitle(`Artikel Strategis: ${fetched[0].title}`);
+
+      // HANYA lakukan inisialisasi default jika tidak ada dokumen hasil forward
+      if (!initialSelectedDocIds || initialSelectedDocIds.length === 0) {
+        if (fetched && fetched.length > 0 && selectedDocIds.length === 0) {
+          setSelectedDocIds([fetched[0].id]);
+          if (!articleTitle) {
+            setArticleTitle(`Artikel Strategis: ${fetched[0].title}`);
+          }
         }
       }
     } catch (err: any) {
@@ -3079,6 +3240,33 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
       setIsLoadingDocs(false);
     }
   };
+
+  /**
+   * Mengonsumsi dan memvalidasi silang data dokumen yang diteruskan (Forwarding State sync)
+   */
+  useEffect(() => {
+    if (documents.length > 0) {
+      if (initialSelectedDocIds && initialSelectedDocIds.length > 0) {
+        // Penyaringan defensif: Pastikan ID dokumen yang diteruskan benar-benar ada di database
+        const validIds = initialSelectedDocIds.filter((id) =>
+          documents.some((doc) => doc.id === id)
+        );
+
+        if (validIds.length > 0) {
+          setSelectedDocIds(validIds);
+
+          // Perbarui judul draf secara otomatis berdasarkan judul dokumen utama rujukan
+          const primaryDoc = documents.find((d) => d.id === validIds[0]);
+          if (primaryDoc && !articleTitle) {
+            setArticleTitle(`Artikel Strategis: ${primaryDoc.title}`);
+          }
+        }
+
+        // Segera bersihkan state transien global untuk mencegah tumpang tindih seleksi berikutnya
+        onClearSharedDocIds?.();
+      }
+    }
+  }, [initialSelectedDocIds, documents]);
 
   const loadHistory = async () => {
     try {
@@ -3108,15 +3296,9 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
     setSelectedDocIds([]);
   };
 
-  const getRenderedHtml = (markdownText: string): string => {
-    try {
-      return marked.parse(markdownText) as string;
-    } catch (err) {
-      console.error('Gagal mengonversi Markdown ke HTML:', err);
-      return markdownText;
-    }
-  };
-
+  /**
+   * Mengeksekusi pembuatan draf naskah baru
+   */
   const handleGenerateNewArticle = async (e: React.FormEvent) => {
     e.preventDefault();
     if (selectedDocIds.length === 0) {
@@ -3142,7 +3324,6 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
       });
 
       setActiveSession(sessionDetail);
-      setEditableText(sessionDetail.fullArticleText || '');
       setDraftingStatus('SUCCESS');
       setActiveTab('editor');
       showToast('✨ Draf artikel baru berhasil disintesis oleh AI dan disimpan ke Database!');
@@ -3173,69 +3354,9 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
     }
   };
 
-  const handleSaveArticleManual = async (): Promise<boolean> => {
-    if (!activeSession) return false;
-    setIsSavingManual(true);
-
-    try {
-      const updated = await AiAssistantService.updateArticleSessionContent(
-        activeSession.id,
-        articleTitle,
-        editableText,
-      );
-      setActiveSession(updated);
-      setEditableText(updated.fullArticleText || '');
-      showToast('💾 Perubahan naskah Anda berhasil disimpan permanen ke database BRIDA!');
-      loadHistory();
-      return true;
-    } catch (err: any) {
-      const displayMsg = err.rawMessage || err.message || 'Gagal menyinkronkan data.';
-      showToast(`Gagal menyimpan ke database: ${displayMsg}`);
-      return false;
-    } finally {
-      setIsSavingManual(false);
-    }
-  };
-
-  const handlePrintArticlePdf = async () => {
-    if (!activeSession) return;
-    setIsPrinting(true);
-    showToast('⏳ Menyinkronkan revisi draf terakhir Anda ke database sebelum mencetak... [1]');
-
-    try {
-
-      await AiAssistantService.updateArticleSessionContent(
-        activeSession.id,
-        articleTitle,
-        editableText,
-      );
-
-      const htmlContent = getRenderedHtml(editableText);
-
-      showToast('🖨️ Mengonversi dan merakit dokumen PDF resmi...');
-      const fontSize = fontFamily === 'Times New Roman' ? 11 : fontFamily === 'Verdana' ? 10 : 11;
-
-      await PdfExportService.exportCustomFormattedArticlePdf(
-        htmlContent,
-        {
-          fontFamily,
-          fontSize,
-          lineSpacing,
-          marginCm,
-        },
-        articleTitle || 'Draf_Artikel_BRIDA_Mimika',
-      );
-
-      showToast('✅ Dokumen PDF resmi berhasil diunduh!');
-      loadHistory();
-    } catch (err: any) {
-      const displayMsg = err.rawMessage || err.message || 'Gagal melakukan ekspor.';
-      showToast(`Pencetakan PDF gagal: ${displayMsg}`);
-    } finally {
-      setIsPrinting(false);
-    }
-  };
-
+  /**
+   * Mengirim kueri instruksi revisi (re-drafting)
+   */
   const handleSendFollowUp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeSession || !followUpQuery.trim() || isSendingFollowUp) return;
@@ -3244,7 +3365,6 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
     try {
       const updated = await AiAssistantService.interactArticle(activeSession.id, followUpQuery);
       setActiveSession(updated);
-      setEditableText(updated.fullArticleText || '');
       setFollowUpQuery('');
       setDraftingStatus('SUCCESS');
       showToast('Draf artikel berhasil diperbarui berdasarkan instruksi revisi Anda.');
@@ -3260,6 +3380,9 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
     }
   };
 
+  /**
+   * Fungsi Sintesis Ulang Berbasis Parameter Cadangan (Fail-Safe Caching) [1, 5]
+   */
   const handleRetryDrafting = async () => {
     if (!lastFailedConfig) return;
 
@@ -3281,7 +3404,6 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
       });
 
       setActiveSession(sessionDetail);
-      setEditableText(sessionDetail.fullArticleText || '');
       setDraftingStatus('SUCCESS');
       setActiveTab('editor');
       showToast('✨ Draf artikel berhasil disintesis ulang!');
@@ -3304,9 +3426,11 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
     }
   };
 
+  /**
+   * Fungsi pembersih State untuk Sesi Baru (Reset States) [5]
+   */
   const handleCreateNewSession = () => {
     setActiveSession(null);
-    setEditableText('');
     setDraftingStatus('IDLE');
     setDraftingErrorType('UNKNOWN_ERROR');
     setDraftingErrorMsg('');
@@ -3318,7 +3442,6 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
     try {
       const session = await AiAssistantService.getArticleSession(sessionId);
       setActiveSession(session);
-      setEditableText(session.fullArticleText || '');
       setDraftingStatus('SUCCESS');
       setArticleTitle(session.articleTitle || session.title);
       setTargetLength(session.targetLength || 'MEDIUM');
@@ -3358,7 +3481,7 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
 
   return (
     <div className="flex flex-col w-full bg-slate-100/70 p-6 space-y-6 font-roboto">
-      {}
+      {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-5 py-3 border border-slate-700 shadow-xl flex items-center gap-3 rounded-none">
           <CheckCircle2 size={18} className="text-teal-400 shrink-0" />
@@ -3366,8 +3489,8 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
         </div>
       )}
 
-      {}
-      <div className="w-full bg-white border border-slate-300 px-6 py-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4 rounded-none shadow-2xs">
+      {/* SECTION 1. HERO HEADER */}
+      <div className="w-full bg-white border border-slate-300 p-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4 rounded-none shadow-2xs">
         <div className="flex flex-col">
           <h1 className="text-xl font-bold uppercase text-slate-900 tracking-tight">
             Penulis Artikel &amp; Rilis Media BRIDA
@@ -3396,7 +3519,7 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
         </div>
       )}
 
-      {}
+      {/* SECTION 2: Control Panel */}
       <div className="bg-white border border-slate-300 p-5 rounded-none shadow-xs space-y-4">
         <div className="flex items-center justify-between border-b border-slate-200 pb-3">
           <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wide flex items-center gap-2">
@@ -3406,7 +3529,7 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
         </div>
 
         <form onSubmit={handleGenerateNewArticle} className="space-y-4 font-roboto">
-          {}
+          {/* Document Selector */}
           <CategorizedDocumentSelector
             documents={documents}
             selectedDocIds={selectedDocIds}
@@ -3417,7 +3540,7 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
             title="Pilih Dokumen Acuan Artikel"
           />
 
-          {}
+          {/* Title Input */}
           <div className="space-y-2 pt-4 border-t border-slate-200">
             <label className="block text-xs font-bold text-slate-800 uppercase tracking-wide">
               Judul / Topik Utama Artikel (Input Pengguna)
@@ -3435,9 +3558,9 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
             </p>
           </div>
 
-          {}
+          {/* Target Length & Tone Options */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-slate-200">
-            {}
+            {/* Length Selector */}
             <div className="border-r border-slate-200 pr-6">
               <label className="block text-xs font-bold text-slate-700 uppercase mb-2 tracking-wider">
                 Panjang Teks Keluaran Artikel
@@ -3460,7 +3583,7 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
               </div>
             </div>
 
-            {}
+            {/* Tone Selector */}
             <div className="pl-0">
               <label className="block text-xs font-bold text-slate-700 uppercase mb-2 tracking-wider">
                 Gaya Bahasa / Tone Publikasi
@@ -3480,7 +3603,7 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
             </div>
           </div>
 
-          {}
+          {/* Submit Action */}
           <div className="flex justify-end pt-2">
             <button
               type="submit"
@@ -3503,7 +3626,7 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
         </form>
       </div>
 
-      {}
+      {/* SECTION 3: Tab System */}
       <div className="flex items-center border-b border-slate-300">
         <button
           onClick={() => setActiveTab('editor')}
@@ -3531,7 +3654,7 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
         </button>
       </div>
 
-      {}
+      {/* TAB CONTENT 1: Editor & Interactive Revision Chat */}
       {activeTab === 'editor' && (
         draftingStatus === 'IDLE' && !activeSession ? (
           <div className="bg-white border border-slate-300 p-12 text-center rounded-none shadow-xs space-y-4">
@@ -3542,31 +3665,15 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-            {}
-            <div className="lg:col-span-1">
-              <FormatControlPanel
-                fontFamily={fontFamily}
-                setFontFamily={setFontFamily}
-                lineSpacing={lineSpacing}
-                setLineSpacing={setLineSpacing}
-                marginCm={marginCm}
-                setMarginCm={setMarginCm}
-                onSave={handleSaveArticleManual}
-                onPrint={handlePrintArticlePdf}
-                isSaving={isSavingManual}
-                isPrinting={isPrinting}
-              />
-            </div>
-
-            {}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Left Col (2 cols): Active Article Preview & Full Text */}
             <div className="lg:col-span-2 bg-white border border-slate-300 p-6 rounded-none shadow-xs flex flex-col h-145">
               {draftingStatus === 'ERROR' ? (
-
+                // Merender Polimorfis Kartu Fallback Kesalahan Sistem [5]
                 <DraftingFallbackCard
                   errorType={draftingErrorType}
                   rawErrorMsg={draftingErrorMsg}
-                  onRetry={handleRetryDrafting}
+                  onRetry={handleRetryDrafting} // Fail-Safe Caching [1, 5]
                   onNewSession={handleCreateNewSession}
                 />
               ) : (
@@ -3583,52 +3690,35 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
                       </div>
                     )}
 
-                    <button
-                      onClick={() => handleCopyText(editableText)}
-                      disabled={!activeSession}
-                      className="px-3 py-1.5 bg-slate-900 hover:bg-slate-950 disabled:bg-slate-300 disabled:text-slate-500 text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-1.5 shadow-2xs"
-                    >
-                      <Copy size={13} />
-                      <span>Salin Teks Markdown</span>
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => onNavigateToEditor(activeSession!.id)}
+                        disabled={!activeSession}
+                        className="px-3 py-1.5 bg-teal-700 hover:bg-teal-850 disabled:bg-slate-300 disabled:text-slate-500 text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-1.5 shadow-2xs border border-teal-800 cursor-pointer"
+                      >
+                        <PenTool size={13} />
+                        <span>Buka Pratinjau &amp; Edit Manual</span>
+                      </button>
+                      <button
+                        onClick={() => handleCopyText(activeSession?.fullArticleText || '')}
+                        disabled={!activeSession}
+                        className="px-3 py-1.5 bg-slate-900 hover:bg-slate-950 disabled:bg-slate-300 disabled:text-slate-500 text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-1.5 shadow-2xs"
+                      >
+                        <Copy size={13} />
+                        <span>Salin Teks Artikel</span>
+                      </button>
+                    </div>
                   </div>
 
-                  {}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 flex-1 min-h-0 mt-4">
-                    {}
-                    <div className="flex flex-col h-full">
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
-                        Markdown Source (Tulis / Sunting Manual)
-                      </label>
-                      <textarea
-                        value={editableText}
-                        onChange={(e) => setEditableText(e.target.value)}
-                        disabled={isGenerating}
-                        className="w-full flex-1 bg-slate-50 border border-slate-300 p-4 text-xs font-mono leading-relaxed text-slate-900 focus:outline-none focus:bg-white focus:border-teal-600 rounded-none resize-none overflow-y-auto"
-                        placeholder="Tulis naskah artikel Anda di sini..."
-                      />
-                    </div>
-
-                    {}
-                    <div className="flex flex-col h-full overflow-hidden">
-                      <label className="block text-[10px] font-bold text-teal-800 uppercase tracking-wider mb-1.5">
-                        Real-time A4 PDF Preview (Cetak Sesuai Layar)
-                      </label>
-                      <div className="flex-1 overflow-y-auto border border-slate-300 bg-slate-200">
-                        <InteractivePaperSheet
-                          htmlContent={getRenderedHtml(editableText)}
-                          fontFamily={fontFamily}
-                          lineSpacing={lineSpacing}
-                          marginCm={marginCm}
-                        />
-                      </div>
-                    </div>
+                  {/* Preview naskah tulisan mentah hasil sintesis AI [3] */}
+                  <div className="bg-slate-50 border border-slate-300 p-6 flex-1 overflow-y-auto rounded-none text-left mt-4 text-xs leading-relaxed font-roboto">
+                    <RichMessageRenderer text={activeSession?.fullArticleText || 'Mempersiapkan draf naskah publikasi...'} />
                   </div>
                 </div>
               )}
             </div>
 
-            {}
+            {/* Right Col (1 col): CoT Interactive Chat History & Revision Input */}
             <div className="bg-white border border-slate-300 p-4 rounded-none shadow-xs flex flex-col h-145">
               <div className="border-b border-slate-200 pb-3 mb-3">
                 <h3 className="text-xs font-bold text-slate-900 uppercase flex items-center gap-1.5">
@@ -3640,7 +3730,7 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
                 </p>
               </div>
 
-              {}
+              {/* Chat Message List */}
               <div className="flex-1 overflow-y-auto space-y-3 pr-1">
                 {activeSession?.messages?.map((msg) => (
                   <div
@@ -3651,11 +3741,26 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
                       }`}
                   >
                     <div className="font-bold uppercase text-[10px] text-slate-500 mb-1">
-                      {msg.role === 'USER' ? 'Pengguna / Editor' : 'BRIDA AI Assistant'} &bull; {new Date(msg.createdAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+                      {msg.role === 'USER' ? 'Pengguna / Editor' : msg.role === 'SYSTEM' ? 'Sistem' : 'BRIDA AI Assistant'} &bull; {new Date(msg.createdAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
                     </div>
                     {}
                     <div className="leading-relaxed font-roboto">
-                      <RichMessageRenderer text={msg.content} />
+                      {msg.role === 'ASSISTANT' ? (
+                        <div className="space-y-2">
+                          <div className="bg-teal-700/10 text-teal-900 border-l-2 border-teal-700 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 rounded-none w-fit">
+                            <Sparkles size={11} className="text-teal-700" />
+                            <span>Draf AI Diperbarui</span>
+                          </div>
+                          <p className="text-xs text-slate-700 italic">
+                            "{getAssistantMessageSummary(msg.content)}"
+                          </p>
+                          <div className="pt-1.5 border-t border-slate-200 text-[10px] font-semibold text-teal-800">
+                            📝 Naskah lengkap telah dimuat pada panel editor di sebelah kiri.
+                          </div>
+                        </div>
+                      ) : (
+                        <RichMessageRenderer text={msg.content} />
+                      )}
                     </div>
                   </div>
                 ))}
@@ -3814,6 +3919,388 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
 };
 
 export default ArticleGeneratorView;
+
+--- FILE: src\modules\ai-assistant\views\article-preview-editor.view.tsx ---
+import React, { useState, useEffect } from 'react';
+import { marked } from 'marked';
+import { AiAssistantService } from '../../../services/ai-assistant.service';
+import type { ArticleSessionDetail } from '../../../services/ai-assistant.service';
+import { PdfExportService } from '../../../services/pdf-export.service';
+import {
+  Loader2,
+  Save,
+  Download,
+  ArrowLeft,
+  CheckCircle2,
+  AlertCircle,
+  FileText,
+} from 'lucide-react';
+
+interface ArticlePreviewEditorViewProps {
+  sessionId: string | null;
+  onBack: () => void;
+}
+
+const fontStyles: Record<string, string> = {
+  'Calibri': 'font-sans',
+  'Times New Roman': 'font-serif',
+  'Verdana': 'font-sans tracking-tight',
+  'Arial': 'font-sans tracking-tight',
+};
+
+const InteractivePaperSheet: React.FC<{
+  htmlContent: string;
+  fontFamily: 'Calibri' | 'Times New Roman' | 'Verdana' | 'Arial';
+  lineSpacing: number;
+  marginCm: number;
+}> = ({ htmlContent, fontFamily, lineSpacing, marginCm }) => {
+  const fontSize = fontFamily === 'Times New Roman' ? '11pt' : fontFamily === 'Verdana' ? '10pt' : '11pt';
+
+  return (
+    <div className="flex justify-center bg-slate-200/50 p-6 overflow-x-auto select-none no-print">
+      <div
+        className={`bg-white shadow-lg border border-slate-300 text-slate-800 text-justify prose max-w-none prose-slate prose-xs focus:outline-none transition-all ${fontStyles[fontFamily]}`}
+        style={{
+          lineHeight: lineSpacing,
+          padding: `${marginCm}cm`,
+          minHeight: '29.7cm',
+          width: '21.0cm',
+          fontSize,
+        }}
+        dangerouslySetInnerHTML={{ __html: htmlContent }}
+      />
+    </div>
+  );
+};
+
+export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> = ({
+  sessionId,
+  onBack,
+}) => {
+  const [activeSession, setActiveSession] = useState<ArticleSessionDetail | null>(null);
+  const [editableText, setEditableText] = useState<string>('');
+  const [articleTitle, setArticleTitle] = useState<string>('');
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+
+  const [fontFamily, setFontFamily] = useState<'Calibri' | 'Times New Roman' | 'Verdana' | 'Arial'>('Calibri');
+  const [lineSpacing, setLineSpacing] = useState<number>(1.18);
+  const [marginCm, setMarginCm] = useState<number>(2.5);
+
+  const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [isPrinting, setIsPrinting] = useState<boolean>(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 4000);
+  };
+
+  useEffect(() => {
+    if (sessionId) {
+      loadSession();
+    }
+  }, [sessionId]);
+
+  const loadSession = async () => {
+    setIsLoading(true);
+    try {
+      const session = await AiAssistantService.getArticleSession(sessionId!);
+      setActiveSession(session);
+      setEditableText(session.fullArticleText || '');
+      setArticleTitle(session.articleTitle || session.title || '');
+    } catch (err: any) {
+      console.error('Gagal memuat sesi artikel:', err);
+      showToast('Gagal memuat sesi artikel dari database.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const getRenderedHtml = (markdownText: string): string => {
+    try {
+      return marked.parse(markdownText) as string;
+    } catch (err) {
+      console.error('Gagal mengonversi Markdown ke HTML:', err);
+      return markdownText;
+    }
+  };
+
+  const handleSave = async () => {
+    if (!sessionId) return;
+    setIsSaving(true);
+    try {
+      const updated = await AiAssistantService.updateArticleSessionContent(
+        sessionId,
+        articleTitle,
+        editableText
+      );
+      setActiveSession(updated);
+      setEditableText(updated.fullArticleText || '');
+      showToast('💾 Perubahan naskah Anda berhasil disimpan permanen ke database BRIDA!');
+    } catch (err: any) {
+      const displayMsg = err.rawMessage || err.message || 'Gagal menyinkronkan data.';
+      showToast(`Gagal menyimpan ke database: ${displayMsg}`);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handlePrint = async () => {
+    if (!editableText && !sessionId) {
+      showToast('⚠️ Tidak ada naskah untuk dicetak. Silakan buka sesi dari halaman generator.');
+      return;
+    }
+    setIsPrinting(true);
+
+    let exportContent = editableText;
+    let exportTitle = articleTitle;
+
+    if (sessionId) {
+      try {
+        showToast('⏳ Mengambil data naskah terbaru dari server untuk ekspor...');
+        const exportData = await AiAssistantService.getArticleExportData(sessionId);
+
+        if (exportData.content) {
+          exportContent = exportData.content;
+        }
+        if (exportData.title) {
+          exportTitle = exportData.title;
+        }
+      } catch (fetchErr: any) {
+
+        console.warn('[ArticlePreviewEditor] Gagal ambil export-data dari server, fallback ke konten lokal:', fetchErr);
+        showToast('⚠️ Gagal sinkron dari server, menggunakan naskah lokal untuk PDF...');
+        await new Promise(res => setTimeout(res, 1200));
+      }
+    }
+
+    if (!exportContent) {
+      showToast('⚠️ Tidak ada naskah untuk dicetak.');
+      setIsPrinting(false);
+      return;
+    }
+
+    try {
+
+      const htmlContent = await Promise.resolve(marked.parse(exportContent));
+
+      showToast('🖨️ Mengonversi dan merakit dokumen PDF resmi...');
+      const fontSize = fontFamily === 'Times New Roman' ? 11 : fontFamily === 'Verdana' ? 10 : 11;
+
+      await PdfExportService.exportCustomFormattedArticlePdf(
+        htmlContent,
+        {
+          fontFamily,
+          fontSize,
+          lineSpacing,
+          marginCm,
+        },
+        exportTitle || 'Draf_Artikel_BRIDA_Mimika'
+      );
+
+      showToast('✅ Dokumen PDF resmi berhasil diunduh!');
+    } catch (err: any) {
+      const displayMsg = err.rawMessage || err.message || 'Gagal melakukan ekspor.';
+      console.error('[ArticlePreviewEditor] Gagal generate PDF:', err);
+      showToast(`❌ Pencetakan PDF gagal: ${displayMsg}`);
+    } finally {
+      setIsPrinting(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-96 font-roboto bg-slate-50/50 border border-slate-300">
+        <div className="flex flex-col items-center gap-2">
+          <Loader2 className="animate-spin text-teal-700" size={24} />
+          <span className="text-xs font-bold uppercase tracking-wider text-slate-600">Memuat Sesi Redaksi...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (!sessionId || !activeSession) {
+    return (
+      <div className="flex items-center justify-center h-96 font-roboto bg-slate-50/50 border border-slate-300 p-6 text-center space-y-4">
+        <div className="max-w-md mx-auto space-y-2">
+          <AlertCircle className="mx-auto text-red-600" size={36} />
+          <h3 className="text-base font-bold text-slate-900 uppercase">Akses Sesi Gagal</h3>
+          <p className="text-xs text-slate-600">
+            ID Sesi Sifat Editorial kosong atau tidak valid. Silakan kembali ke Halaman Penulis Artikel untuk memilih sesi aktif.
+          </p>
+          <button
+            onClick={onBack}
+            className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-1.5 cursor-pointer mt-4"
+          >
+            <ArrowLeft size={13} />
+            <span>Kembali ke AI Editor</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col w-full bg-slate-100/70 p-6 space-y-6 font-roboto">
+      {}
+      {toastMessage && (
+        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-5 py-3 border border-slate-700 shadow-xl flex items-center gap-3 rounded-none">
+          <CheckCircle2 size={18} className="text-teal-400 shrink-0" />
+          <span className="text-sm font-semibold">{toastMessage}</span>
+        </div>
+      )}
+
+      {}
+      <div className="w-full bg-white border border-slate-300 p-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4 rounded-none shadow-2xs">
+        <div className="flex flex-col">
+          <button
+            onClick={onBack}
+            className="self-start mb-2 text-xs font-bold text-teal-700 hover:text-teal-850 inline-flex items-center gap-1.5 cursor-pointer"
+          >
+            <ArrowLeft size={13} />
+            <span>Kembali ke AI Editor</span>
+          </button>
+          <h1 className="text-xl font-bold uppercase text-slate-900 tracking-tight mt-1">
+            Redaksi &amp; Layouting Cetak (A4)
+          </h1>
+          <p className="text-xs text-slate-500 font-normal mt-1">
+            Sesi Cetak: <span className="font-bold text-slate-700">{articleTitle || activeSession.title}</span>
+          </p>
+        </div>
+      </div>
+
+      {}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+        {}
+        <div className="lg:col-span-2 space-y-6 flex flex-col h-185">
+          {}
+          <div className="bg-white border border-slate-300 p-5 space-y-4 rounded-none shadow-xs">
+            <h3 className="text-xs font-bold uppercase text-slate-800 tracking-wider border-b border-slate-200 pb-2">
+              Kontrol Letak Kertas &amp; Estetika Cetak
+            </h3>
+
+            {}
+            <div className="space-y-1">
+              <label className="block text-[11px] font-bold text-slate-600 uppercase">Tipe Huruf (Font)</label>
+              <select
+                value={fontFamily}
+                onChange={(e) => setFontFamily(e.target.value as any)}
+                className="w-full bg-white border border-slate-300 text-xs font-semibold px-2.5 py-1.5 rounded-none focus:outline-none focus:border-teal-600 shadow-xs"
+              >
+                <option value="Calibri">Calibri</option>
+                <option value="Times New Roman">Times New Roman</option>
+                <option value="Verdana">Verdana</option>
+                <option value="Arial">Arial</option>
+              </select>
+            </div>
+
+            {}
+            <div className="space-y-1">
+              <label className="block text-[11px] font-bold text-slate-600 uppercase">Jarak Baris (Spasi)</label>
+              <div className="grid grid-cols-2 divide-x divide-slate-300 border border-slate-300 bg-white">
+                <button
+                  type="button"
+                  onClick={() => setLineSpacing(1.18)}
+                  className={`py-1 text-xs font-bold transition-colors cursor-pointer ${lineSpacing === 1.18 ? 'bg-teal-700 text-white' : 'hover:bg-slate-50 text-slate-700'}`}
+                >
+                  1.18 (Nota Dinas)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLineSpacing(1.5)}
+                  className={`py-1 text-xs font-bold transition-colors cursor-pointer ${lineSpacing === 1.5 ? 'bg-teal-700 text-white' : 'hover:bg-slate-50 text-slate-700'}`}
+                >
+                  1.50 (Laporan)
+                </button>
+              </div>
+            </div>
+
+            {}
+            <div className="space-y-1">
+              <label className="block text-[11px] font-bold text-slate-600 uppercase">Margin Sisi Kertas (cm)</label>
+              <div className="grid grid-cols-2 divide-x divide-slate-300 border border-slate-300 bg-white">
+                <button
+                  type="button"
+                  onClick={() => setMarginCm(2.5)}
+                  className={`py-1 text-xs font-bold transition-colors cursor-pointer ${marginCm === 2.5 ? 'bg-teal-700 text-white' : 'hover:bg-slate-50 text-slate-700'}`}
+                >
+                  2.5 cm (Standar)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMarginCm(3.0)}
+                  className={`py-1 text-xs font-bold transition-colors cursor-pointer ${marginCm === 3.0 ? 'bg-teal-700 text-white' : 'hover:bg-slate-50 text-slate-700'}`}
+                >
+                  3.0 cm (Longgar)
+                </button>
+              </div>
+            </div>
+
+            {}
+            <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-200">
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={isSaving}
+                className="px-4 py-2 bg-slate-900 hover:bg-slate-950 text-white font-bold text-xs uppercase tracking-wider rounded-none flex items-center justify-center gap-1.5 border border-slate-950 shadow-xs cursor-pointer disabled:opacity-50"
+              >
+                {isSaving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
+                <span>Simpan DB</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handlePrint}
+                disabled={isPrinting}
+                className="px-4 py-2 bg-teal-700 hover:bg-teal-850 text-white font-bold text-xs uppercase tracking-wider rounded-none flex items-center justify-center gap-1.5 border border-teal-850 shadow-xs cursor-pointer disabled:opacity-50"
+              >
+                {isPrinting ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
+                <span>Cetak PDF</span>
+              </button>
+            </div>
+          </div>
+
+          {}
+          <div className="bg-white border border-slate-300 p-5 flex flex-col flex-1 min-h-0">
+            <div className="flex items-center gap-1.5 mb-2 shrink-0">
+              <FileText size={14} className="text-slate-500" />
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                Sumber Naskah Markdown (Sunting Manual)
+              </label>
+            </div>
+            <textarea
+              value={editableText}
+              onChange={(e) => setEditableText(e.target.value)}
+              className="w-full flex-1 bg-slate-50 border border-slate-300 p-4 text-xs font-mono leading-relaxed text-slate-900 focus:outline-none focus:bg-white focus:border-teal-600 rounded-none resize-none overflow-y-auto"
+              placeholder="Tulis naskah draf artikel Anda di sini..."
+            />
+          </div>
+        </div>
+
+        {}
+        <div className="lg:col-span-3 bg-white border border-slate-300 p-6 flex flex-col h-185 overflow-hidden">
+          <div className="border-b border-slate-200 pb-3 mb-4 shrink-0 flex items-center justify-between">
+            <h3 className="text-xs font-bold text-teal-800 uppercase tracking-wider">
+              Pratinjau Halaman A4 Resmi
+            </h3>
+            <span className="text-[10px] text-slate-400 font-semibold italic">
+              *Tampilan menyerupai cetak fisik PDF
+            </span>
+          </div>
+
+          <div className="flex-1 overflow-y-auto border border-slate-300 bg-slate-200">
+            <InteractivePaperSheet
+              htmlContent={getRenderedHtml(editableText)}
+              fontFamily={fontFamily}
+              lineSpacing={lineSpacing}
+              marginCm={marginCm}
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 --- FILE: src\modules\analytics\components\causal-factor-chart.component.tsx ---
 import React from 'react';
@@ -4223,9 +4710,15 @@ interface SavedAnalysisSession {
 
 interface AnalyticsViewProps {
   onNavigateToGenerator?: (initialPrompt?: string) => void;
+  initialSelectedDocIds?: string[];
+  onClearSharedDocIds?: () => void;
 }
 
-export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenerator }) => {
+export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
+  onNavigateToGenerator,
+  initialSelectedDocIds,
+  onClearSharedDocIds,
+}) => {
   const [compareResult, setCompareResult] = useState<DeviationCompareResult | null>(null);
 
   const [documents, setDocuments] = useState<DocumentRecord[]>([]);
@@ -4242,6 +4735,15 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
 
   const [sessionSearchQuery, setSessionSearchQuery] = useState('');
   const [selectedCalendarDate, setSelectedCalendarDate] = useState<string>('');
+
+  const [isMappingModalOpen, setIsMappingModalOpen] = useState(false);
+  const [modalBaselineId, setModalBaselineId] = useState('');
+  const [modalRealizationId, setModalRealizationId] = useState('');
+  const [modalIndicatorName, setModalIndicatorName] = useState('Analisis Deviasi Dokumen Terpilih');
+  const [modalSector, setModalSector] = useState('Pembangunan & Kebijakan Daerah');
+  const [modalTargetValue, setModalTargetValue] = useState(100);
+  const [modalRealizationValue, setModalRealizationValue] = useState(84.5);
+  const [modalUnitSuffix, setModalUnitSuffix] = useState('%');
 
   const filteredSavedSessions = savedSessions.filter((session) => {
 
@@ -4291,7 +4793,11 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
         const docs = await DocumentService.listDocuments().catch(() => []);
         setDocuments(docs || []);
 
-        if (docs && docs.length > 0) {
+        if (initialSelectedDocIds && initialSelectedDocIds.length > 0) {
+          setSelectedDocIds(initialSelectedDocIds);
+
+          onClearSharedDocIds?.();
+        } else if (docs && docs.length > 0) {
           setSelectedDocIds(docs.map((d) => d.id));
         }
 
@@ -4373,7 +4879,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
     };
 
     loadInitialData();
-  }, []);
+  }, [initialSelectedDocIds]);
 
   const saveSessionToStorage = (newSessions: SavedAnalysisSession[]) => {
     setSavedSessions(newSessions);
@@ -4398,32 +4904,44 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
     }
   };
 
-  const handleExecuteMultiAnalysis = async () => {
+  const handleOpenMappingModal = () => {
     if (selectedDocIds.length === 0) {
       alert('Silakan pilih minimal 1 dokumen acuan di atas.');
       return;
     }
 
+    const autoBaseline = documents.find(
+      (d) => selectedDocIds.includes(d.id) && d.metadata?.docType === 'BASELINE'
+    );
+    const autoRealization = documents.find(
+      (d) => selectedDocIds.includes(d.id) && d.metadata?.docType === 'REALIZATION'
+    );
+    const firstSelected = documents.find((d) => selectedDocIds.includes(d.id));
+
+    setModalBaselineId(autoBaseline?.id || firstSelected?.id || '');
+    setModalRealizationId(autoRealization?.id || firstSelected?.id || '');
+    setIsMappingModalOpen(true);
+  };
+
+  const handleConfirmExecuteAnalysis = async () => {
+    setIsMappingModalOpen(false);
     setIsComparing(true);
 
     try {
-      const baselineDoc = documents.find((d) => selectedDocIds.includes(d.id) && d.metadata?.docType === 'BASELINE');
-      const realizationDoc = documents.find((d) => selectedDocIds.includes(d.id) && d.metadata?.docType === 'REALIZATION');
-      const fallbackDoc = documents.find((d) => selectedDocIds.includes(d.id));
-
       const selectedDocTitles = documents
         .filter((d) => selectedDocIds.includes(d.id))
         .map((d) => d.title);
 
       const res = await AnalysisService.compareDeviation({
-        indicatorName: 'Analisis Deviasi Dokumen Terpilih',
-        targetValue: 100,
-        realizationValue: 84.5,
-        sector: 'Pembangunan & Kebijakan Daerah',
-        unitPrefix: '',
-        unitSuffix: '%',
-        baselineDocId: baselineDoc?.id || fallbackDoc?.id,
-        realizationDocId: realizationDoc?.id || fallbackDoc?.id,
+        indicatorName: modalIndicatorName,
+        targetValue: Number(modalTargetValue),
+        realizationValue: Number(modalRealizationValue),
+        sector: modalSector,
+        unitPrefix: modalUnitSuffix === 'Miliar' || modalUnitSuffix === 'Juta' ? 'Rp ' : '',
+        unitSuffix: modalUnitSuffix === 'Miliar' ? ' Miliar' : modalUnitSuffix === 'Juta' ? ' Juta' : modalUnitSuffix,
+        baselineDocId: modalBaselineId,
+        realizationDocId: modalRealizationId,
+        documentIds: selectedDocIds,
       });
 
       setCompareResult(res);
@@ -4442,7 +4960,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
         id: `sess-${Date.now()}`,
         timestamp: dateStr,
         createdAtISO: nowIso,
-        indicatorName: res.math?.indicatorName || 'Analisis Deviasi Multidokumen',
+        indicatorName: res.math?.indicatorName || modalIndicatorName,
         selectedDocTitles,
         compareResult: res,
       };
@@ -4451,7 +4969,8 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
       saveSessionToStorage(updatedSessions);
       setActiveSessionId(newSession.id);
     } catch (err: any) {
-      console.error('Error executing multi-analysis:', err);
+      console.error('Gagal memproses analisis multidokumen:', err);
+      alert(`Gagal mengeksekusi analisis: ${err.message || 'Koneksi API bermasalah'}`);
     } finally {
       setIsComparing(false);
     }
@@ -4536,9 +5055,11 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
   const isAllRealizationSelected = realizationDocs.length > 0 && realizationDocs.every((d) => selectedDocIds.includes(d.id));
   const isAllGeneralSelected = generalDocs.length > 0 && generalDocs.every((d) => selectedDocIds.includes(d.id));
 
+  const selectedDocumentsList = documents.filter((d) => selectedDocIds.includes(d.id));
+
   return (
-    <div className="flex flex-col w-full bg-slate-100/70 p-6 space-y-6 font-roboto">
-      {}
+    <div className="flex flex-col w-full bg-slate-100/70 p-6 space-y-6 font-roboto relative">
+      { }
       <div className="w-full bg-white border border-slate-300 px-6 py-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4 rounded-none shadow-2xs">
         <div className="flex flex-col">
           <h1 className="text-xl font-bold uppercase text-slate-900 tracking-tight">
@@ -4549,7 +5070,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
           </p>
         </div>
 
-        {}
+        { }
         <div className="flex items-center md:pl-6">
           <div className="px-1 py-2 flex flex-col justify-center rounded-none">
             <span className="text-[9px] uppercase font-bold text-slate-500 tracking-wider">
@@ -4562,7 +5083,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
         </div>
       </div>
 
-      {}
+      { }
       {cacheStatus?.isCached && (
         <div className="bg-teal-50 border border-teal-300 p-4 rounded-none flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs font-roboto">
           <div className="flex items-center gap-2.5">
@@ -4587,10 +5108,10 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
         </div>
       )}
 
-      {}
+      { }
       {savedSessions.length > 0 && (
         <div className="bg-white border border-slate-300 p-4 rounded-none shadow-2xs space-y-3 font-roboto">
-          {}
+          { }
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 border-b border-slate-200 pb-2.5">
             <div className="flex items-center gap-2">
               <History size={16} className="text-teal-700 shrink-0" />
@@ -4599,9 +5120,9 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
               </span>
             </div>
 
-            {}
+            { }
             <div className="flex flex-wrap items-center gap-2">
-              {}
+              { }
               <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-300 px-2 py-1 text-xs">
                 <Calendar size={13} className="text-teal-700 shrink-0" />
                 <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wider hidden sm:inline">
@@ -4624,7 +5145,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
                 )}
               </div>
 
-              {}
+              { }
               <div className="relative w-full sm:w-56">
                 <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
@@ -4647,7 +5168,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
             </div>
           </div>
 
-          {}
+          { }
           {filteredSavedSessions.length === 0 ? (
             <p className="text-xs text-slate-500 py-2 italic font-normal">
               Tidak ada cache sesi analisis yang cocok dengan filter kata kunci "{sessionSearchQuery}".
@@ -4660,15 +5181,14 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
                   <div
                     key={session.id}
                     onClick={() => handleSelectHistorySession(session)}
-                    className={`px-3.5 py-2 border text-xs cursor-pointer flex items-center gap-2.5 shrink-0 transition-all rounded-none ${
-                      isActive
-                        ? 'bg-teal-50 border-teal-600 text-teal-950 font-bold shadow-2xs'
-                        : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
-                    }`}
+                    className={`px-3.5 py-2 border text-xs cursor-pointer flex items-center gap-2.5 shrink-0 transition-all rounded-none ${isActive
+                      ? 'bg-teal-50 border-teal-600 text-teal-950 font-bold shadow-2xs'
+                      : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                      }`}
                   >
                     <Clock size={13} className="text-teal-700 shrink-0" />
                     <div className="flex flex-col">
-                      <span className="truncate max-w-[200px] font-semibold text-slate-900">{session.indicatorName}</span>
+                      <span className="truncate max-w-50 font-semibold text-slate-900">{session.indicatorName}</span>
                       <span className="text-[9px] text-slate-500 font-normal">
                         {session.timestamp} &bull; {session.selectedDocTitles?.length || 1} Dokumen
                       </span>
@@ -4688,7 +5208,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
         </div>
       )}
 
-      {}
+      { }
       <div className="bg-white border border-slate-200 p-6 rounded-none shadow-xs space-y-4 font-roboto">
         <div className="flex items-center justify-between border-b border-slate-200 pb-3">
           <div className="flex items-center gap-2">
@@ -4717,7 +5237,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-slate-200 border-y border-slate-200 py-2">
-            {}
+            { }
             <div className="p-3 space-y-2.5">
               <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                 <span className="text-xs font-semibold text-slate-800 flex items-center gap-1.5">
@@ -4747,9 +5267,8 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
                       <div
                         key={doc.id}
                         onClick={() => toggleDocumentSelection(doc.id)}
-                        className={`p-2 text-xs cursor-pointer flex items-start gap-2 transition-colors ${
-                          isSelected ? 'bg-teal-50/80 font-semibold text-slate-900' : 'hover:bg-slate-50 text-slate-600'
-                        }`}
+                        className={`p-2 text-xs cursor-pointer flex items-start gap-2 transition-colors ${isSelected ? 'bg-teal-50/80 font-semibold text-slate-900' : 'hover:bg-slate-50 text-slate-600'
+                          }`}
                       >
                         {isSelected ? <CheckSquare size={15} className="text-teal-700 shrink-0 mt-0.5" /> : <Square size={15} className="text-slate-400 shrink-0 mt-0.5" />}
                         <span className="truncate">{doc.title}</span>
@@ -4760,7 +5279,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
               </div>
             </div>
 
-            {}
+            { }
             <div className="p-3 space-y-2.5">
               <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                 <span className="text-xs font-semibold text-slate-800 flex items-center gap-1.5">
@@ -4790,9 +5309,8 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
                       <div
                         key={doc.id}
                         onClick={() => toggleDocumentSelection(doc.id)}
-                        className={`p-2 text-xs cursor-pointer flex items-start gap-2 transition-colors ${
-                          isSelected ? 'bg-teal-50/80 font-semibold text-slate-900' : 'hover:bg-slate-50 text-slate-600'
-                        }`}
+                        className={`p-2 text-xs cursor-pointer flex items-start gap-2 transition-colors ${isSelected ? 'bg-teal-50/80 font-semibold text-slate-900' : 'hover:bg-slate-50 text-slate-600'
+                          }`}
                       >
                         {isSelected ? <CheckSquare size={15} className="text-teal-700 shrink-0 mt-0.5" /> : <Square size={15} className="text-slate-400 shrink-0 mt-0.5" />}
                         <span className="truncate">{doc.title}</span>
@@ -4803,7 +5321,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
               </div>
             </div>
 
-            {}
+            { }
             <div className="p-3 space-y-2.5">
               <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                 <span className="text-xs font-semibold text-slate-800 flex items-center gap-1.5">
@@ -4833,9 +5351,8 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
                       <div
                         key={doc.id}
                         onClick={() => toggleDocumentSelection(doc.id)}
-                        className={`p-2 text-xs cursor-pointer flex items-start gap-2 transition-colors ${
-                          isSelected ? 'bg-teal-50/80 font-semibold text-slate-900' : 'hover:bg-slate-50 text-slate-600'
-                        }`}
+                        className={`p-2 text-xs cursor-pointer flex items-start gap-2 transition-colors ${isSelected ? 'bg-teal-50/80 font-semibold text-slate-900' : 'hover:bg-slate-50 text-slate-600'
+                          }`}
                       >
                         {isSelected ? <CheckSquare size={15} className="text-teal-700 shrink-0 mt-0.5" /> : <Square size={15} className="text-slate-400 shrink-0 mt-0.5" />}
                         <span className="truncate">{doc.title}</span>
@@ -4848,10 +5365,10 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
           </div>
         )}
 
-        {}
+        { }
         <div className="pt-2 flex justify-end">
           <button
-            onClick={handleExecuteMultiAnalysis}
+            onClick={handleOpenMappingModal}
             disabled={isComparing || selectedDocIds.length === 0}
             className="px-5 py-2.5 bg-teal-700 hover:bg-teal-800 disabled:bg-slate-300 text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-2 border border-teal-900 shadow-sm"
           >
@@ -4865,10 +5382,10 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
         </div>
       </div>
 
-      {}
+      { }
       {(isComparing || compareResult) && (
         <div className="space-y-4">
-          {}
+          { }
           <div className="flex items-center justify-between bg-white border border-slate-300 p-3 rounded-none">
             <span className="text-xs font-bold text-slate-900 uppercase tracking-wider">
               Hasil Diagnostik Deviasi: {compareResult?.math?.indicatorName || 'Analisis Multidokumen'}
@@ -4910,9 +5427,9 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
             </div>
           </div>
 
-          {}
+          { }
           <div id="deep-dive-analysis-container" className="space-y-6 bg-white p-4 border border-slate-300">
-            {}
+            { }
             <div className="p-4 bg-slate-50 border border-slate-300 rounded-none flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
               <div>
                 <span className="text-[10px] font-bold text-teal-800 uppercase tracking-widest block">
@@ -4930,7 +5447,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
               </div>
             </div>
 
-            {}
+            { }
             {compareResult && (
               <>
                 <hr className="border-slate-200" />
@@ -4945,7 +5462,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
               </>
             )}
 
-            {}
+            { }
             {isComparing ? (
               <div className="bg-white border border-slate-300 p-12 text-center text-slate-600 space-y-2">
                 <Loader2 size={28} className="animate-spin text-teal-700 mx-auto" />
@@ -4963,7 +5480,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
               </>
             ) : null}
 
-            {}
+            { }
             {compareResult && (
               <>
                 <hr className="border-slate-200" />
@@ -4975,6 +5492,166 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateToGenera
           </div>
         </div>
       )}
+
+      {}
+      {isMappingModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-300 shadow-2xl max-w-lg w-full p-6 rounded-none space-y-4 font-roboto">
+
+            {}
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+              <div className="flex items-center gap-2 text-slate-900">
+                <BarChart3 size={18} className="text-teal-700" />
+                <h3 className="text-sm font-bold uppercase">Pemetaan Peran &amp; Parameter Analisis</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsMappingModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {}
+            <div className="space-y-4">
+              {}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                  Pilih Dokumen Target (Baseline) [3]
+                </label>
+                <select
+                  value={modalBaselineId}
+                  onChange={(e) => setModalBaselineId(e.target.value)}
+                  className="w-full text-xs p-2.5 border border-slate-300 focus:outline-none focus:border-teal-700 bg-white font-semibold rounded-none"
+                >
+                  <option value="">-- Pilih Dokumen Target --</option>
+                  {selectedDocumentsList.map((doc) => (
+                    <option key={doc.id} value={doc.id}>
+                      [{doc.metadata?.category || 'Umum'}] {doc.title}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                  Pilih Dokumen Capaian (Realisasi) [3]
+                </label>
+                <select
+                  value={modalRealizationId}
+                  onChange={(e) => setModalRealizationId(e.target.value)}
+                  className="w-full text-xs p-2.5 border border-slate-300 focus:outline-none focus:border-teal-700 bg-white font-semibold rounded-none"
+                >
+                  <option value="">-- Pilih Dokumen Realisasi --</option>
+                  {selectedDocumentsList.map((doc) => (
+                    <option key={doc.id} value={doc.id}>
+                      [{doc.metadata?.category || 'Umum'}] {doc.title}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                    Nama Indikator Daerah
+                  </label>
+                  <input
+                    type="text"
+                    value={modalIndicatorName}
+                    onChange={(e) => setModalIndicatorName(e.target.value)}
+                    required
+                    className="w-full text-xs p-2.5 border border-slate-300 focus:outline-none focus:border-teal-700 rounded-none font-semibold"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                    Sektor Kebijakan
+                  </label>
+                  <input
+                    type="text"
+                    value={modalSector}
+                    onChange={(e) => setModalSector(e.target.value)}
+                    required
+                    className="w-full text-xs p-2.5 border border-slate-300 focus:outline-none focus:border-teal-700 rounded-none font-semibold"
+                  />
+                </div>
+              </div>
+
+              {}
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                    Nilai Target
+                  </label>
+                  <input
+                    type="number"
+                    step="any"
+                    value={modalTargetValue}
+                    onChange={(e) => setModalTargetValue(Number(e.target.value))}
+                    required
+                    className="w-full text-xs p-2.5 border border-slate-300 focus:outline-none focus:border-teal-700 rounded-none font-semibold"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                    Nilai Realisasi
+                  </label>
+                  <input
+                    type="number"
+                    step="any"
+                    value={modalRealizationValue}
+                    onChange={(e) => setModalRealizationValue(Number(e.target.value))}
+                    required
+                    className="w-full text-xs p-2.5 border border-slate-300 focus:outline-none focus:border-teal-700 rounded-none font-semibold"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                    Satuan Indikator
+                  </label>
+                  <select
+                    value={modalUnitSuffix}
+                    onChange={(e) => setModalUnitSuffix(e.target.value)}
+                    className="w-full text-xs p-2.5 border border-slate-300 focus:outline-none focus:border-teal-700 bg-white font-semibold rounded-none"
+                  >
+                    <option value="%">% (Persentase)</option>
+                    <option value="Miliar">Rupiah (Miliar)</option>
+                    <option value="Juta">Rupiah (Juta)</option>
+                    <option value="Km">Km (Panjang)</option>
+                    <option value="Jiwa">Jiwa (Penduduk)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {}
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200">
+              <button
+                type="button"
+                onClick={() => setIsMappingModalOpen(false)}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs uppercase rounded-none border border-slate-300 cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmExecuteAnalysis}
+                disabled={!modalBaselineId || !modalRealizationId}
+                className="px-4 py-2 bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-2 border border-teal-850 shadow-xs cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Play size={14} />
+                <span>Proses Analisis Deviasi</span>
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };
@@ -6009,17 +6686,21 @@ export const DocumentDetailModal: React.FC<DocumentDetailModalProps> = ({ docume
 
 --- FILE: src\modules\knowledge-hub\components\document-table.tsx ---
 import React from 'react';
-import { FileText, Eye, Download, Trash2 } from 'lucide-react';
+import { FileText, Eye, Download, Trash2, Clock } from 'lucide-react';
 import type { DocumentRecord } from '../../../services/document.service';
 
 interface DocumentTableProps {
   documents: DocumentRecord[];
+  selectedDocIds: string[];
+  onSelectionChange: (selectedIds: string[]) => void;
   onViewDetail: (doc: DocumentRecord) => void;
   onDeleteDocument: (doc: DocumentRecord) => void;
 }
 
 export const DocumentTable: React.FC<DocumentTableProps> = ({
   documents,
+  selectedDocIds,
+  onSelectionChange,
   onViewDetail,
   onDeleteDocument,
 }) => {
@@ -6032,32 +6713,119 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
     );
   }
 
+  const selectableDocs = documents.filter((doc) => doc.status === 'READY');
+  const isAllSelectableSelected =
+    selectableDocs.length > 0 &&
+    selectableDocs.every((doc) => selectedDocIds.includes(doc.id));
+
+  const handleSelectAllToggle = () => {
+    const selectableIds = selectableDocs.map((d) => d.id);
+    if (isAllSelectableSelected) {
+
+      onSelectionChange(selectedDocIds.filter((id) => !selectableIds.includes(id)));
+    } else {
+
+      onSelectionChange(Array.from(new Set([...selectedDocIds, ...selectableIds])));
+    }
+  };
+
+  const handleRowToggle = (docId: string) => {
+    if (selectedDocIds.includes(docId)) {
+      onSelectionChange(selectedDocIds.filter((id) => id !== docId));
+    } else {
+      onSelectionChange([...selectedDocIds, docId]);
+    }
+  };
+
+  const renderStatusBadge = (status: string) => {
+    switch (status) {
+      case 'READY':
+        return (
+          <span className="inline-block text-[10px] bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.5 font-bold uppercase tracking-wider rounded-none">
+            Ready
+          </span>
+        );
+      case 'PROCESSING':
+        return (
+          <span className="inline-flex items-center gap-1 text-[10px] bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 font-bold uppercase tracking-wider rounded-none">
+            <Clock size={10} className="animate-spin text-amber-600" /> Ingesting
+          </span>
+        );
+      case 'FAILED':
+        return (
+          <span className="inline-block text-[10px] bg-red-50 text-red-800 border border-red-200 px-2 py-0.5 font-bold uppercase tracking-wider rounded-none">
+            Failed
+          </span>
+        );
+      default:
+        return (
+          <span className="inline-block text-[10px] bg-slate-50 text-slate-800 border border-slate-200 px-2 py-0.5 font-bold uppercase tracking-wider rounded-none">
+            Pending
+          </span>
+        );
+    }
+  };
+
   return (
     <div className="bg-white border border-slate-200 rounded-none overflow-hidden shadow-xs">
       <div className="px-6 py-3.5 border-b border-slate-200 bg-slate-50/50">
-        <h2 className="text-base font-bold text-slate-900">Daftar Dokumen</h2>
+        <h2 className="text-base font-bold text-slate-900">Daftar Dokumen Repositori</h2>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="border-b border-slate-200 bg-slate-100/70 font-roboto text-sm text-slate-900 font-bold tracking-wide">
+              {}
+              <th className="py-3 px-4 w-12 text-center">
+                <input
+                  type="checkbox"
+                  checked={isAllSelectableSelected}
+                  onChange={handleSelectAllToggle}
+                  disabled={selectableDocs.length === 0}
+                  className="rounded-none border-slate-300 text-teal-700 focus:ring-teal-500 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed w-4 h-4"
+                  title="Pilih semua dokumen yang siap digunakan"
+                />
+              </th>
               <th className="py-3 px-4 font-bold text-slate-900">Judul Dokumen</th>
               <th className="py-3 px-4 font-bold text-slate-900">Kategori</th>
               <th className="py-3 px-4 font-bold text-slate-900">Jumlah Halaman &amp; Chunks</th>
+              <th className="py-3 px-4 font-bold text-slate-900">Status</th>
               <th className="py-3 px-4 font-bold text-slate-900 text-center">Aksi</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {documents.map((doc) => {
+              const isSelected = selectedDocIds.includes(doc.id);
+              const isSelectable = doc.status === 'READY';
+
               return (
                 <tr
                   key={doc.id}
-                  className="transition-colors hover:bg-slate-50/80"
+                  className={`transition-colors font-roboto ${isSelected ? 'bg-teal-50/30 font-semibold' : 'hover:bg-slate-50/80'
+                    } ${!isSelectable ? 'opacity-65 bg-slate-50/30' : ''}`}
                 >
+                  {}
+                  <td className="py-3 px-4 text-center">
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => handleRowToggle(doc.id)}
+                      disabled={!isSelectable}
+                      className="rounded-none border-slate-300 text-teal-700 focus:ring-teal-500 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed w-4 h-4"
+                      title={
+                        isSelectable
+                          ? 'Pilih dokumen ini'
+                          : 'Dokumen sedang diproses atau gagal dianalisis oleh AI'
+                      }
+                    />
+                  </td>
+
                   <td className="py-3 px-4">
                     <div className="flex items-center gap-2">
                       <FileText size={14} className="text-teal-600 shrink-0" />
-                      <span className="font-roboto text-slate-800 text-xs">{doc.title}</span>
+                      <span className="text-slate-800 text-xs truncate max-w-sm" title={doc.title}>
+                        {doc.title}
+                      </span>
                     </div>
                   </td>
                   <td className="py-3 px-4 text-slate-800 text-xs font-normal">
@@ -6065,6 +6833,9 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
                   </td>
                   <td className="py-3 px-4 text-slate-800 text-xs font-normal">
                     {doc.metadata?.pageCount || 0} Hal / {doc.chunkCount || 0} Chunks
+                  </td>
+                  <td className="py-3 px-4 text-xs">
+                    {renderStatusBadge(doc.status)}
                   </td>
 
                   <td className="py-3 px-4 text-center">
@@ -6105,7 +6876,6 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
                 </tr>
               );
             })}
-
           </tbody>
         </table>
       </div>
@@ -6113,6 +6883,110 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
   );
 };
 
+--- FILE: src\modules\knowledge-hub\components\floating-action-bar.component.tsx ---
+import React from 'react';
+import {
+    MessageSquareCode,
+    BarChart3,
+    FileText,
+    PenTool,
+    X,
+} from 'lucide-react';
+
+export interface FloatingActionBarProps {
+    selectedCount: number;
+    onClearSelection: () => void;
+    onForward: (targetRoute: string) => void;
+}
+
+export const FloatingActionBar: React.FC<FloatingActionBarProps> = ({
+    selectedCount,
+    onClearSelection,
+    onForward,
+}) => {
+
+    const actionItems = [
+        {
+            id: 'ai-request',
+            label: 'Tanya AI Chat',
+            icon: MessageSquareCode,
+            isPrimary: true,
+        },
+        {
+            id: 'analytics',
+            label: 'Analisis Deviasi',
+            icon: BarChart3,
+            isPrimary: false,
+        },
+        {
+            id: 'reports',
+            label: 'Nota Dinas Bupati',
+            icon: FileText,
+            isPrimary: false,
+        },
+        {
+            id: 'generator',
+            label: 'Generate Artikel',
+            icon: PenTool,
+            isPrimary: false,
+        },
+    ];
+
+    return (
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-3rem)] max-w-5xl bg-zinc-950/95 backdrop-blur-md text-zinc-100 border border-zinc-800 p-4 md:py-3 md:px-5 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.8)] flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 rounded-none animate-in fade-in slide-in-from-bottom-3 duration-250 no-print font-roboto">
+
+            {}
+            <div className="flex items-center justify-between lg:justify-start gap-4">
+                <div className="flex items-center gap-1.5 text-xs">
+                    <span className="font-extrabold text-sm text-white bg-zinc-900 border border-zinc-800 px-2 py-0.5 rounded-none">
+                        {selectedCount}
+                    </span>
+                    <span className="font-bold text-zinc-300 uppercase tracking-widest text-[10px]">
+                        Dokumen Terpilih
+                    </span>
+                    <span className="hidden sm:inline text-zinc-600 font-normal">|</span>
+                    <span className="hidden sm:inline text-[11px] text-zinc-400 font-medium">
+                        Siap diteruskan ke modul AI [3]
+                    </span>
+                </div>
+
+                {}
+                <button
+                    onClick={onClearSelection}
+                    className="text-zinc-500 hover:text-zinc-200 transition-colors duration-150 cursor-pointer inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest"
+                    title="Batalkan semua pilihan"
+                >
+                    <X size={11} />
+                    <span>Batal</span>
+                </button>
+            </div>
+
+            {}
+            <div className="grid grid-cols-2 sm:flex sm:items-center gap-1.5 shrink-0">
+                {actionItems.map((item) => {
+                    const IconComponent = item.icon;
+                    return (
+                        <button
+                            key={item.id}
+                            onClick={() => onForward(item.id)}
+                            className={`
+                px-3.5 py-2 text-[10px] font-bold uppercase tracking-widest transition-all duration-150 cursor-pointer rounded-none flex items-center justify-center gap-1.5
+                ${item.isPrimary
+                                    ? 'bg-white hover:bg-zinc-200 text-zinc-950 font-extrabold border border-white'
+                                    : 'bg-transparent hover:bg-zinc-900 text-zinc-300 hover:text-white border border-zinc-800'
+                                }
+              `}
+                            title={`Forward ke ${item.label}`}
+                        >
+                            <IconComponent size={12} className="shrink-0" />
+                            <span>{item.label}</span>
+                        </button>
+                    );
+                })}
+            </div>
+        </div>
+    );
+};
 
 --- FILE: src\modules\knowledge-hub\components\upload-dropzone.tsx ---
 import React, { useState, useRef } from 'react';
@@ -6353,12 +7227,18 @@ import React, { useState, useEffect } from 'react';
 import { UploadDropzone } from '../components/upload-dropzone';
 import { DocumentTable } from '../components/document-table';
 import { DocumentDetailModal } from '../components/document-detail-modal.component';
+import { FloatingActionBar } from '../components/floating-action-bar.component';
 import { DocumentService, type DocumentRecord } from '../../../services/document.service';
 import { MOCK_DATA } from '../../../services/mock-data.service';
 import { Loader2, AlertCircle, RefreshCw, Trash2 } from 'lucide-react';
 
-export const KnowledgeHubView: React.FC = () => {
+interface KnowledgeHubViewProps {
+  onForward: (documentIds: string[], targetRoute: string, promptText?: string) => void;
+}
+
+export const KnowledgeHubView: React.FC<KnowledgeHubViewProps> = ({ onForward }) => {
   const [documents, setDocuments] = useState<DocumentRecord[]>([]);
+  const [selectedDocIds, setSelectedDocIds] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isUsingMock, setIsUsingMock] = useState(false);
@@ -6371,7 +7251,7 @@ export const KnowledgeHubView: React.FC = () => {
     setLoadError(null);
     try {
       const docs = await DocumentService.listDocuments();
-      setDocuments(docs);
+      setDocuments(docs || []);
       setIsUsingMock(false);
     } catch {
 
@@ -6386,6 +7266,11 @@ export const KnowledgeHubView: React.FC = () => {
   useEffect(() => {
     loadDocuments();
   }, []);
+
+  useEffect(() => {
+    const activeIds = documents.map((d) => d.id);
+    setSelectedDocIds((prev) => prev.filter((id) => activeIds.includes(id)));
+  }, [documents]);
 
   const handleUploadSuccess = (newDoc: DocumentRecord) => {
     setDocuments((prev) => [newDoc, ...prev]);
@@ -6409,8 +7294,18 @@ export const KnowledgeHubView: React.FC = () => {
     }
   };
 
+  const handleExecuteForward = (targetRoute: string) => {
+
+    if (selectedDocIds.length > 3) {
+      alert('Batas Maksimal Terlampaui: Anda hanya dapat memilih maksimal 3 dokumen acuan untuk diteruskan demi kestabilan pemrosesan AI.');
+      return;
+    }
+
+    onForward(selectedDocIds, targetRoute);
+  };
+
   return (
-    <div className="flex flex-col w-full bg-slate-100/70 p-6 space-y-6 font-roboto">
+    <div className="flex flex-col w-full bg-slate-100/70 p-6 space-y-6 font-roboto relative pb-24">
       {}
       <div className="w-full bg-white border border-slate-300 px-6 py-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4 rounded-none shadow-2xs">
         {}
@@ -6470,8 +7365,19 @@ export const KnowledgeHubView: React.FC = () => {
       ) : (
         <DocumentTable
           documents={documents}
+          selectedDocIds={selectedDocIds}
+          onSelectionChange={setSelectedDocIds}
           onViewDetail={(doc) => setDetailDoc(doc)}
           onDeleteDocument={(doc) => setDeleteConfirmDoc(doc)}
+        />
+      )}
+
+      {}
+      {selectedDocIds.length > 0 && (
+        <FloatingActionBar
+          selectedCount={selectedDocIds.length}
+          onClearSelection={() => setSelectedDocIds([])}
+          onForward={handleExecuteForward}
         />
       )}
 
@@ -6554,11 +7460,15 @@ import {
 interface ReportsViewProps {
   onNavigateToGenerator?: (initialPrompt?: string) => void;
   onNavigateToDashboard?: () => void;
+  initialSelectedDocIds?: string[];
+  onClearSharedDocIds?: () => void;
 }
 
 export const ReportsView: React.FC<ReportsViewProps> = ({
   onNavigateToGenerator,
   onNavigateToDashboard,
+  initialSelectedDocIds,
+  onClearSharedDocIds,
 }) => {
 
   const [documents, setDocuments] = useState<DocumentRecord[]>([]);
@@ -6628,9 +7538,12 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
     try {
       const fetchedDocs = await DocumentService.listDocuments();
       setDocuments(fetchedDocs || []);
-      if (fetchedDocs && fetchedDocs.length > 0 && selectedDocIds.length === 0) {
 
-        setSelectedDocIds([fetchedDocs[0].id]);
+      if (!initialSelectedDocIds || initialSelectedDocIds.length === 0) {
+        if (fetchedDocs && fetchedDocs.length > 0 && selectedDocIds.length === 0) {
+
+          setSelectedDocIds([fetchedDocs[0].id]);
+        }
       }
     } catch (err: any) {
       console.error('Gagal memuat dokumen dari database:', err);
@@ -6640,6 +7553,23 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
       setIsLoadingDocs(false);
     }
   };
+
+  useEffect(() => {
+    if (documents.length > 0) {
+      if (initialSelectedDocIds && initialSelectedDocIds.length > 0) {
+
+        const validIds = initialSelectedDocIds.filter((id) =>
+          documents.some((doc) => doc.id === id)
+        );
+
+        if (validIds.length > 0) {
+          setSelectedDocIds(validIds);
+        }
+
+        onClearSharedDocIds?.();
+      }
+    }
+  }, [initialSelectedDocIds, documents]);
 
   const loadHistory = async () => {
     setIsLoadingHistory(true);
@@ -6988,7 +7918,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
             <div className="border-b-2 border-slate-900 pb-4">
               <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 mb-2">
                 <div>
-                  <span className="text-xs font-bold text-teal-800 uppercase tracking-widest block mb-1 flex items-center gap-1.5">
+                  <span className="text-xs font-bold text-teal-800 uppercase tracking-widest block mb-1 items-center gap-1.5">
                     <Building2 size={14} className="text-teal-700" />
                     <span>PEMERINTAH KABUPATEN MIMIKA &bull; BRIDA SMART ANALYSIS</span>
                   </span>
@@ -7004,8 +7934,8 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                   const bgClass = isHigh
                     ? 'bg-red-50 text-red-800 border border-red-200'
                     : isMedium
-                    ? 'bg-amber-50 text-amber-800 border border-amber-200'
-                    : 'bg-emerald-50 text-emerald-800 border border-emerald-200';
+                      ? 'bg-amber-50 text-amber-800 border border-amber-200'
+                      : 'bg-emerald-50 text-emerald-800 border border-emerald-200';
 
                   return (
                     <span className={`px-3 py-1 text-xs font-bold uppercase rounded-none flex items-center gap-1.5 shrink-0 self-start ${bgClass}`}>
@@ -7039,7 +7969,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
 
             {}
             <div className="border-teal-700 pl-4 py-2.5 bg-slate-50/70 text-slate-900 font-normal leading-relaxed italic text-sm text-justify pr-4">
-              <strong className="block text-xs uppercase tracking-wider text-teal-900 font-bold mb-1.5 not-italic flex items-center gap-1.5">
+              <strong className="block text-xs uppercase tracking-wider text-teal-900 font-bold mb-1.5 not-italic items-center gap-1.5">
                 <FileText size={14} className="text-teal-700" />
                 <span>RINGKASAN EKSEKUTIF</span>
               </strong>
@@ -7529,6 +8459,21 @@ export const AiAssistantService = {
     return result.data;
   },
 
+  async transitionToArticle(req: {
+    sessionId: string;
+    articleTitle: string;
+    targetLength?: 'SHORT' | 'MEDIUM' | 'LONG';
+    tone?: string;
+    userInstruction?: string;
+  }): Promise<ArticleSessionDetail> {
+    const result = await safeFetch(`${API_BASE_URL}/assistant/article/transition`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req),
+    });
+    return result.data;
+  },
+
   async interactArticle(sessionId: string, userInstruction: string): Promise<ArticleSessionDetail> {
     const result = await safeFetch(`${API_BASE_URL}/assistant/article/interact`, {
       method: 'POST',
@@ -7569,6 +8514,18 @@ export const AiAssistantService = {
     await safeFetch(`${API_BASE_URL}/assistant/article/sessions/${id}`, {
       method: 'DELETE',
     });
+  },
+
+  async getArticleExportData(id: string): Promise<{
+    title: string;
+    content: string;
+    tone: string;
+    generatedAt: string;
+  }> {
+    const result = await safeFetch(`${API_BASE_URL}/assistant/article/sessions/${id}/export-data`, {
+      method: 'GET',
+    });
+    return result.data;
   },
 
   async listQaSessions(): Promise<Array<{
@@ -7706,6 +8663,7 @@ export const AnalysisService = {
     unitSuffix?: string;
     baselineDocId?: string;
     realizationDocId?: string;
+    documentIds?: string[];
   }): Promise<DeviationCompareResult> {
     try {
       const response = await fetch(`${API_BASE_URL}/analysis/compare`, {
@@ -8092,8 +9050,19 @@ import htmlToPdfmake from 'html-to-pdfmake';
 
 const vfsFonts = (pdfFonts as any)?.pdfMake?.vfs || (pdfFonts as any)?.vfs || (pdfFonts as any);
 if (vfsFonts) {
-  (pdfMake as any).vfs = vfsFonts;
+  (pdfMake as any).addVirtualFileSystem(vfsFonts);
 }
+
+const defaultFonts = {
+  Roboto: {
+    normal:      'Roboto-Regular.ttf',
+    bold:        'Roboto-Medium.ttf',
+    italics:     'Roboto-Italic.ttf',
+    bolditalics: 'Roboto-MediumItalic.ttf',
+  }
+};
+
+const fontVfsCache: Record<string, string> = {};
 
 export interface PDFFormatConfig {
   fontFamily: 'Calibri' | 'Times New Roman' | 'Verdana' | 'Arial';
@@ -8103,9 +9072,11 @@ export interface PDFFormatConfig {
 }
 
 async function fetchLocalFontToBase64(url: string): Promise<string> {
+  if (fontVfsCache[url]) return fontVfsCache[url];
+
   const response = await fetch(url);
   if (!response.ok) {
-    throw new Error(`Gagal memuat aset biner font dari jalur server lokal: ${url}`);
+    throw new Error(`Gagal memuat aset biner font dari jalur server lokal: ${url} (HTTP ${response.status})`);
   }
   const blob = await response.blob();
   return new Promise<string>((resolve, reject) => {
@@ -8113,6 +9084,7 @@ async function fetchLocalFontToBase64(url: string): Promise<string> {
     reader.onloadend = () => {
       const base64String = reader.result as string;
       const base64Data = base64String.split(',')[1];
+      fontVfsCache[url] = base64Data;
       resolve(base64Data);
     };
     reader.onerror = reject;
@@ -8127,71 +9099,67 @@ export const PdfExportService = {
     config: PDFFormatConfig,
     filename: string,
   ): Promise<void> {
-    const fontFolderMap: Record<string, string> = {
-      'Times New Roman': 'times',
-      'Arial': 'arial',
-      'Verdana': 'verdana',
-      'Calibri': 'calibri',
-    };
-
     const fontFileMap: Record<string, { normal: string; bold: string; italics: string; bolditalics: string }> = {
-      times: { normal: 'times.ttf', bold: 'timesbd.ttf', italics: 'timesi.ttf', bolditalics: 'timesbi.ttf' },
-      arial: { normal: 'arial.ttf', bold: 'arialbd.ttf', italics: 'ariali.ttf', bolditalics: 'arialbi.ttf' },
-      verdana: { normal: 'verdana.ttf', bold: 'verdanab.ttf', italics: 'verdanai.ttf', bolditalics: 'verdanaz.ttf' },
-      calibri: { normal: 'calibri.ttf', bold: 'calibrib.ttf', italics: 'calibrii.ttf', bolditalics: 'calibriz.ttf' },
+      'Times New Roman': { normal: 'times.ttf', bold: 'timesbd.ttf', italics: 'timesi.ttf', bolditalics: 'timesbi.ttf' },
+      'Arial':           { normal: 'arial.ttf', bold: 'arialbd.ttf', italics: 'ariali.ttf', bolditalics: 'arialbi.ttf' },
+      'Verdana':         { normal: 'verdana.ttf', bold: 'verdanab.ttf', italics: 'verdanai.ttf', bolditalics: 'verdanaz.ttf' },
+      'Calibri':         { normal: 'calibri.ttf', bold: 'calibrib.ttf', italics: 'calibrii.ttf', bolditalics: 'calibriz.ttf' },
     };
 
-    const folder = fontFolderMap[config.fontFamily] || 'arial';
-    const files = fontFileMap[folder];
+    const files = fontFileMap[config.fontFamily] || fontFileMap['Arial'];
+
+    const vfsPrefix = files.normal.replace('.ttf', '');
 
     const [vNormal, vBold, vItalics, vBoldItalics] = await Promise.all([
-      fetchLocalFontToBase64(`/fonts/${folder}/${files.normal}`),
-      fetchLocalFontToBase64(`/fonts/${folder}/${files.bold}`),
-      fetchLocalFontToBase64(`/fonts/${folder}/${files.italics}`),
-      fetchLocalFontToBase64(`/fonts/${folder}/${files.bolditalics}`),
+      fetchLocalFontToBase64(`/fonts/${files.normal}`),
+      fetchLocalFontToBase64(`/fonts/${files.bold}`),
+      fetchLocalFontToBase64(`/fonts/${files.italics}`),
+      fetchLocalFontToBase64(`/fonts/${files.bolditalics}`),
     ]);
 
-    (pdfMake as any).vfs[`${folder}-Regular.ttf`] = vNormal;
-    (pdfMake as any).vfs[`${folder}-Bold.ttf`] = vBold;
-    (pdfMake as any).vfs[`${folder}-Italic.ttf`] = vItalics;
-    (pdfMake as any).vfs[`${folder}-BoldItalic.ttf`] = vBoldItalics;
-
-    (pdfMake as any).fonts = {
-      Roboto: {
-        normal: 'Roboto-Regular.ttf',
-        bold: 'Roboto-Medium.ttf',
-        italics: 'Roboto-Italic.ttf',
-        bolditalics: 'Roboto-MediumItalic.ttf',
-      },
-      CustomFont: {
-        normal: `${folder}-Regular.ttf`,
-        bold: `${folder}-Bold.ttf`,
-        italics: `${folder}-Italic.ttf`,
-        bolditalics: `${folder}-BoldItalic.ttf`,
-      },
+    const customVfs = {
+      [`${vfsPrefix}-Regular.ttf`]:    vNormal,
+      [`${vfsPrefix}-Bold.ttf`]:       vBold,
+      [`${vfsPrefix}-Italic.ttf`]:     vItalics,
+      [`${vfsPrefix}-BoldItalic.ttf`]: vBoldItalics,
     };
+    (pdfMake as any).addVirtualFileSystem(customVfs);
 
     const marginPoints = Math.round(config.marginCm * 28.3465);
 
-    const pdfContent = htmlToPdfmake(htmlText, {
+    let sanitizedHtml = htmlText.trim();
+    const trailingEmptyRegex = /(?:<p>\s*<\/p>|<p>\s*<br\s*\/?>\s*<\/p>|<p>&nbsp;<\/p>|<br\s*\/?>)+$/i;
+    sanitizedHtml = sanitizedHtml.replace(trailingEmptyRegex, '').trim();
+
+    const pdfContent = htmlToPdfmake(sanitizedHtml, {
       window: window,
+      ignoreStyles: ['font-family'],
+      removeExtraBlanks: true,
     });
+
+    const fontDefinitions: any = {
+      Roboto: {
+        normal:      'Roboto-Regular.ttf',
+        bold:        'Roboto-Medium.ttf',
+        italics:     'Roboto-Italic.ttf',
+        bolditalics: 'Roboto-MediumItalic.ttf',
+      },
+      CustomFont: {
+        normal:      `${vfsPrefix}-Regular.ttf`,
+        bold:        `${vfsPrefix}-Bold.ttf`,
+        italics:     `${vfsPrefix}-Italic.ttf`,
+        bolditalics: `${vfsPrefix}-BoldItalic.ttf`,
+      },
+    };
 
     const docDefinition: any = {
       pageSize: 'A4',
       pageMargins: [marginPoints, marginPoints, marginPoints, marginPoints],
       defaultStyle: {
-        font: 'CustomFont',
-        fontSize: config.fontSize,
+        font:       'CustomFont',
+        fontSize:   config.fontSize,
         lineHeight: config.lineSpacing,
-        alignment: 'justify',
-      },
-      header: {
-        text: 'BRIDA SMART ANALYSIS — KABUPATEN MIMIKA',
-        alignment: 'right',
-        fontSize: 8,
-        color: '#94a3b8',
-        margin: [marginPoints, 15, marginPoints, 0],
+        alignment:  'justify',
       },
       footer: (currentPage: number, pageCount: number) => ({
         columns: [
@@ -8203,21 +9171,15 @@ export const PdfExportService = {
       content: pdfContent,
     };
 
+    (pdfMake as any).setFonts(fontDefinitions);
     const targetFilename = filename.toLowerCase().endsWith('.pdf') ? filename : `${filename}.pdf`;
-    pdfMake.createPdf(docDefinition).download(targetFilename);
+    (pdfMake as any).createPdf(docDefinition).download(targetFilename);
   },
 
   exportAnalyticsPdf(indicator: any, filename?: string): void {
     const docDefinition: any = {
       pageSize: 'A4',
       pageMargins: [30, 30, 30, 30],
-      header: {
-        text: 'BRIDA SMART ANALYSIS — KABUPATEN MIMIKA',
-        alignment: 'right',
-        fontSize: 8,
-        color: '#64748b',
-        margin: [30, 15, 30, 0],
-      },
       footer: (currentPage: number, pageCount: number) => ({
         columns: [
           { text: `Tanggal Rilis: ${new Date().toLocaleDateString('id-ID')}`, fontSize: 8, color: '#64748b' },
@@ -8347,21 +9309,15 @@ export const PdfExportService = {
       },
     };
 
+    (pdfMake as any).setFonts(defaultFonts);
     const targetFilename = filename || `Analisis_Deviasi_${indicator.id.toUpperCase()}_Mimika.pdf`;
-    pdfMake.createPdf(docDefinition).download(targetFilename);
+    (pdfMake as any).createPdf(docDefinition).download(targetFilename);
   },
 
   exportBupatiReportPdf(report: any): void {
     const docDefinition: any = {
       pageSize: 'A4',
       pageMargins: [35, 35, 35, 35],
-      header: {
-        text: 'BRIDA SMART ANALYSIS — KABUPATEN MIMIKA',
-        alignment: 'right',
-        fontSize: 8,
-        color: '#64748b',
-        margin: [35, 18, 35, 0],
-      },
       footer: (currentPage: number, pageCount: number) => ({
         columns: [
           { text: 'Dokumen Resmi Pemerintah Kabupaten Mimika', fontSize: 8, color: '#64748b' },
@@ -8490,7 +9446,8 @@ export const PdfExportService = {
       },
     };
 
-    pdfMake.createPdf(docDefinition).download('Nota_Dinas_Resmi_Bupati_Mimika_Maret_2026.pdf');
+    (pdfMake as any).setFonts(defaultFonts);
+    (pdfMake as any).createPdf(docDefinition).download('Nota_Dinas_Resmi_Bupati_Mimika_Maret_2026.pdf');
   },
 
   async exportElementToPdf(_elementId: string, filename: string, compareResult?: any): Promise<void> {

@@ -9,11 +9,24 @@ import { AiQaView } from './modules/ai-assistant/views/ai-qa.view';
 import { ArticleGeneratorView } from './modules/ai-assistant/views/article-generator.view';
 import { ArticlePreviewEditorView } from './modules/ai-assistant/views/article-preview-editor.view';
 
+const SESSION_FORWARD_DOCS_KEY = 'brida_forward_doc_ids';
+
 export function App() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(true);
   const [activeRoute, setActiveRoute] = useState('dashboard');
   const [initialArticlePrompt, setInitialArticlePrompt] = useState<string | undefined>(undefined);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+
+  // Inisialisasi state secara aman dari SessionStorage (Tahan terhadap Hard Refresh / F5)
+  const [sharedDocIds, setSharedDocIds] = useState<string[] | undefined>(() => {
+    try {
+      const stored = sessionStorage.getItem(SESSION_FORWARD_DOCS_KEY);
+      return stored ? JSON.parse(stored) : undefined;
+    } catch (err) {
+      console.warn('[SessionStorage] Gagal menginisialisasi sharedDocIds:', err);
+      return undefined;
+    }
+  });
 
   const pageTitles: Record<string, string> = {
     dashboard: 'Dashboard Spasial & Metrik Perkembangan',
@@ -21,13 +34,55 @@ export function App() {
     analytics: 'Analisis Deterministik Statis',
     reports: 'Laporan Terstruktur & Matriks Rekap',
     'ai-request': 'AI Request & Asisten Obrolan Q&A',
-    generator: 'Article Generator & Public Drafting (CoT)',
+    generator: 'Collaborative Workspace & AI Co-Writer (A4 Canvas)', // Diperbarui agar selaras dengan nama workspace baru [5]
     'article-editor': 'Pratinjau Cetak & Editor Manual',
   };
 
-  const handleNavigateToGenerator = (promptText?: string) => {
-    setInitialArticlePrompt(promptText);
-    setActiveRoute('generator');
+  /**
+   * Mengatur navigasi forward aksi lintas modul dengan payload data dokumen terpilih.
+   * Mendukung penangkapan sinyal transisi obrolan dinamis [Two-Pass Pipeline].
+   */
+  const handleForwardAction = (documentIds: string[], targetRoute: string, promptText?: string) => {
+    try {
+      sessionStorage.setItem(SESSION_FORWARD_DOCS_KEY, JSON.stringify(documentIds));
+      setSharedDocIds(documentIds);
+
+      // --- SINKRONISASI AKTIF UNTUK SENSITIVITAS TRANSISI CHAT KE ARTIKEL [3, 5] ---
+      if (promptText && promptText.startsWith('[TRANSITIONED_SESSION_ID]:')) {
+        const transitionedId = promptText.replace('[TRANSITIONED_SESSION_ID]:', '');
+
+        setActiveSessionId(transitionedId); // Set ID sesi artikel hasil transisi
+        setInitialArticlePrompt(undefined); // Bersihkan prompt transien
+        setActiveRoute('article-editor');   // Alihkan mulus ke editor cetak A4 WYSIWYG [3]
+        return;
+      }
+
+      setInitialArticlePrompt(promptText || undefined);
+      setActiveRoute(targetRoute);
+    } catch (err) {
+      console.error('[Forward Action] Gagal mengamankan state ke SessionStorage:', err);
+    }
+  };
+
+  /**
+   * Fungsi koordinasi global untuk membersihkan state transien pasca-forwarding berhasil dikonsumsi.
+   */
+  const handleClearSharedDocIds = () => {
+    try {
+      sessionStorage.removeItem(SESSION_FORWARD_DOCS_KEY);
+      setSharedDocIds(undefined);
+    } catch (err) {
+      console.error('[SessionStorage] Gagal menghapus kunci forward docs:', err);
+    }
+  };
+
+  /**
+   * Guardrail Lifecycle: Membersihkan memori transien jika pengguna melakukan navigasi manual secara sadar
+   */
+  const handleManualNavigation = (route: string) => {
+    handleClearSharedDocIds();
+    setInitialArticlePrompt(undefined);
+    setActiveRoute(route);
   };
 
   if (!isAuthenticated) {
@@ -39,26 +94,48 @@ export function App() {
       case 'dashboard':
         return <DashboardView />;
       case 'knowledge-hub':
-        return <KnowledgeHubView />;
+        return (
+          <KnowledgeHubView
+            onForward={(docIds, targetRoute, prompt) => handleForwardAction(docIds, targetRoute, prompt)}
+          />
+        );
       case 'analytics':
-        return <AnalyticsView />;
+        return (
+          <AnalyticsView
+            initialSelectedDocIds={sharedDocIds}
+            onClearSharedDocIds={handleClearSharedDocIds}
+            onNavigateToGenerator={(prompt) => handleForwardAction(sharedDocIds || [], 'generator', prompt)}
+          />
+        );
       case 'reports':
-        return <ReportsView />;
+        return (
+          <ReportsView
+            initialSelectedDocIds={sharedDocIds}
+            onClearSharedDocIds={handleClearSharedDocIds}
+            onNavigateToGenerator={(prompt) => handleForwardAction(sharedDocIds || [], 'generator', prompt)}
+            onNavigateToDashboard={() => handleManualNavigation('dashboard')}
+          />
+        );
       case 'ai-request':
         return (
-          <AiQaView 
-            onNavigateToGenerator={(prompt) => handleNavigateToGenerator(prompt)} 
+          <AiQaView
+            initialSelectedDocIds={sharedDocIds}
+            onClearSharedDocIds={handleClearSharedDocIds}
+            onNavigateToGenerator={(prompt) => handleForwardAction(sharedDocIds || [], 'generator', prompt)}
           />
         );
       case 'generator':
         return (
-          <ArticleGeneratorView 
+          <ArticleGeneratorView
+            initialSelectedDocIds={sharedDocIds}
+            onClearSharedDocIds={handleClearSharedDocIds}
             initialPrompt={initialArticlePrompt}
-            onNavigateToQa={() => setActiveRoute('ai-request')}
+            onNavigateToQa={() => handleManualNavigation('ai-request')}
             onNavigateToEditor={(sessionId) => {
               setActiveSessionId(sessionId);
               setActiveRoute('article-editor');
             }}
+            initialSessionId={activeSessionId}
           />
         );
       case 'article-editor':
@@ -76,7 +153,7 @@ export function App() {
   return (
     <AppShell
       activeRoute={activeRoute}
-      onNavigate={(route) => setActiveRoute(route)}
+      onNavigate={handleManualNavigation}
       pageTitle={pageTitles[activeRoute] || 'Executive Dashboard'}
       onLogout={() => setIsAuthenticated(false)}
     >

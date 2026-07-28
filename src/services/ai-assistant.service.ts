@@ -28,17 +28,20 @@ export class AiServiceException extends Error {
 
 /**
  * Interface respons AI interaktif polimorfis dari backend NestJS.
- * Membawa Markdown bebas (answer), quick-reply suggestions, dan metadata sitasi.
+ * Membawa Markdown bebas (answer), quick-reply suggestions, dan draf artikel terbarui.
  */
 export interface AiInteractResult {
   intent: string;
   sessionId?: string;
   documentId?: string;
   data: {
-    answer?: string;           // Teks jawaban utama dalam format Rich Markdown [3]
-    suggestions?: string[];    // Pertanyaan rekomendasi dinamis (chips) [1, 3]
-    fullArticleText?: string;  // Teks artikel utuh (jika memicu penulisan naskah)
-    citations?: Array<{        // Metadata sitasi jangkar dokumen rujukan [5, 6]
+    answer?: string;           // Teks jawaban utama dalam format Rich Markdown
+    suggestions?: string[];    // Pertanyaan rekomendasi dinamis (chips)
+    updatedArticle?: {         // Metadata artikel terbarui hasil proses kolaboratif (Dual-Pane) [5]
+      title: string;
+      draftMarkdown: string;
+    };
+    citations?: Array<{        // Metadata sitasi jangkar dokumen rujukan [5]
       documentId: string;
       chunkIndex: number;
       rawText: string;
@@ -124,26 +127,58 @@ export const AiAssistantService = {
   /**
    * Membuat sesi obrolan AI baru yang terikat ke beberapa dokumen acuan.
    */
-  async createSession(documentId: string, title?: string, documentIds?: string[]): Promise<string> {
+  async createSession(documentId: string, title?: string, documentIds?: string[], sessionType?: 'QA_CHAT' | 'ARTICLE_GENERATOR'): Promise<string> {
     const result = await safeFetch(`${API_BASE_URL}/assistant/session`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ documentId, title, documentIds }),
+      body: JSON.stringify({ documentId, title, documentIds, sessionType }),
     });
     return result.data.id;
   },
 
   /**
-   * Mengirim kueri diskusi dokumen ke backend.
-   * Mengembalikan objek bertipe kuat untuk didelegasikan langsung ke layer rendering UI [3].
+   * Mengunggah berkas transien/multimodal (screenshot clipboard atau file chat) ke server.
+   * Format pengiriman dikelola dalam objek FormData asinkron secara aman [5].
    */
-  async sendQuery(sessionId: string, query: string): Promise<AiInteractResult> {
+  async uploadSessionAttachment(
+    sessionId: string,
+    file: File,
+  ): Promise<{
+    tempFileId: string;
+    fileName: string;
+    mimeType: string;
+    fileSizeBytes: string;
+    tempPath: string;
+  }> {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const result = await safeFetch(`${API_BASE_URL}/assistant/sessions/${sessionId}/attachments`, {
+      method: 'POST',
+      body: formData, // Konten-tipe dikosongkan agar ditangani otomatis oleh browser pembatas biner
+    });
+    return result.data;
+  },
+
+  /**
+   * Mengirim kueri obrolan kolaboratif dinamis ke asisten AI (Pane Kiri).
+   * Mendukung transmisi draf aktif (Pane Kanan) dan ID lampiran berkas/screenshots.
+   */
+  async sendQuery(
+    sessionId: string,
+    query: string,
+    attachments?: Array<{ fileId: string; classification?: 'BASELINE' | 'REALIZATION' | 'GENERAL_REFERENCE' }>,
+    currentDraft?: string,
+    documentIds?: string[],
+    tone?: string,
+    targetLength?: string,
+  ): Promise<AiInteractResult> {
     const result = await safeFetch(`${API_BASE_URL}/assistant/interact`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sessionId, query }),
+      body: JSON.stringify({ sessionId, query, attachments, currentDraft, documentIds, tone, targetLength }),
     });
-    return result.data as AiInteractResult; // Mengembalikan data murni bertipe kuat [3]
+    return result.data as AiInteractResult; // Mengembalikan data murni bertipe kuat
   },
 
   /**
@@ -169,6 +204,25 @@ export const AiAssistantService = {
     sessionId?: string;
   }): Promise<ArticleSessionDetail> {
     const result = await safeFetch(`${API_BASE_URL}/assistant/article/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req),
+    });
+    return result.data;
+  },
+
+  /**
+   * Mentransisikan sesi obrolan QA panjang lebar menjadi sesi pembuatan artikel independen baru [Two-Pass Pipeline].
+   * Endpoint: POST /assistant/article/transition
+   */
+  async transitionToArticle(req: {
+    sessionId: string; // ID sesi QA obrolan asal
+    articleTitle: string;
+    targetLength?: 'SHORT' | 'MEDIUM' | 'LONG';
+    tone?: string;
+    userInstruction?: string;
+  }): Promise<ArticleSessionDetail> {
+    const result = await safeFetch(`${API_BASE_URL}/assistant/article/transition`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(req),
@@ -220,6 +274,22 @@ export const AiAssistantService = {
     await safeFetch(`${API_BASE_URL}/assistant/article/sessions/${id}`, {
       method: 'DELETE',
     });
+  },
+
+  /**
+   * Mengambil data artikel dari endpoint export-data backend untuk keperluan cetak PDF.
+   * Endpoint: GET /assistant/article/sessions/:id/export-data
+   */
+  async getArticleExportData(id: string): Promise<{
+    title: string;
+    content: string;
+    tone: string;
+    generatedAt: string;
+  }> {
+    const result = await safeFetch(`${API_BASE_URL}/assistant/article/sessions/${id}/export-data`, {
+      method: 'GET',
+    });
+    return result.data;
   },
 
   // --- Metode Manajemen Sesi Obrolan Q&A ---

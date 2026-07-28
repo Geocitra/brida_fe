@@ -81,6 +81,7 @@ export const AnalysisService = {
     unitSuffix?: string;
     baselineDocId?: string;
     realizationDocId?: string;
+    documentIds?: string[];
   }): Promise<DeviationCompareResult> {
     try {
       const response = await fetch(`${API_BASE_URL}/analysis/compare`, {
