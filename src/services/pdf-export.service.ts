@@ -1,6 +1,6 @@
 import pdfMake from 'pdfmake/build/pdfmake';
 import pdfFonts from 'pdfmake/build/vfs_fonts';
-import htmlToPdfmake from 'html-to-pdfmake'; // Impor pustaka parser HTML [1]
+import htmlToPdfmake from 'html-to-pdfmake';
 
 // Inisialisasi VFS pdfMake dengan biner Roboto bawaan — JANGAN pernah dioverwrite seluruhnya
 const vfsFonts = (pdfFonts as any)?.pdfMake?.vfs || (pdfFonts as any)?.vfs || (pdfFonts as any);
@@ -22,7 +22,7 @@ const defaultFonts = {
 const fontVfsCache: Record<string, string> = {};
 
 /**
- * Interface Konfigurasi Tata Letak Halaman PDF Dinamis (OCP) [1]
+ * Interface Konfigurasi Tata Letak Halaman PDF Dinamis (OCP)
  */
 export interface PDFFormatConfig {
   fontFamily: 'Calibri' | 'Times New Roman' | 'Verdana' | 'Arial';
@@ -32,7 +32,7 @@ export interface PDFFormatConfig {
 }
 
 /**
- * Mengunduh berkas biner font lokal secara asinkron dan mengonversinya ke Base64 [1].
+ * Mengunduh berkas biner font lokal secara asinkron dan mengonversinya ke Base64.
  * Menggunakan cache in-memory untuk mencegah HTTP round-trip ganda pada ekspor berulang.
  */
 async function fetchLocalFontToBase64(url: string): Promise<string> {
@@ -59,7 +59,7 @@ async function fetchLocalFontToBase64(url: string): Promise<string> {
 export const PdfExportService = {
   /**
    * Mengambil draf HTML interaktif, menyuntikkan font kustom secara dinamis,
-   * dan mencetak dokumen PDF formal dengan format presisi (WYSIWYG) [1].
+   * dan mencetak dokumen PDF formal dengan format presisi (WYSIWYG).
    *
    * DESAIN ARSITEKTUR: Font kustom didaftarkan melalui parameter createPdf,
    * BUKAN melalui mutasi properti global `pdfMake.fonts`, untuk mencegah polusi
@@ -81,7 +81,7 @@ export const PdfExportService = {
     // Nama key VFS deterministik berdasarkan nama asli berkas agar tidak menabrak kunci lain
     const vfsPrefix = files.normal.replace('.ttf', '');
 
-    // 1. Ambil berkas font .ttf secara paralel dari /public/fonts/ dengan dukungan cache [1]
+    // 1. Ambil berkas font .ttf secara paralel dari /public/fonts/ dengan dukungan cache
     const [vNormal, vBold, vItalics, vBoldItalics] = await Promise.all([
       fetchLocalFontToBase64(`/fonts/${files.normal}`),
       fetchLocalFontToBase64(`/fonts/${files.bold}`),
@@ -89,31 +89,44 @@ export const PdfExportService = {
       fetchLocalFontToBase64(`/fonts/${files.bolditalics}`),
     ]);
 
-    // 2. Suntikkan biner font ke VFS pdfMake — TAMBAH ke VFS yang sudah ada, jangan replace seluruhnya [1]
-    const currentVfs = (pdfMake as any).vfs || {};
-    (pdfMake as any).vfs = {
-      ...currentVfs, // Pertahankan Roboto bawaan agar html-to-pdfmake tidak crash
+    // 2. Suntikkan biner font ke VFS pdfMake — TAMBAH ke VFS yang sudah ada, jangan replace seluruhnya
+    const customVfs = {
       [`${vfsPrefix}-Regular.ttf`]: vNormal,
       [`${vfsPrefix}-Bold.ttf`]: vBold,
       [`${vfsPrefix}-Italic.ttf`]: vItalics,
       [`${vfsPrefix}-BoldItalic.ttf`]: vBoldItalics,
     };
-    (pdfMake as any).addVirtualFileSystem(customVfs);
 
-    // 3. Konversi satuan margin kertas dari Sentimeter ke Satuan Point (1 cm = ~28.3465 pt) [1]
+    const currentVfs = (pdfMake as any).vfs || {};
+    (pdfMake as any).vfs = {
+      ...currentVfs, // Pertahankan Roboto bawaan agar html-to-pdfmake tidak crash
+      ...customVfs,
+    };
+
+    // 3. Konversi satuan margin kertas dari Sentimeter ke Satuan Point (1 cm = ~28.3465 pt)
     const marginPoints = Math.round(config.marginCm * 28.3465);
 
-    // 4. Terjemahkan draf HTML menjadi representasi JSON AST pdfMake [1]
+    // 4. Terjemahkan draf HTML menjadi representasi JSON AST pdfMake
     // Bersihkan whitespace dan tag kosong di akhir konten HTML untuk mencegah halaman kosong tambahan di akhir PDF
     let sanitizedHtml = htmlText.trim();
     const trailingEmptyRegex = /(?:<p>\s*<\/p>|<p>\s*<br\s*\/?>\s*<\/p>|<p>&nbsp;<\/p>|<br\s*\/?>)+$/i;
     sanitizedHtml = sanitizedHtml.replace(trailingEmptyRegex, '').trim();
 
     // Abaikan style font-family bawaan agar tidak memicu error pencarian font di pdfMake VFS
+    // Daftarkan customStyles untuk menjamin standardisasi rendering tag semantik HTML
     const pdfContent = htmlToPdfmake(sanitizedHtml, {
       window: window,
       ignoreStyles: ['font-family'],
       removeExtraBlanks: true,
+      customStyles: {
+        'p': { margin: [0, 0, 0, 8], alignment: 'justify' }, // Gunakan justify sebagai layout default paragraf
+        'ul': { margin: [10, 4, 0, 8] },
+        'ol': { margin: [10, 4, 0, 8] },
+        'li': { margin: [0, 2, 0, 2], lineHeight: config.lineSpacing },
+        'h1': { margin: [0, 12, 0, 6], bold: true },
+        'h2': { margin: [0, 10, 0, 4], bold: true },
+        'h3': { margin: [0, 8, 0, 4], bold: true },
+      }
     });
 
     // 5. Susun font definitions — WAJIB dikirim sebagai argumen ke-3 createPdf(), BUKAN di dalam docDefinition.
@@ -132,7 +145,7 @@ export const PdfExportService = {
       },
     };
 
-    // 6. Susun docDefinition — fonts TIDAK disertakan di sini
+    // 6. Susun docDefinition — mendaftarkan class khusus html-to-pdfmake untuk menjaga margin list
     const docDefinition: any = {
       pageSize: 'A4',
       pageMargins: [marginPoints, marginPoints, marginPoints, marginPoints],
@@ -140,14 +153,25 @@ export const PdfExportService = {
         font: 'CustomFont',
         fontSize: config.fontSize,
         lineHeight: config.lineSpacing,
-        alignment: 'justify',
+        alignment: 'justify', // Default alignment jika paragraph tidak memiliki align kustom
+      },
+      styles: {
+        'html-ul': {
+          margin: [10, 2, 0, 6] // Indentasi margin kiri aman untuk bullet list standar
+        },
+        'html-ol': {
+          margin: [10, 2, 0, 6] // Indentasi margin kiri aman untuk numbered list standar
+        },
+        'html-li': {
+          lineHeight: config.lineSpacing,
+          margin: [0, 1, 0, 1]
+        }
       },
       header: {
         text: 'BRIDA SMART ANALYSIS — KABUPATEN MIMIKA',
         alignment: 'right',
         fontSize: 8,
         color: '#94a3b8',
-        // Increase top margin for header to avoid overlapping body content
         margin: [marginPoints, 30, marginPoints, 0],
       },
       footer: (currentPage: number, pageCount: number) => ({
@@ -165,7 +189,6 @@ export const PdfExportService = {
     const targetFilename = filename.toLowerCase().endsWith('.pdf') ? filename : `${filename}.pdf`;
     (pdfMake as any).createPdf(docDefinition).download(targetFilename);
   },
-
 
   /**
    * Export Diagnostik Deviasi Indikator ke PDF Vector Pristine (pdfMake)

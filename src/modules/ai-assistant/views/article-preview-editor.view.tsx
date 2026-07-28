@@ -1,8 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { marked } from 'marked';
+import { useEditor, EditorContent } from '@tiptap/react';
+import StarterKit from '@tiptap/starter-kit';
+import UnderlineExtension from '@tiptap/extension-underline';
+import TextAlign from '@tiptap/extension-text-align';
+
 import { AiAssistantService } from '../../../services/ai-assistant.service';
 import type { ArticleSessionDetail } from '../../../services/ai-assistant.service';
 import { PdfExportService } from '../../../services/pdf-export.service';
+import { MarkupConverter } from '../utils/markup-converter.util';
+
 import {
   Loader2,
   Save,
@@ -10,7 +16,17 @@ import {
   ArrowLeft,
   CheckCircle2,
   AlertCircle,
-  FileText,
+  Bold,
+  Italic,
+  Underline as UnderlineIcon,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  AlignJustify,
+  List,
+  ListOrdered,
+  Undo,
+  Redo,
 } from 'lucide-react';
 
 interface ArticlePreviewEditorViewProps {
@@ -55,7 +71,7 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
   onBack,
 }) => {
   const [activeSession, setActiveSession] = useState<ArticleSessionDetail | null>(null);
-  const [editableText, setEditableText] = useState<string>('');
+  const [editableText, setEditableText] = useState<string>(''); // Menyimpan representasi HTML aktif dari Editor
   const [articleTitle, setArticleTitle] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
@@ -73,6 +89,32 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
     setTimeout(() => setToastMessage(null), 4000);
   };
 
+  // Inisialisasi TipTap WYSIWYG Editor
+  const editor = useEditor({
+    extensions: [
+      StarterKit.configure({
+        heading: {
+          levels: [1, 2, 3],
+        },
+      }),
+      UnderlineExtension,
+      TextAlign.configure({
+        types: ['heading', 'paragraph'],
+        alignments: ['left', 'center', 'right', 'justify'],
+        defaultAlignment: 'justify',
+      }),
+    ],
+    editorProps: {
+      attributes: {
+        class: 'prose prose-xs focus:outline-none max-w-none min-h-[450px] outline-none h-full text-slate-900 leading-relaxed font-sans text-xs p-4 selection:bg-teal-700 selection:text-white',
+      },
+    },
+    onUpdate: ({ editor }) => {
+      // Sinkronisasi HTML secara real-time ke state pratinjau lembar kertas kanan
+      setEditableText(editor.getHTML());
+    },
+  });
+
   useEffect(() => {
     if (sessionId) {
       loadSession();
@@ -84,8 +126,16 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
     try {
       const session = await AiAssistantService.getArticleSession(sessionId!);
       setActiveSession(session);
-      setEditableText(session.fullArticleText || '');
       setArticleTitle(session.articleTitle || session.title || '');
+
+      // Tahap 1 [RAG Compatibility Pass]: Konversi Markdown dari DB menjadi HTML
+      const htmlContent = MarkupConverter.toHTML(session.fullArticleText || '');
+      setEditableText(htmlContent);
+
+      // Tahap 2: Muat konten HTML ke dalam TipTap Editor
+      if (editor) {
+        editor.commands.setContent(htmlContent);
+      }
     } catch (err: any) {
       console.error('Gagal memuat sesi artikel:', err);
       showToast('Gagal memuat sesi artikel dari database.');
@@ -94,29 +144,27 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
     }
   };
 
-  const getRenderedHtml = (markdownText: string): string => {
-    try {
-      return marked.parse(markdownText) as string;
-    } catch (err) {
-      console.error('Gagal mengonversi Markdown ke HTML:', err);
-      return markdownText;
-    }
-  };
-
   /**
    * Menyimpan draf artikel secara manual ke database PostgreSQL
    */
   const handleSave = async () => {
-    if (!sessionId) return;
+    if (!sessionId || !editor) return;
     setIsSaving(true);
     try {
+      // Konversi HTML dari Editor TipTap ke Markdown bersih sebelum dikirim ke DB
+      const markdownContent = MarkupConverter.toMarkdown(editor.getHTML());
+
       const updated = await AiAssistantService.updateArticleSessionContent(
         sessionId,
         articleTitle,
-        editableText
+        markdownContent
       );
+
       setActiveSession(updated);
-      setEditableText(updated.fullArticleText || '');
+      const htmlContent = MarkupConverter.toHTML(updated.fullArticleText || '');
+      setEditableText(htmlContent);
+      editor.commands.setContent(htmlContent);
+
       showToast('💾 Perubahan naskah Anda berhasil disimpan permanen ke database BRIDA!');
     } catch (err: any) {
       const displayMsg = err.rawMessage || err.message || 'Gagal menyinkronkan data.';
@@ -127,10 +175,10 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
   };
 
   /**
-   * Save-On-Back Sync: Menyimpan naskah secara otomatis sebelum kembali ke obrolan Dual-Pane [5]
+   * Save-On-Back Sync: Menyimpan naskah secara otomatis sebelum kembali ke obrolan Dual-Pane
    */
   const handleSaveAndBack = async () => {
-    if (!sessionId || isSaving) {
+    if (!sessionId || !editor || isSaving) {
       onBack();
       return;
     }
@@ -139,18 +187,19 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
     showToast('⏳ Menyinkronkan perubahan naskah terakhir Anda ke database...');
 
     try {
+      // Konversi HTML TipTap ke Markdown
+      const markdownContent = MarkupConverter.toMarkdown(editor.getHTML());
+
       await AiAssistantService.updateArticleSessionContent(
         sessionId,
         articleTitle,
-        editableText
+        markdownContent
       );
-      // Pindahkan halaman setelah data ter-commit dengan sukses ke database
+
       onBack();
     } catch (err: any) {
       const displayMsg = err.rawMessage || err.message || 'Gagal menyinkronkan data.';
       console.error('[ArticlePreviewEditor] Gagal autosave sebelum kembali:', err);
-
-      // Berikan toleransi kesalahan agar pengguna tidak terlock out di halaman editor jika jaringan mati
       showToast(`⚠️ Sinkronisasi otomatis gagal: ${displayMsg}. Mengalihkan halaman...`);
       await new Promise((resolve) => setTimeout(resolve, 1500));
       onBack();
@@ -163,13 +212,13 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
    * Merakit dokumen dan mencetak PDF resmi menggunakan PdfExportService
    */
   const handlePrint = async () => {
-    if (!editableText && !sessionId) {
+    if (!editor && !sessionId) {
       showToast('⚠️ Tidak ada naskah untuk dicetak. Silakan buka sesi dari halaman generator.');
       return;
     }
     setIsPrinting(true);
 
-    let exportContent = editableText;
+    let exportHtmlContent = editor ? editor.getHTML() : editableText;
     let exportTitle = articleTitle;
 
     if (sessionId) {
@@ -178,7 +227,8 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
         const exportData = await AiAssistantService.getArticleExportData(sessionId);
 
         if (exportData.content) {
-          exportContent = exportData.content;
+          // Konversi data Markdown backend menjadi HTML cetak
+          exportHtmlContent = MarkupConverter.toHTML(exportData.content);
         }
         if (exportData.title) {
           exportTitle = exportData.title;
@@ -190,20 +240,18 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
       }
     }
 
-    if (!exportContent) {
+    if (!exportHtmlContent) {
       showToast('⚠️ Tidak ada naskah untuk dicetak.');
       setIsPrinting(false);
       return;
     }
 
     try {
-      const htmlContent = await Promise.resolve(marked.parse(exportContent));
-
       showToast('🖨️ Mengonversi dan merakit dokumen PDF resmi...');
       const fontSize = fontFamily === 'Times New Roman' ? 11 : fontFamily === 'Verdana' ? 10 : 11;
 
       await PdfExportService.exportCustomFormattedArticlePdf(
-        htmlContent,
+        exportHtmlContent,
         {
           fontFamily,
           fontSize,
@@ -269,7 +317,7 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
       <div className="w-full bg-white border border-slate-300 p-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4 rounded-none shadow-2xs">
         <div className="flex flex-col">
           <button
-            onClick={handleSaveAndBack} // Menjalankan autosave transaksional sebelum kembali [5]
+            onClick={handleSaveAndBack} // Menjalankan autosave transaksional sebelum kembali
             disabled={isSaving || isPrinting}
             className="self-start mb-2 text-xs font-bold text-teal-700 hover:text-teal-850 disabled:opacity-50 inline-flex items-center gap-1.5 cursor-pointer"
           >
@@ -287,7 +335,7 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
 
       {/* Main Workspace split panel */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-        {/* Left Side: Editorial Settings & Markdown Textarea Editor (2 cols) */}
+        {/* Left Side: Editorial Settings & TipTap WYSIWYG Editor (2 cols) */}
         <div className="lg:col-span-2 space-y-6 flex flex-col h-185">
           {/* Format Control Panel */}
           <div className="bg-white border border-slate-300 p-5 space-y-4 rounded-none shadow-xs">
@@ -381,21 +429,120 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
             </div>
           </div>
 
-          {/* Text Editor Box */}
-          <div className="bg-white border border-slate-300 p-5 flex flex-col flex-1 min-h-0">
-            <div className="flex items-center gap-1.5 mb-2 shrink-0">
-              <FileText size={14} className="text-slate-500" />
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                Sumber Naskah Markdown (Sunting Manual)
-              </label>
+          {/* TipTap Rich Text Editor Container */}
+          <div className="bg-white border border-slate-300 flex flex-col flex-1 min-h-0 overflow-hidden">
+            <div className="bg-slate-50 border-b border-slate-300 p-2 flex flex-wrap items-center gap-1.5 shrink-0">
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mr-2 ml-1">Toolbar</span>
+
+              {/* Inline Styles */}
+              <button
+                type="button"
+                onClick={() => editor?.chain().focus().toggleBold().run()}
+                className={`p-1.5 transition-colors cursor-pointer ${editor?.isActive('bold') ? 'bg-teal-700 text-white' : 'text-slate-600 hover:bg-slate-200'}`}
+                title="Teks Tebal (Bold)"
+              >
+                <Bold size={14} />
+              </button>
+              <button
+                type="button"
+                onClick={() => editor?.chain().focus().toggleItalic().run()}
+                className={`p-1.5 transition-colors cursor-pointer ${editor?.isActive('italic') ? 'bg-teal-700 text-white' : 'text-slate-600 hover:bg-slate-200'}`}
+                title="Teks Miring (Italic)"
+              >
+                <Italic size={14} />
+              </button>
+              <button
+                type="button"
+                onClick={() => editor?.chain().focus().toggleUnderline().run()}
+                className={`p-1.5 transition-colors cursor-pointer ${editor?.isActive('underline') ? 'bg-teal-700 text-white' : 'text-slate-600 hover:bg-slate-200'}`}
+                title="Garis Bawah (Underline)"
+              >
+                <UnderlineIcon size={14} />
+              </button>
+
+              <div className="w-px h-4 bg-slate-300 mx-1" />
+
+              {/* Text Alignments */}
+              <button
+                type="button"
+                onClick={() => editor?.chain().focus().setTextAlign('left').run()}
+                className={`p-1.5 transition-colors cursor-pointer ${editor?.isActive({ textAlign: 'left' }) ? 'bg-teal-700 text-white' : 'text-slate-600 hover:bg-slate-200'}`}
+                title="Rata Kiri (Align Left)"
+              >
+                <AlignLeft size={14} />
+              </button>
+              <button
+                type="button"
+                onClick={() => editor?.chain().focus().setTextAlign('center').run()}
+                className={`p-1.5 transition-colors cursor-pointer ${editor?.isActive({ textAlign: 'center' }) ? 'bg-teal-700 text-white' : 'text-slate-600 hover:bg-slate-200'}`}
+                title="Rata Tengah (Align Center)"
+              >
+                <AlignCenter size={14} />
+              </button>
+              <button
+                type="button"
+                onClick={() => editor?.chain().focus().setTextAlign('right').run()}
+                className={`p-1.5 transition-colors cursor-pointer ${editor?.isActive({ textAlign: 'right' }) ? 'bg-teal-700 text-white' : 'text-slate-600 hover:bg-slate-200'}`}
+                title="Rata Kanan (Align Right)"
+              >
+                <AlignRight size={14} />
+              </button>
+              <button
+                type="button"
+                onClick={() => editor?.chain().focus().setTextAlign('justify').run()}
+                className={`p-1.5 transition-colors cursor-pointer ${editor?.isActive({ textAlign: 'justify' }) ? 'bg-teal-700 text-white' : 'text-slate-600 hover:bg-slate-200'}`}
+                title="Rata Kanan Kiri (Align Justify)"
+              >
+                <AlignJustify size={14} />
+              </button>
+
+              <div className="w-px h-4 bg-slate-300 mx-1" />
+
+              {/* Lists */}
+              <button
+                type="button"
+                onClick={() => editor?.chain().focus().toggleBulletList().run()}
+                className={`p-1.5 transition-colors cursor-pointer ${editor?.isActive('bulletList') ? 'bg-teal-700 text-white' : 'text-slate-600 hover:bg-slate-200'}`}
+                title="Daftar Berbutir (Bullet List)"
+              >
+                <List size={14} />
+              </button>
+              <button
+                type="button"
+                onClick={() => editor?.chain().focus().toggleOrderedList().run()}
+                className={`p-1.5 transition-colors cursor-pointer ${editor?.isActive('orderedList') ? 'bg-teal-700 text-white' : 'text-slate-600 hover:bg-slate-200'}`}
+                title="Daftar Berangka (Ordered List)"
+              >
+                <ListOrdered size={14} />
+              </button>
+
+              <div className="w-px h-4 bg-slate-300 mx-1" />
+
+              {/* History Undo Redo */}
+              <button
+                type="button"
+                onClick={() => editor?.chain().focus().undo().run()}
+                disabled={!editor?.can().undo()}
+                className="p-1.5 text-slate-600 hover:bg-slate-200 disabled:opacity-40 transition-colors cursor-pointer"
+                title="Batal Tindakan (Undo)"
+              >
+                <Undo size={14} />
+              </button>
+              <button
+                type="button"
+                onClick={() => editor?.chain().focus().redo().run()}
+                disabled={!editor?.can().redo()}
+                className="p-1.5 text-slate-600 hover:bg-slate-200 disabled:opacity-40 transition-colors cursor-pointer"
+                title="Ulangi Tindakan (Redo)"
+              >
+                <Redo size={14} />
+              </button>
             </div>
-            <textarea
-              value={editableText}
-              onChange={(e) => setEditableText(e.target.value)}
-              disabled={isSaving || isPrinting}
-              className="w-full flex-1 bg-slate-50 border border-slate-300 p-4 text-xs font-mono leading-relaxed text-slate-900 focus:outline-none focus:bg-white focus:border-teal-600 rounded-none resize-none overflow-y-auto disabled:opacity-60"
-              placeholder="Tulis naskah draf artikel Anda di sini..."
-            />
+
+            {/* TipTap WYSIWYG Editable Area */}
+            <div className="flex-1 overflow-y-auto bg-slate-50 focus-within:bg-white border-none min-h-0 outline-none">
+              <EditorContent editor={editor} className="h-full focus:outline-none" />
+            </div>
           </div>
         </div>
 
@@ -412,7 +559,7 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
 
           <div className="flex-1 overflow-y-auto border border-slate-300 bg-slate-200">
             <InteractivePaperSheet
-              htmlContent={getRenderedHtml(editableText)}
+              htmlContent={editableText} // Menampilkan HTML langsung dari TipTap secara instan
               fontFamily={fontFamily}
               lineSpacing={lineSpacing}
               marginCm={marginCm}

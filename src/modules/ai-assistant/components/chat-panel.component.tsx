@@ -19,10 +19,8 @@ import {
   RefreshCw,
   LogOut,
   Paperclip,
-  Image as ImageIcon,
   Sparkles,
   FileCheck,
-  FileText,
 } from 'lucide-react';
 import { AiAssistantService, AiServiceException } from '../../../services/ai-assistant.service';
 import { AiErrorMapper } from '../utils/error-mapper.util';
@@ -354,7 +352,7 @@ const MiniAnchorCard: React.FC<MiniAnchorCardProps> = ({ title }) => {
           <FileCheck size={18} className="animate-pulse" />
         </div>
         <div className="space-y-0.5 text-left">
-          <strong className="block text-xs uppercase tracking-wider text-teal-950 font-bold flex items-center gap-1">
+          <strong className="text-xs uppercase tracking-wider text-teal-950 font-bold flex items-center gap-1">
             <Sparkles size={12} className="text-teal-700" />
             <span>Draf Naskah Diperbarui!</span>
           </strong>
@@ -464,7 +462,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     ? documentTitles
     : (documentTitle ? [documentTitle] : []);
 
-  const hasSelectedDoc = activeDocIds.length > 0;
 
   useEffect(() => {
     onLoadingChange?.(isLoading);

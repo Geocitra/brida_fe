@@ -5,9 +5,10 @@ import { AiAssistantService, AiServiceException } from '../../../services/ai-ass
 import type { ArticleSessionDetail } from '../../../services/ai-assistant.service';
 import { CategorizedDocumentSelector } from '../../../components/common/categorized-document-selector.component';
 import { ChatInputBar } from '../components/chat-input-bar.component';
-import type { StagedAttachment } from '../components/chat-input-bar.component'; // Type-only import [5]
+import type { StagedAttachment } from '../components/chat-input-bar.component'; // Type-only import
 import { RichMessageRenderer } from '../components/chat-panel.component';
 import { AiErrorMapper } from '../utils/error-mapper.util';
+import { MarkupConverter } from '../utils/markup-converter.util'; // Impor utilitas konverter dua arah
 import {
   MessageSquareCode,
   Sparkles,
@@ -25,20 +26,10 @@ import {
   WifiOff,
   Plus,
   FileCheck,
-  LayoutGrid,
-  Type,
-  AlignLeft,
   Clock,
   Bot,
   User,
 } from 'lucide-react';
-
-const fontStyles: Record<string, string> = {
-  'Calibri': 'font-sans',
-  'Times New Roman': 'font-serif',
-  'Verdana': 'font-sans tracking-tight',
-  'Arial': 'font-sans tracking-tight',
-};
 
 // --- SUB-KOMPONEN 1: MINI ANCHOR CARD (Pane Sync Indicator) ---
 
@@ -180,11 +171,10 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
   const [selectedDocIds, setSelectedDocIds] = useState<string[]>([]);
   const [isLoadingDocs, setIsLoadingDocs] = useState<boolean>(true);
 
-  // State Kooperatif Sinkronisasi Lembar Kerja Kanan (Pane Kanan) [5]
+  // State Kooperatif Sinkronisasi Lembar Kerja Kanan (Pane Kanan) [Markdown format]
   const [currentDraft, setCurrentDraft] = useState<string>('');
   const [articleTitle, setArticleTitle] = useState<string>('');
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
-
 
   // Logika Obrolan Sisi Kiri
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -249,7 +239,7 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
   };
 
   /**
-   * Konsolidasi State Dokumen Teruskan (Forwarding State Sync) [5]
+   * Konsolidasi State Dokumen Teruskan (Forwarding State Sync)
    */
   useEffect(() => {
     if (documents.length > 0) {
@@ -314,6 +304,8 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
     try {
       const session = await AiAssistantService.getArticleSession(sessionId);
       setActiveSessionId(session.id);
+
+      // Jaminan: State disinkronkan dalam bentuk Markdown bersih
       setCurrentDraft(session.fullArticleText || '');
       setArticleTitle(session.articleTitle || session.title);
 
@@ -374,7 +366,7 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
   };
 
   /**
-   * Delegasi Layanan Pengunggahan Berkas Transien ke Komponen Induk (Low Coupling) [5]
+   * Delegasi Layanan Pengunggahan Berkas Transien ke Komponen Induk (Low Coupling)
    */
   const handleUploadStagedAsset = async (file: File) => {
     if (!activeSessionId) {
@@ -388,7 +380,7 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
   };
 
   /**
-   * Logika Utama Pengiriman Kueri Multimodal Kolaboratif (Dual-Pane Coordinator) [5]
+   * Logika Utama Pengiriman Kueri Multimodal Kolaboratif (Dual-Pane Coordinator)
    */
   const handleSendMessage = async (
     queryText: string,
@@ -419,7 +411,7 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
 
     try {
       if (isFirstPrompt) {
-        // Alur 1: Inisiasi Sesi Baru menggunakan generateArticleMulti (Creative Synthesis) [5]
+        // Alur 1: Inisiasi Sesi Baru menggunakan generateArticleMulti (Creative Synthesis)
         const firstSession = await AiAssistantService.generateArticleMulti({
           documentIds: selectedDocIds,
           articleTitle: articleTitle || `Artikel Kolaboratif: ${selectedTone.toUpperCase()}`,
@@ -435,7 +427,7 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
         handleLoadSession(firstSession.id);
         showToast('✨ Draf artikel berhasil di-sintesis oleh AI!');
       } else {
-        // Alur 2: Revisi Sesi Aktif menggunakan sendQuery (Conversational Editing Loop) [5]
+        // Alur 2: Revisi Sesi Aktif menggunakan sendQuery (Conversational Editing Loop)
         const response = await AiAssistantService.sendQuery(
           activeSessionId!,
           queryText,
@@ -451,6 +443,7 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
         const updatedArticle = response.data.updatedArticle || undefined;
 
         if (updatedArticle) {
+          // AI mengembalikan drafMarkdown bersih (Markdown format)
           setCurrentDraft(updatedArticle.draftMarkdown);
           setArticleTitle(updatedArticle.title);
         }
@@ -497,14 +490,15 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
 
   const handleCopyText = () => {
     if (!currentDraft) return;
-    navigator.clipboard.writeText(currentDraft);
+    // Jaminan: Teks yang disalin adalah Markdown bersih tanpa tag HTML visual kustom
+    const cleanMarkdown = MarkupConverter.toMarkdown(MarkupConverter.toHTML(currentDraft));
+    navigator.clipboard.writeText(cleanMarkdown);
     showToast('📋 Teks naskah berhasil disalin ke papan klip.');
   };
 
-  const hasSelectedDoc = selectedDocIds.length > 0; // Memperbaiki kesalahan variabel hasSelectedDoc [5]
 
   return (
-    <div className="flex flex-col w-full h-[1000px] min-h-0 bg-slate-100/70 p-4 space-y-4 font-roboto overflow-hidden">
+    <div className="flex flex-col w-full h-250 min-h-0 bg-slate-100/70 p-4 space-y-4 font-roboto overflow-hidden">
       {/* Toast Notification Banner */}
       {toastMessage && (
         <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-5 py-3 border border-slate-700 shadow-xl flex items-center gap-3 rounded-none animate-in fade-in duration-200">
@@ -516,7 +510,6 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
       {/* SECTION 1. COLLABORATIVE HERO HEADER */}
       <div className="w-full bg-white border border-slate-300 px-6 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4 rounded-none shadow-2xs shrink-0">
         <div className="flex flex-col text-left">
-          {/* Memperbaiki CSS Conflict (block vs flex) */}
           <span className="text-[10px] font-bold tracking-widest text-teal-800 uppercase mb-1.5 flex items-center gap-1.5">
             <Sparkles size={12} className="text-teal-700" />
             <span>WORKSPACE PENULISAN KOLABORATIF</span>
@@ -551,8 +544,8 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
         />
       </div>
 
-      {/* SECTION 2. DUAL-PANE COOPERATIVE WORKSPACE AREA [5] */}
-      <div className="flex-1 flex flex-col lg:flex-row gap-0 min-h-0 w-full overflow-hidden">
+      {/* SECTION 2. DUAL-PANE COOPERATIVE WORKSPACE AREA */}
+      <div className="flex-1 flex flex-row gap-0 min-h-0 w-full overflow-hidden">
 
         {/* Sub-Sidebar: Riwayat Sesi Kolaboratif (Chat History) */}
         {showHistorySidebar && (
@@ -690,7 +683,7 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
                           <div className="space-y-2">
                             <RichMessageRenderer text={msg.text} />
 
-                            {/* Render secara terintegrasi Mini Anchor Card jika ada draf terbarui [5] */}
+                            {/* Render secara terintegrasi Mini Anchor Card jika ada draf terbarui */}
                             {msg.updatedArticle && (
                               <MiniAnchorCard title={msg.updatedArticle.title} />
                             )}
@@ -713,20 +706,19 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
             <div ref={messagesEndRef} />
           </div>
 
-          {/* ChatInputBar Multimodal Terintegrasi [5] */}
+          {/* ChatInputBar Multimodal Terintegrasi */}
           <div className="shrink-0 border-t border-slate-200">
             <ChatInputBar
               isLoading={isGenerating}
-              hasSelectedDoc={hasSelectedDoc}
               initialPrompt={initialPrompt}
               onSendMessage={handleSendMessage}
-              onUploadAttachment={handleUploadStagedAsset} // Menggunakan nama handler ter-maptch secara sinkron [5]
+              onUploadAttachment={handleUploadStagedAsset}
             />
           </div>
         </div>
 
-        {/* PANEL KANAN (50% Lebar): Fluid Draft Document Canvas [5] */}
-        <div className="lg:w-[50%] xl:w-[50%] w-full h-full flex flex-col min-h-0 bg-white border border-slate-300 shadow-xs overflow-hidden relative">
+        {/* PANEL KANAN (50% Lebar): Fluid Draft Document Canvas [High-Fidelity WYSIWYG] */}
+        <div className="w-1/2 h-full flex flex-col min-h-0 bg-white border border-slate-300 shadow-xs overflow-hidden relative">
 
           {isGenerating && (
             <div className="absolute inset-0 z-40 bg-slate-900/15 backdrop-blur-md flex flex-col items-center justify-center text-teal-900 font-bold space-y-3 no-print animate-in fade-in duration-200">
@@ -747,7 +739,7 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
             </div>
           </div>
 
-          {/* WYSIWYG Fluid Canvas Live Rendering [5] */}
+          {/* WYSIWYG Fluid Canvas Live Rendering */}
           <div className="flex-1 overflow-y-auto bg-slate-200/40 p-4 flex flex-col items-center justify-start gap-6 no-print relative select-text">
 
             {currentDraft ? (
@@ -760,8 +752,17 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
                     {articleTitle || 'Draf Naskah Kebijakan BRIDA'}
                   </h1>
 
-                  {/* Render Markdown Terpadu */}
-                  <RichMessageRenderer text={currentDraft} />
+                  {/* 
+                     SYSTEM ANALYST DESIGN NOTE [High Fidelity Preview]:
+                     Alih-alih menggunakan RichMessageRenderer yang memiliki keterbatasan parser linear,
+                     kita mengonversi currentDraft (Markdown murni) menjadi HTML semantik secara real-time.
+                     Ini menjamin bahwa list berbutir, list berangka, dan perataan paragraf (alignments)
+                     hasil suntingan manual tampil dengan akurasi 100% pada lembar kerja pratinjau.
+                  */}
+                  <div
+                    className="text-xs text-slate-800 font-sans leading-relaxed text-justify max-w-none prose prose-slate prose-xs focus:outline-none"
+                    dangerouslySetInnerHTML={{ __html: MarkupConverter.toHTML(currentDraft) }}
+                  />
                 </div>
 
                 {/* Baris Tombol Aksi di bawah Kertas/Canvas */}

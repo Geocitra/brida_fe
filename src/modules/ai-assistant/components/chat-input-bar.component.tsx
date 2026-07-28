@@ -4,7 +4,6 @@ import {
     X,
     Loader2,
     Paperclip,
-    Image as ImageIcon,
     AlertCircle,
 } from 'lucide-react';
 
@@ -18,7 +17,6 @@ export interface StagedAttachment {
 
 interface ChatInputBarProps {
     isLoading: boolean;              // Melacak apakah AI sedang berpikir
-    hasSelectedDoc: boolean;         // Memastikan pengguna telah memilih dokumen acuan dasar
     initialPrompt?: string;          // Auto-fill input text
     onSendMessage: (                 // Trigger pengiriman kueri multimodal terpadu ke parent [5]
         query: string,
@@ -33,7 +31,6 @@ interface ChatInputBarProps {
 
 export const ChatInputBar: React.FC<ChatInputBarProps> = ({
     isLoading,
-    hasSelectedDoc,
     initialPrompt,
     onSendMessage,
     onUploadAttachment,
