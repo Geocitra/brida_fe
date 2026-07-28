@@ -34,7 +34,7 @@ const InteractivePaperSheet: React.FC<{
   const fontSize = fontFamily === 'Times New Roman' ? '11pt' : fontFamily === 'Verdana' ? '10pt' : '11pt';
 
   return (
-    <div className="flex justify-center bg-slate-200/50 p-6 overflow-x-auto select-none no-print">
+    <div className="flex justify-center bg-slate-200/50 p-6 overflow-x-auto select-none no-print w-full">
       <div
         className={`bg-white shadow-lg border border-slate-300 text-slate-800 text-justify prose max-w-none prose-slate prose-xs focus:outline-none transition-all ${fontStyles[fontFamily]}`}
         style={{
@@ -103,6 +103,9 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
     }
   };
 
+  /**
+   * Menyimpan draf artikel secara manual ke database PostgreSQL
+   */
   const handleSave = async () => {
     if (!sessionId) return;
     setIsSaving(true);
@@ -123,6 +126,42 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
     }
   };
 
+  /**
+   * Save-On-Back Sync: Menyimpan naskah secara otomatis sebelum kembali ke obrolan Dual-Pane [5]
+   */
+  const handleSaveAndBack = async () => {
+    if (!sessionId || isSaving) {
+      onBack();
+      return;
+    }
+
+    setIsSaving(true);
+    showToast('⏳ Menyinkronkan perubahan naskah terakhir Anda ke database...');
+
+    try {
+      await AiAssistantService.updateArticleSessionContent(
+        sessionId,
+        articleTitle,
+        editableText
+      );
+      // Pindahkan halaman setelah data ter-commit dengan sukses ke database
+      onBack();
+    } catch (err: any) {
+      const displayMsg = err.rawMessage || err.message || 'Gagal menyinkronkan data.';
+      console.error('[ArticlePreviewEditor] Gagal autosave sebelum kembali:', err);
+
+      // Berikan toleransi kesalahan agar pengguna tidak terlock out di halaman editor jika jaringan mati
+      showToast(`⚠️ Sinkronisasi otomatis gagal: ${displayMsg}. Mengalihkan halaman...`);
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      onBack();
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  /**
+   * Merakit dokumen dan mencetak PDF resmi menggunakan PdfExportService
+   */
   const handlePrint = async () => {
     if (!editableText && !sessionId) {
       showToast('⚠️ Tidak ada naskah untuk dicetak. Silakan buka sesi dari halaman generator.');
@@ -130,7 +169,6 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
     }
     setIsPrinting(true);
 
-    // 1. Ambil data artikel terbaru dari endpoint export-data backend
     let exportContent = editableText;
     let exportTitle = articleTitle;
 
@@ -138,7 +176,7 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
       try {
         showToast('⏳ Mengambil data naskah terbaru dari server untuk ekspor...');
         const exportData = await AiAssistantService.getArticleExportData(sessionId);
-        // Gunakan konten dari server (paling up-to-date), fallback ke local jika kosong
+
         if (exportData.content) {
           exportContent = exportData.content;
         }
@@ -146,10 +184,9 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
           exportTitle = exportData.title;
         }
       } catch (fetchErr: any) {
-        // Fallback ke konten lokal jika endpoint gagal
-        console.warn('[ArticlePreviewEditor] Gagal ambil export-data dari server, fallback ke konten lokal:', fetchErr);
+        console.warn('[ArticlePreviewEditor] Gagal ambil export-data, menggunakan draf lokal:', fetchErr);
         showToast('⚠️ Gagal sinkron dari server, menggunakan naskah lokal untuk PDF...');
-        await new Promise(res => setTimeout(res, 1200));
+        await new Promise((res) => setTimeout(res, 1200));
       }
     }
 
@@ -160,10 +197,8 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
     }
 
     try {
-      // 2. Konversi Markdown → HTML
       const htmlContent = await Promise.resolve(marked.parse(exportContent));
 
-      // 3. Export PDF menggunakan PdfExportService dengan konfigurasi format dari panel
       showToast('🖨️ Mengonversi dan merakit dokumen PDF resmi...');
       const fontSize = fontFamily === 'Times New Roman' ? 11 : fontFamily === 'Verdana' ? 10 : 11;
 
@@ -234,10 +269,11 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
       <div className="w-full bg-white border border-slate-300 p-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4 rounded-none shadow-2xs">
         <div className="flex flex-col">
           <button
-            onClick={onBack}
-            className="self-start mb-2 text-xs font-bold text-teal-700 hover:text-teal-850 inline-flex items-center gap-1.5 cursor-pointer"
+            onClick={handleSaveAndBack} // Menjalankan autosave transaksional sebelum kembali [5]
+            disabled={isSaving || isPrinting}
+            className="self-start mb-2 text-xs font-bold text-teal-700 hover:text-teal-850 disabled:opacity-50 inline-flex items-center gap-1.5 cursor-pointer"
           >
-            <ArrowLeft size={13} />
+            {isSaving ? <Loader2 size={13} className="animate-spin" /> : <ArrowLeft size={13} />}
             <span>Kembali ke AI Editor</span>
           </button>
           <h1 className="text-xl font-bold uppercase text-slate-900 tracking-tight mt-1">
@@ -265,7 +301,8 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
               <select
                 value={fontFamily}
                 onChange={(e) => setFontFamily(e.target.value as any)}
-                className="w-full bg-white border border-slate-300 text-xs font-semibold px-2.5 py-1.5 rounded-none focus:outline-none focus:border-teal-600 shadow-xs"
+                disabled={isSaving || isPrinting}
+                className="w-full bg-white border border-slate-300 text-xs font-semibold px-2.5 py-1.5 rounded-none focus:outline-none focus:border-teal-600 shadow-xs disabled:opacity-50"
               >
                 <option value="Calibri">Calibri</option>
                 <option value="Times New Roman">Times New Roman</option>
@@ -281,14 +318,16 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
                 <button
                   type="button"
                   onClick={() => setLineSpacing(1.18)}
-                  className={`py-1 text-xs font-bold transition-colors cursor-pointer ${lineSpacing === 1.18 ? 'bg-teal-700 text-white' : 'hover:bg-slate-50 text-slate-700'}`}
+                  disabled={isSaving || isPrinting}
+                  className={`py-1 text-xs font-bold transition-colors cursor-pointer disabled:opacity-50 ${lineSpacing === 1.18 ? 'bg-teal-700 text-white' : 'hover:bg-slate-50 text-slate-700'}`}
                 >
                   1.18 (Nota Dinas)
                 </button>
                 <button
                   type="button"
                   onClick={() => setLineSpacing(1.5)}
-                  className={`py-1 text-xs font-bold transition-colors cursor-pointer ${lineSpacing === 1.5 ? 'bg-teal-700 text-white' : 'hover:bg-slate-50 text-slate-700'}`}
+                  disabled={isSaving || isPrinting}
+                  className={`py-1 text-xs font-bold transition-colors cursor-pointer disabled:opacity-50 ${lineSpacing === 1.5 ? 'bg-teal-700 text-white' : 'hover:bg-slate-50 text-slate-700'}`}
                 >
                   1.50 (Laporan)
                 </button>
@@ -302,14 +341,16 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
                 <button
                   type="button"
                   onClick={() => setMarginCm(2.5)}
-                  className={`py-1 text-xs font-bold transition-colors cursor-pointer ${marginCm === 2.5 ? 'bg-teal-700 text-white' : 'hover:bg-slate-50 text-slate-700'}`}
+                  disabled={isSaving || isPrinting}
+                  className={`py-1 text-xs font-bold transition-colors cursor-pointer disabled:opacity-50 ${marginCm === 2.5 ? 'bg-teal-700 text-white' : 'hover:bg-slate-50 text-slate-700'}`}
                 >
                   2.5 cm (Standar)
                 </button>
                 <button
                   type="button"
                   onClick={() => setMarginCm(3.0)}
-                  className={`py-1 text-xs font-bold transition-colors cursor-pointer ${marginCm === 3.0 ? 'bg-teal-700 text-white' : 'hover:bg-slate-50 text-slate-700'}`}
+                  disabled={isSaving || isPrinting}
+                  className={`py-1 text-xs font-bold transition-colors cursor-pointer disabled:opacity-50 ${marginCm === 3.0 ? 'bg-teal-700 text-white' : 'hover:bg-slate-50 text-slate-700'}`}
                 >
                   3.0 cm (Longgar)
                 </button>
@@ -321,7 +362,7 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
               <button
                 type="button"
                 onClick={handleSave}
-                disabled={isSaving}
+                disabled={isSaving || isPrinting}
                 className="px-4 py-2 bg-slate-900 hover:bg-slate-950 text-white font-bold text-xs uppercase tracking-wider rounded-none flex items-center justify-center gap-1.5 border border-slate-950 shadow-xs cursor-pointer disabled:opacity-50"
               >
                 {isSaving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
@@ -331,7 +372,7 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
               <button
                 type="button"
                 onClick={handlePrint}
-                disabled={isPrinting}
+                disabled={isSaving || isPrinting}
                 className="px-4 py-2 bg-teal-700 hover:bg-teal-850 text-white font-bold text-xs uppercase tracking-wider rounded-none flex items-center justify-center gap-1.5 border border-teal-850 shadow-xs cursor-pointer disabled:opacity-50"
               >
                 {isPrinting ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
@@ -351,7 +392,8 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
             <textarea
               value={editableText}
               onChange={(e) => setEditableText(e.target.value)}
-              className="w-full flex-1 bg-slate-50 border border-slate-300 p-4 text-xs font-mono leading-relaxed text-slate-900 focus:outline-none focus:bg-white focus:border-teal-600 rounded-none resize-none overflow-y-auto"
+              disabled={isSaving || isPrinting}
+              className="w-full flex-1 bg-slate-50 border border-slate-300 p-4 text-xs font-mono leading-relaxed text-slate-900 focus:outline-none focus:bg-white focus:border-teal-600 rounded-none resize-none overflow-y-auto disabled:opacity-60"
               placeholder="Tulis naskah draf artikel Anda di sini..."
             />
           </div>

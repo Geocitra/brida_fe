@@ -11,18 +11,23 @@ import {
   Plus,
   Trash2,
   MessageSquare,
-  X, // Impor ikon X baru untuk penutup modal transisi
+  X,
   Clock,
   ShieldAlert,
   WifiOff,
   Database,
   RefreshCw,
   LogOut,
+  Paperclip,
+  Image as ImageIcon,
+  Sparkles,
+  FileCheck,
+  FileText,
 } from 'lucide-react';
 import { AiAssistantService, AiServiceException } from '../../../services/ai-assistant.service';
 import { AiErrorMapper } from '../utils/error-mapper.util';
 
-// --- SUB-KOMPONEN 1: PENAMPIL TABEL MARKDOWN DINAMIS (Component-Driven UI) ---
+// --- SUB-KOMPONEN 1: PENAMPIL TABEL MARKDOWN DINAMIS ---
 
 interface MarkdownTableRendererProps {
   rawTable: string;
@@ -32,14 +37,12 @@ const MarkdownTableRenderer: React.FC<MarkdownTableRendererProps> = ({ rawTable 
   const lines = rawTable.trim().split('\n');
   if (lines.length < 2) return null;
 
-  // Ekstraksi kolom header (baris index 0)
   const headerLine = lines[0];
   const headers = headerLine
     .split('|')
     .map((h) => h.trim())
     .filter((_, idx, arr) => idx > 0 && idx < arr.length - 1);
 
-  // Ekstraksi baris data (melewati pembatas baris indeks 1)
   const rows = lines.slice(2).map((line) => {
     return line
       .split('|')
@@ -78,7 +81,7 @@ const MarkdownTableRenderer: React.FC<MarkdownTableRendererProps> = ({ rawTable 
   );
 };
 
-// --- SUB-KOMPONEN 2: PARSER & RENDERING MARKDOWN KLIEN (SRP) ---
+// --- SUB-KOMPONEN 2: PARSER & RENDERING MARKDOWN KLIEN ---
 
 const parseInlineStyles = (lineText: string): React.ReactNode[] => {
   const parts: React.ReactNode[] = [];
@@ -120,9 +123,6 @@ export interface RichMessageRendererProps {
   text: string;
 }
 
-/**
- * Komponen Perender Teks Markdown Terpadu (Eksport Publik untuk Reusability) [3].
- */
 export const RichMessageRenderer: React.FC<RichMessageRendererProps> = ({ text }) => {
   const lines = text.split('\n');
   const elements: React.ReactNode[] = [];
@@ -225,7 +225,7 @@ export const RichMessageRenderer: React.FC<RichMessageRendererProps> = ({ text }
   return <div className="space-y-1 w-full text-left">{elements}</div>;
 };
 
-// --- SUB-KOMPONEN 3: SUGGESTION CHIPS (Interactive AI) ---
+// --- SUB-KOMPONEN 3: SUGGESTION CHIPS ---
 
 interface SuggestionChipsProps {
   suggestions?: string[];
@@ -258,7 +258,7 @@ const SuggestionChips: React.FC<SuggestionChipsProps> = ({
   );
 };
 
-// --- SUB-KOMPONEN 4: KARTU FALLBACK GANGGUAN SISTEM (Polymorphic Error UX) [5] ---
+// --- SUB-KOMPONEN 4: KARTU FALLBACK GANGGUAN SISTEM ---
 
 const iconMap = {
   AlertCircle,
@@ -283,7 +283,6 @@ const SystemFallbackCard: React.FC<SystemFallbackCardProps> = ({
   onNewSession,
   onLogin,
 }) => {
-  // Evaluasi tipe kesalahan menggunakan asisten utilitas mapper murni [1]
   const mapped = AiErrorMapper.map(new AiServiceException(500, errorType, rawErrorMsg));
   const IconComponent = iconMap[mapped.iconName] || AlertCircle;
 
@@ -303,7 +302,6 @@ const SystemFallbackCard: React.FC<SystemFallbackCardProps> = ({
         </div>
       </div>
 
-      {/* Render Tombol Aksi Taktis Berdasarkan Rekomendasi Mapper UX [1, 5] */}
       <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-200/60 no-print">
         {mapped.actionType === 'RETRY' && (
           <button
@@ -342,16 +340,58 @@ const SystemFallbackCard: React.FC<SystemFallbackCardProps> = ({
   );
 };
 
-// --- KOMPONEN UTAMA: CHAT PANEL ---
+// --- SUB-KOMPONEN 5: MINI ANCHOR CARD (Pane Sync Indicator) [5] ---
+
+interface MiniAnchorCardProps {
+  title: string;
+}
+
+const MiniAnchorCard: React.FC<MiniAnchorCardProps> = ({ title }) => {
+  return (
+    <div className="p-4 my-3 bg-teal-50/50 border border-teal-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shadow-2xs no-print">
+      <div className="flex items-center gap-3">
+        <div className="p-2 bg-teal-100 border border-teal-300 text-teal-800 shrink-0">
+          <FileCheck size={18} className="animate-pulse" />
+        </div>
+        <div className="space-y-0.5 text-left">
+          <strong className="block text-xs uppercase tracking-wider text-teal-950 font-bold flex items-center gap-1">
+            <Sparkles size={12} className="text-teal-700" />
+            <span>Draf Naskah Diperbarui!</span>
+          </strong>
+          <p className="text-[11px] font-semibold text-slate-700 line-clamp-1">
+            Judul: "{title}"
+          </p>
+        </div>
+      </div>
+      <div className="text-left sm:text-right shrink-0">
+
+      </div>
+    </div>
+  );
+};
+
+// --- INTERFACES DAN TIPE DATA ---
+
+interface StagedAttachment {
+  fileId: string;
+  fileName: string;
+  mimeType: string;
+  classification?: 'BASELINE' | 'REALIZATION' | 'GENERAL_REFERENCE';
+  base64Data?: string; // Menyimpan pratinjau biner khusus tipe berkas gambar
+}
 
 interface ChatMessage {
   id: string;
   sender: 'user' | 'ai';
   text: string;
-  status: 'SUCCESS' | 'ERROR'; // Melacak apakah pesan berhasil diproses atau mengalami kegagalan [5]
-  errorType?: string;          // Menyimpan kode kesalahan teknis untuk filter fallback visual [5]
+  status: 'SUCCESS' | 'ERROR';
+  errorType?: string;
   suggestions?: string[];
   timestamp: string;
+  updatedArticle?: { // Menyimpan snapshot naskah di dalam timeline obrolan
+    title: string;
+    draftMarkdown: string;
+  };
 }
 
 interface QaSessionItem {
@@ -370,8 +410,10 @@ interface ChatPanelProps {
   selectedDocumentIds?: string[];
   documentTitle?: string;
   documentTitles?: string[];
+  currentDraft?: string; // Draf aktif yang staged dari Pane Kanan [5]
   onArticleIntentDetected?: (promptText: string) => void;
   onLoadingChange?: (loading: boolean) => void;
+  onDraftUpdated?: (newDraft: string, title: string) => void; // Sinkronisasi otomatis ke lembar visual kanan [1, 5]
 }
 
 export const ChatPanel: React.FC<ChatPanelProps> = ({
@@ -379,8 +421,10 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   selectedDocumentIds = [],
   documentTitle,
   documentTitles = [],
+  currentDraft,
   onArticleIntentDetected,
   onLoadingChange,
+  onDraftUpdated,
 }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputQuery, setInputQuery] = useState('');
@@ -389,14 +433,19 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [sessionError, setSessionError] = useState<string | null>(null);
 
-  // Cadangan memori kueri terakhir yang gagal dikirim (Fail-Safe Caching) [1, 5]
+  // Cadangan memori kueri terakhir yang gagal dikirim
   const [lastFailedQuery, setLastFailedQuery] = useState<string | null>(null);
 
   const [qaSessions, setQaSessions] = useState<QaSessionItem[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState<boolean>(false);
   const [showHistorySidebar, setShowHistorySidebar] = useState<boolean>(true);
 
-  // --- STATE BARU UNTUK KONTROL MODAL TRANSISI ---
+
+  // Pengelolaan State Berkas Terlampir (Staged Attachments) [5]
+  const [stagedAttachments, setStagedAttachments] = useState<StagedAttachment[]>([]);
+  const [isUploadingAttachment, setIsUploadingAttachment] = useState(false);
+
+  // Dialog Transisi Modal
   const [isTransitionModalOpen, setIsTransitionModalOpen] = useState(false);
   const [transitionTitle, setTransitionTitle] = useState('');
   const [transitionTone, setTransitionTone] = useState('solutif');
@@ -405,6 +454,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const [isTransitioning, setIsTransitioning] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const activeDocIds = selectedDocumentIds.length > 0
     ? selectedDocumentIds
@@ -453,13 +503,13 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       const detail = await AiAssistantService.getQaSessionDetail(id);
       setSessionId(detail.id);
 
-      // Parsing Defensif untuk riwayat pesan [Defensive Programming]
       const formattedMessages: ChatMessage[] = (detail.messages || []).map((m) => {
         const isAi = m.role === 'ASSISTANT';
         let text = m.content;
         let suggestions: string[] = [];
         let status: 'SUCCESS' | 'ERROR' = 'SUCCESS';
         let errorType: string | undefined = undefined;
+        let updatedArticle = undefined;
 
         if (isAi) {
           try {
@@ -467,13 +517,14 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             if (parsed && typeof parsed === 'object') {
               text = parsed.answer || parsed.fullArticleText || m.content;
               suggestions = parsed.suggestions || [];
+              updatedArticle = parsed.updatedArticle || undefined;
               if (parsed.status === 'ERROR' || parsed.errorType) {
                 status = 'ERROR';
                 errorType = parsed.errorType;
               }
             }
           } catch {
-            // Data bertipe string warisan (legacy string), abaikan parsing JSON
+            // String legacy
           }
         }
 
@@ -484,6 +535,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           status,
           errorType,
           suggestions,
+          updatedArticle,
           timestamp: new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         };
       });
@@ -502,6 +554,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     setSessionError(null);
     setDetectedArticlePrompt(null);
     setLastFailedQuery(null);
+    setStagedAttachments([]);
   };
 
   const handleDeleteQaSession = async (e: React.MouseEvent, idToDelete: string) => {
@@ -519,21 +572,15 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     }
   };
 
-  const isArticleIntent = (text: string) => {
-    const keywords = ['artikel', 'publikasi', 'naskah', 'rilis', 'buatkan artikel', 'tulis artikel', 'generate artikel'];
-    return keywords.some((k) => text.toLowerCase().includes(k));
-  };
-
   const getOrCreateSession = async (): Promise<string> => {
     if (sessionId) return sessionId;
-    if (activeDocIds.length === 0) throw new Error('Pilih dokumen sumber terlebih dahulu.');
-    const primaryId = activeDocIds[0];
+    const primaryId = activeDocIds.length > 0 ? activeDocIds[0] : undefined;
     const sessionTitle = activeDocTitles.length > 0
       ? `Sesi Q&A (${activeDocTitles.length} Dokumen): ${activeDocTitles.slice(0, 2).join(', ')}${activeDocTitles.length > 2 ? '...' : ''}`
-      : 'Sesi Q&A Interaktif';
+      : 'Sesi Q&A Interaktif (Kreasi Bebas)';
 
     const newSessionId = await AiAssistantService.createSession(
-      primaryId,
+      primaryId || '',
       sessionTitle,
       activeDocIds,
     );
@@ -542,24 +589,98 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   };
 
   /**
-   * Pipa Pemrosesan Pengiriman Pesan Utama (Polimorfis)
+   * Mengunggah berkas penempelan keyboard (Ctrl+V) atau dari pemilih konvensional secara asinkron [5]
+   */
+  const handleUploadStagedAsset = async (file: File) => {
+    setIsUploadingAttachment(true);
+    setSessionError(null);
+    try {
+      const activeSessionId = await getOrCreateSession();
+      const res = await AiAssistantService.uploadSessionAttachment(activeSessionId, file);
+
+      let base64Data: string | undefined = undefined;
+      const isImg = file.type.startsWith('image/');
+
+      if (isImg) {
+        base64Data = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            const result = reader.result as string;
+            resolve(result.split(',')[1]);
+          };
+          reader.readAsDataURL(file);
+        });
+      }
+
+      setStagedAttachments((prev) => [
+        ...prev,
+        {
+          fileId: res.tempFileId,
+          fileName: file.name,
+          mimeType: file.type,
+          classification: isImg ? undefined : 'GENERAL_REFERENCE',
+          base64Data,
+        },
+      ]);
+    } catch (err: any) {
+      setSessionError(`Gagal melampirkan berkas: ${err.message}`);
+    } finally {
+      setIsUploadingAttachment(false);
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      handleUploadStagedAsset(e.target.files[0]);
+    }
+  };
+
+  /**
+   * Menangkap penempelan biner screenshot langsung dari clipboard (Ctrl+V) [5]
+   */
+  const handlePaste = async (e: React.ClipboardEvent<HTMLInputElement>) => {
+    const items = e.clipboardData.items;
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.indexOf('image') !== -1) {
+        const file = items[i].getAsFile();
+        if (file) {
+          e.preventDefault();
+          // Cek batas maksimal ubin gambar (maksimal 3 per prompt) [5]
+          const existingImagesCount = stagedAttachments.filter((att) => att.mimeType.startsWith('image/')).length;
+          if (existingImagesCount >= 3) {
+            setSessionError('Batas Terlampaui: Anda hanya dapat melampirkan maksimal 3 gambar per prompt.');
+            return;
+          }
+          await handleUploadStagedAsset(file);
+        }
+      }
+    }
+  };
+
+  const handleUpdateClassification = (fileId: string, classification: any) => {
+    setStagedAttachments((prev) =>
+      prev.map((att) => (att.fileId === fileId ? { ...att, classification } : att)),
+    );
+  };
+
+  const handleRemoveStagedAttachment = (fileId: string) => {
+    setStagedAttachments((prev) => prev.filter((att) => att.fileId !== fileId));
+  };
+
+  /**
+   * Pipa Pemrosesan Pengiriman Pesan Multimodal Utama [5]
    */
   const executeSendMessage = async (queryText: string) => {
-    if (!queryText.trim() || activeDocIds.length === 0 || isLoading) return;
+    if (!queryText.trim() && stagedAttachments.length === 0) return;
+    if (isLoading) return;
 
     const currentQuery = queryText.trim();
-    setLastFailedQuery(null); // Reset cache kegagalan pada setiap pengiriman baru
-
-    if (isArticleIntent(currentQuery) && onArticleIntentDetected) {
-      setDetectedArticlePrompt(currentQuery);
-    } else {
-      setDetectedArticlePrompt(null);
-    }
+    setLastFailedQuery(null);
 
     const userMsg: ChatMessage = {
       id: Date.now().toString(),
       sender: 'user',
-      text: currentQuery,
+      text: currentQuery || 'Mengirim berkas terlampir...',
       status: 'SUCCESS',
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     };
@@ -569,28 +690,47 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     setIsLoading(true);
     setSessionError(null);
 
+    // Salin antrean lampiran aktif ke variabel lokal sebelum di-reset di UI [5]
+    const attachmentsPayload = stagedAttachments.map((att) => ({
+      fileId: att.fileId,
+      classification: att.classification,
+    }));
+    setStagedAttachments([]);
+
     try {
       const activeSessionId = await getOrCreateSession();
 
-      // Ambil respons bertipe kuat dari layer service [3]
-      const response = await AiAssistantService.sendQuery(activeSessionId, currentQuery);
+      // Kirim kueri multimodal terpadu berisi instruksi + draf + daftar lampiran [5]
+      const response = await AiAssistantService.sendQuery(
+        activeSessionId,
+        currentQuery,
+        attachmentsPayload,
+        currentDraft,
+        activeDocIds,
+      );
 
       const responseText = response.data.answer || response.data.fullArticleText || JSON.stringify(response.data);
       const responseSuggestions = response.data.suggestions || [];
+      const updatedArticle = response.data.updatedArticle || undefined;
+
+      // Sinkronisasikan naskah draf terbarui langsung ke Pane Kanan secara dinamis (Two-Way Sync) [1, 5]
+      if (updatedArticle && onDraftUpdated) {
+        onDraftUpdated(updatedArticle.draftMarkdown, updatedArticle.title);
+      }
 
       const aiMsg: ChatMessage = {
         id: (Date.now() + 1).toString(),
         sender: 'ai',
         text: responseText,
         status: 'SUCCESS',
-        suggestions: responseSuggestions, // Mengisi Quick-Reply Suggestion Chips [1]
+        suggestions: responseSuggestions,
+        updatedArticle, // Rekam snapshot artikel di dalam balon timeline
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
 
       setMessages((prev) => [...prev, aiMsg]);
       loadQaSessionsHistory();
     } catch (err: any) {
-      // Isolasi dan identifikasi pengecualian kustom dari layer service [5]
       let errorType = 'UNKNOWN_ERROR';
       let displayMsg = err.message || 'Gagal memproses kueri diskusi AI.';
 
@@ -599,14 +739,13 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         displayMsg = err.rawMessage;
       }
 
-      // Caching kueri yang gagal untuk fungsionalitas tombol Coba Ulang [1, 5]
       setLastFailedQuery(currentQuery);
 
       const errorMsg: ChatMessage = {
         id: (Date.now() + 1).toString(),
         sender: 'ai',
         text: displayMsg,
-        status: 'ERROR', // Flag visual polimorfis diaktifkan [5]
+        status: 'ERROR',
         errorType: errorType,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
@@ -622,7 +761,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     executeSendMessage(inputQuery);
   };
 
-  // --- LOGIKA PEMICU MODAL TRANSISI ---
   const handleOpenTransitionModal = () => {
     if (!sessionId) return;
     const activeSession = qaSessions.find((s) => s.id === sessionId);
@@ -647,7 +785,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
       setIsTransitionModalOpen(false);
 
-      // Kirim sinyal navigasi dinamis lewat handler deteksi draf artikel
       if (onArticleIntentDetected) {
         onArticleIntentDetected(`[TRANSITIONED_SESSION_ID]:${result.id}`);
       }
@@ -816,6 +953,10 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                       ) : (
                         <>
                           <RichMessageRenderer text={msg.text} />
+                          {/* Merender Mini Anchor Card secara bersyarat jika draf diperbarui oleh AI [5] */}
+                          {msg.updatedArticle && (
+                            <MiniAnchorCard title={msg.updatedArticle.title} />
+                          )}
                           <SuggestionChips
                             suggestions={msg.suggestions}
                             onClick={(suggestion) => executeSendMessage(suggestion)}
@@ -841,21 +982,103 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         </div>
 
         { }
-        {/* Input Form Obrolan Terintegrasi (Perbaikan Kontras Tombol) */}
-        <form onSubmit={handleFormSubmit} className="p-4 border-t border-slate-300 bg-white no-print">
-          <div className="flex flex-col sm:flex-row gap-3">
+        {/* Antrean Berkas Lampiran / Preview Screenshot Ctrl+V [5] */}
+        {stagedAttachments.length > 0 && (
+          <div className="px-4 py-2 border-t border-slate-200 bg-slate-50 flex flex-wrap gap-2.5">
+            {stagedAttachments.map((att) => (
+              <div
+                key={att.fileId}
+                className="p-1.5 bg-white border border-slate-300 flex items-center gap-2 shadow-2xs font-roboto"
+              >
+                {att.base64Data ? (
+                  <img
+                    src={`data:${att.mimeType};base64,${att.base64Data}`}
+                    alt={att.fileName}
+                    className="w-8 h-8 object-cover border border-slate-200"
+                  />
+                ) : (
+                  <div className="w-8 h-8 bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-500 font-extrabold text-[10px]">
+                    DOC
+                  </div>
+                )}
+
+                <div className="text-left space-y-0.5">
+                  <span className="block text-[10px] font-bold text-slate-800 truncate max-w-40" title={att.fileName}>
+                    {att.fileName}
+                  </span>
+
+                  {/* Dropdown Klasifikasi Berkas Sesuai Karakteristik RAG BRIDA [5] */}
+                  {att.classification && (
+                    <div className="flex items-center gap-1">
+                      <span className="text-[9px] font-bold text-teal-800 uppercase tracking-wider">Tipe:</span>
+                      <select
+                        value={att.classification}
+                        onChange={(e) => handleUpdateClassification(att.fileId, e.target.value as any)}
+                        className="text-[9px] bg-slate-100 border border-slate-300 text-slate-700 font-bold focus:outline-none focus:border-teal-700 px-1 py-0.5"
+                      >
+                        <option value="BASELINE">1. Target</option>
+                        <option value="REALIZATION">2. Realisasi</option>
+                        <option value="GENERAL_REFERENCE">3. Referensi</option>
+                      </select>
+                    </div>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => handleRemoveStagedAttachment(att.fileId)}
+                  className="p-0.5 text-slate-400 hover:text-red-600 transition-colors cursor-pointer ml-1"
+                  title="Batalkan lampiran"
+                >
+                  <X size={12} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        { }
+        {/* Input Diskusi Q&A */}
+        <div className="p-3 border-t border-slate-300 bg-white no-print">
+          <form onSubmit={handleFormSubmit} className="flex flex-col sm:flex-row gap-3">
             <div className="flex-1 flex items-center border border-slate-400 focus-within:border-teal-600 bg-slate-50 transition-colors">
+
+              {/* Tombol Klip Kertas Kustom */}
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isLoading || isUploadingAttachment}
+                className="p-3 text-slate-500 hover:text-teal-700 disabled:opacity-40 cursor-pointer border-r border-slate-200"
+                title="Unggah berkas acuan / screenshots (.pdf, .docx, .png, .jpg)"
+              >
+                {isUploadingAttachment ? (
+                  <Loader2 size={16} className="animate-spin text-teal-600" />
+                ) : (
+                  <Paperclip size={16} />
+                )}
+              </button>
+
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileChange}
+                accept=".pdf,.docx,.txt,image/*"
+                className="hidden"
+              />
+
               <input
                 type="text"
                 value={inputQuery}
                 onChange={(e) => setInputQuery(e.target.value)}
-                placeholder={hasSelectedDoc ? 'Ketik pertanyaan analitis Anda di sini...' : 'Pilih dokumen sumber terlebih dahulu...'}
-                disabled={!hasSelectedDoc || isLoading}
+                onPaste={handlePaste} // Listener penempelan biner (Ctrl+V) [5]
+                placeholder="Ketik pertanyaan / draf revisi Anda di sini..."
+                disabled={isLoading || isUploadingAttachment}
                 className="flex-1 bg-transparent px-4 py-3 text-xs text-slate-900 font-semibold focus:outline-none disabled:opacity-50"
               />
+
               <button
                 type="submit"
-                disabled={!hasSelectedDoc || !inputQuery.trim() || isLoading}
+                disabled={(!inputQuery.trim() && stagedAttachments.length === 0) || isLoading || isUploadingAttachment}
                 className="px-5 py-3 bg-teal-700 hover:bg-teal-800 disabled:bg-slate-50 text-white disabled:text-slate-500 font-bold text-xs uppercase transition-colors flex items-center gap-2 cursor-pointer disabled:cursor-not-allowed shrink-0 h-full"
               >
                 <span>Kirim</span>
@@ -875,16 +1098,16 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                 <span>Jadikan Artikel</span>
               </button>
             )}
-          </div>
-        </form>
+          </form>
+        </div>
+
       </div>
 
-      {/* --- MODAL TRANSISI: JADIKAN ARTIKEL (Component-Driven UI) --- */}
+      {/* --- MODAL TRANSISI --- */}
       {isTransitionModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white border border-slate-300 shadow-2xl max-w-lg w-full p-6 rounded-none space-y-4 font-roboto text-left">
 
-            {/* Header Modal */}
             <div className="flex items-center justify-between border-b border-slate-200 pb-3">
               <div className="flex items-center gap-2 text-slate-900">
                 <PenTool size={18} className="text-teal-700 shrink-0" />
@@ -901,13 +1124,11 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
               </button>
             </div>
 
-            {/* Body Modal */}
             <div className="space-y-4">
               <p className="text-xs text-slate-600 leading-relaxed font-semibold text-justify">
                 AI Engine akan mengambil seluruh riwayat tanya-jawab dalam sesi diskusi ini secara kronologis, men-distilasi konsensus obrolan, kemudian melahirkan sesi draf artikel baru yang independen dengan mengamankan keterkaitan sitasi dokumen asal.
               </p>
 
-              {/* Input Judul */}
               <div className="space-y-1.5">
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide">
                   Judul Artikel Baru
@@ -923,7 +1144,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                 />
               </div>
 
-              {/* Tone & Target Length */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide">
@@ -959,7 +1179,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                 </div>
               </div>
 
-              {/* Instruksi Tambahan */}
               <div className="space-y-1.5">
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide">
                   Instruksi Khusus Tambahan (Opsional)
@@ -974,7 +1193,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
               </div>
             </div>
 
-            {/* Footer Modal */}
             <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200">
               <button
                 type="button"

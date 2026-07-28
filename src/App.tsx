@@ -34,7 +34,7 @@ export function App() {
     analytics: 'Analisis Deterministik Statis',
     reports: 'Laporan Terstruktur & Matriks Rekap',
     'ai-request': 'AI Request & Asisten Obrolan Q&A',
-    generator: 'Article Generator & Public Drafting (CoT)',
+    generator: 'Collaborative Workspace & AI Co-Writer (A4 Canvas)', // Diperbarui agar selaras dengan nama workspace baru [5]
     'article-editor': 'Pratinjau Cetak & Editor Manual',
   };
 
@@ -135,6 +135,7 @@ export function App() {
               setActiveSessionId(sessionId);
               setActiveRoute('article-editor');
             }}
+            initialSessionId={activeSessionId}
           />
         );
       case 'article-editor':
