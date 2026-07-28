@@ -19,10 +19,10 @@ interface TopHeaderProps {
 export const TopHeader: React.FC<TopHeaderProps> = ({ activeRoute, onNavigate, onLogout }) => {
   const navItems = [
     { id: 'dashboard', label: 'Dashboard Spasial', icon: LayoutDashboard },
-    { id: 'generator', label: 'Article Generator', icon: PenTool },
+    { id: 'generator', label: 'Generator Artikel', icon: PenTool },
     { id: 'ai-request', label: 'AI Chat', icon: MessageSquareCode },
     { id: 'analytics', label: 'Analisis', icon: BarChart3 },
-    { id: 'reports', label: 'Laporan Terstruktur', icon: FileText },
+    { id: 'reports', label: 'Laporan', icon: FileText },
     { id: 'knowledge-hub', label: 'Repositori Dokumen', icon: FolderOpen },
   ];
 
