@@ -15,7 +15,6 @@ export interface DashboardViewProps {
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
   onNavigate,
-  onLogout
 }) => {
   const [mapPoints, setMapPoints] = useState<MapLocationPoint[]>([]);
   const [dashboardMeta, setDashboardMeta] = useState<{

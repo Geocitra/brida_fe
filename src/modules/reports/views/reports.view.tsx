@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { marked } from 'marked';
 import { PdfExportService } from '../../../services/pdf-export.service';
 import { DocumentService } from '../../../services/document.service';
 import type { DocumentRecord } from '../../../services/document.service';
@@ -35,6 +36,29 @@ interface ReportsViewProps {
   initialSelectedDocIds?: string[]; // Prop baru hasil forward [3]
   onClearSharedDocIds?: () => void;  // Callback pembersihan [3]
 }
+
+const stripCitationTokens = (content?: string | null): string => {
+  if (!content) return '';
+
+  return content
+    .replace(/\[(?:[a-f0-9-]{8,}|doc(?:[-_a-z0-9]+)?):\d+\]/gi, '')
+    .replace(/\[(?:[a-f0-9-]{8,}|doc(?:[-_a-z0-9]+)?):\d+\]\[(?:[a-f0-9-]{8,}|doc(?:[-_a-z0-9]+)?):\d+\]/gi, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+};
+
+const sanitizeReportText = (content?: string | null): string => stripCitationTokens(content);
+
+const MarkdownContent: React.FC<{ content?: string | null; className?: string }> = ({ content, className = '' }) => {
+  const html = React.useMemo(() => {
+    const safeContent = sanitizeReportText(content);
+    if (!safeContent) return '';
+    const rendered = marked.parse(safeContent, { breaks: true });
+    return typeof rendered === 'string' ? rendered : '';
+  }, [content]);
+
+  return <div className={className} dangerouslySetInnerHTML={{ __html: html }} />;
+};
 
 export const ReportsView: React.FC<ReportsViewProps> = ({
   onNavigateToGenerator,
@@ -272,17 +296,31 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
   const loadReportToView = (reportDetail: GeneratedReportDetail, isCached: boolean = true) => {
     const payload = reportDetail.contentPayload || {};
 
+    const sanitizedDeviations = (payload.deviations || []).map((d: any) => ({
+      ...d,
+      title: sanitizeReportText(d.title),
+      baseline: sanitizeReportText(d.baseline),
+      realization: sanitizeReportText(d.realization),
+      deviationText: sanitizeReportText(d.deviationText),
+      causes: sanitizeReportText(d.causes),
+    }));
+
+    const sanitizedNationalPolicyImpact = {
+      policyName: sanitizeReportText(payload.nationalPolicyImpact?.policyName),
+      simulationResults: (payload.nationalPolicyImpact?.simulationResults || []).map((item: string) => sanitizeReportText(item)),
+    };
+
     setCurrentReport({
-      title: reportDetail.title || payload.title || 'Laporan Eksekutif Resmi Bupati',
-      urgency: payload.urgency || 'TINGGI',
-      recipient: payload.recipient || 'Bupati Mimika',
-      sender: payload.sender || 'Kepala Badan Riset dan Inovasi Daerah (BRIDA) Kabupaten Mimika',
-      period: payload.period || 'Triwulan IV 2024 / Sintesis Multidokumen',
-      date: payload.date || new Date(reportDetail.createdAt).toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' }),
-      executiveSummary: reportDetail.executiveSummary || payload.executiveSummary,
-      deviations: payload.deviations || [],
-      nationalPolicyImpact: payload.nationalPolicyImpact || { policyName: '-', simulationResults: [] },
-      actionPriorities: payload.actionPriorities || [],
+      title: sanitizeReportText(reportDetail.title || payload.title || 'Laporan Eksekutif Resmi Bupati'),
+      urgency: sanitizeReportText(payload.urgency || 'TINGGI'),
+      recipient: sanitizeReportText(payload.recipient || 'Bupati Mimika'),
+      sender: sanitizeReportText(payload.sender || 'Kepala Badan Riset dan Inovasi Daerah (BRIDA) Kabupaten Mimika'),
+      period: sanitizeReportText(payload.period || 'Triwulan IV 2024 / Sintesis Multidokumen'),
+      date: sanitizeReportText(payload.date || new Date(reportDetail.createdAt).toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' })),
+      executiveSummary: sanitizeReportText(reportDetail.executiveSummary || payload.executiveSummary),
+      deviations: sanitizedDeviations,
+      nationalPolicyImpact: sanitizedNationalPolicyImpact,
+      actionPriorities: (payload.actionPriorities || []).map((item: string) => sanitizeReportText(item)),
     });
 
     setReportMetadata({
@@ -559,12 +597,15 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
             </div>
 
             {/* Ringkasan Eksekutif (Executive Summary - Clean Left Accent - Zero Nested Box) */}
-            <div className="border-teal-700 pl-4 py-2.5 bg-slate-50/70 text-slate-900 font-normal leading-relaxed italic text-sm text-justify pr-4">
-              <strong className="block text-xs uppercase tracking-wider text-teal-900 font-bold mb-1.5 not-italic items-center gap-1.5">
+            <div className="border-teal-700 pl-4 py-2.5 bg-slate-50/70 text-slate-900 font-normal leading-relaxed text-sm text-justify pr-4">
+              <strong className="block text-xs uppercase tracking-wider text-teal-900 font-bold mb-1.5 items-center gap-1.5">
                 <FileText size={14} className="text-teal-700" />
                 <span>RINGKASAN EKSEKUTIF</span>
               </strong>
-              {currentReport.executiveSummary}
+              <MarkdownContent
+                content={currentReport.executiveSummary}
+                className="prose prose-sm max-w-none text-slate-800 [&_p]:mb-2 [&_strong]:font-semibold [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:mb-1 [&_h2]:text-base [&_h2]:font-bold [&_h2]:mt-3"
+              />
             </div>
 
             {/* Kumpulan Indikator Deviasi Signifikan (Flat Modular Section) */}
@@ -578,13 +619,17 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                 <div className="space-y-3 divide-y divide-slate-100">
                   {currentReport.deviations.map((d: any, idx: number) => (
                     <div key={idx} className="pt-3 first:pt-0 space-y-1 text-xs">
-                      <strong className="block font-bold text-slate-900 text-sm">{d.title}</strong>
+                      <strong className="block font-bold text-slate-900 text-sm">{sanitizeReportText(d.title)}</strong>
                       <p className="text-slate-700 font-medium">
-                        Baseline Target: <span className="font-bold text-slate-900">{d.baseline}</span> &bull; Realisasi Aktual: <span className="font-bold text-slate-900">{d.realization}</span> &bull; Deviasi: <span className={d.severityColor || 'text-red-700 font-bold'}>{d.deviationText}</span>
+                        Baseline Target: <span className="font-bold text-slate-900">{sanitizeReportText(d.baseline)}</span> &bull; Realisasi Aktual: <span className="font-bold text-slate-900">{sanitizeReportText(d.realization)}</span> &bull; Deviasi: <span className={d.severityColor || 'text-red-700 font-bold'}>{sanitizeReportText(d.deviationText)}</span>
                       </p>
-                      <p className="text-slate-600 font-normal pt-0.5">
-                        <strong className="text-slate-800">Penyebab Utama:</strong> {d.causes}
-                      </p>
+                      <div className="text-slate-600 font-normal pt-0.5">
+                        <strong className="text-slate-800">Penyebab Utama:</strong>
+                        <MarkdownContent
+                          content={sanitizeReportText(d.causes)}
+                          className="mt-1 text-slate-700 [&_p]:mb-1 [&_strong]:font-semibold"
+                        />
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -608,7 +653,9 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                   </p>
                   <ul className="list-disc pl-5 space-y-1 text-slate-800 font-medium">
                     {currentReport.nationalPolicyImpact.simulationResults?.map((r: string, idx: number) => (
-                      <li key={idx}>{r}</li>
+                      <li key={idx} className="leading-relaxed">
+                        <MarkdownContent content={r} className="text-inherit [&_p]:mb-0 [&_strong]:font-semibold" />
+                      </li>
                     ))}
                   </ul>
                 </div>
@@ -630,7 +677,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                   <div className="space-y-2">
                     {currentReport.actionPriorities.map((act: string, idx: number) => (
                       <div key={idx} className="text-xs text-slate-800 font-medium border-amber-600 pl-3 py-1">
-                        {act}
+                        <MarkdownContent content={act} className="text-inherit [&_p]:mb-0 [&_strong]:font-semibold" />
                       </div>
                     ))}
                   </div>
@@ -646,7 +693,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                 className="px-4 py-2.5 bg-slate-900 hover:bg-slate-950 text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-2 border border-slate-950 shadow-xs disabled:opacity-50"
               >
                 {isExportingPdf ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
-                <span>{isExportingPdf ? 'Merakit PDF Vector...' : 'Download PDF Resmi'}</span>
+                <span>{isExportingPdf ? 'Merakit PDF Vector...' : 'Ekspor PDF'}</span>
               </button>
 
               <button

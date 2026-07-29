@@ -23,21 +23,20 @@ export const DeviationSummaryCard: React.FC<DeviationSummaryCardProps> = ({
       {/* Header Info */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-slate-200 pb-3 gap-2">
         <div>
-          <span className="text-[11px] font-bold text-teal-800 uppercase tracking-wider block mb-0.5">
+          <h2 className="text-xl font-bold text-slate-900 uppercase tracking-tight">
             Sektor: {sector}
-          </span>
-          <h2 className="text-xl font-bold text-slate-900 tracking-tight">
-            Ringkasan Deviasi: {indicatorName}
           </h2>
+          <span className="text-[12px] font-bold text-teal-800 uppercase tracking-wider block mb-0.5">
+            Ringkasan Deviasi: {indicatorName}
+          </span>
         </div>
 
-        <span className={`self-start sm:self-auto px-3.5 py-1.5 text-xs font-bold uppercase tracking-wider rounded-none inline-flex items-center gap-1.5 border ${
-          urgencyStatus === 'KRITIS'
-            ? 'bg-red-50 text-red-800 border-red-300'
-            : urgencyStatus === 'WASPADA'
+        <span className={`self-start sm:self-auto px-3.5 py-1.5 text-xs font-bold uppercase tracking-wider rounded-none inline-flex items-center gap-1.5 border ${urgencyStatus === 'KRITIS'
+          ? 'bg-red-50 text-red-800 border-red-300'
+          : urgencyStatus === 'WASPADA'
             ? 'bg-amber-50 text-amber-900 border-amber-300'
             : 'bg-emerald-50 text-emerald-900 border-emerald-300'
-        }`}>
+          }`}>
           {urgencyStatus === 'KRITIS' && <AlertCircle size={14} className="text-red-700" />}
           {urgencyStatus === 'WASPADA' && <AlertTriangle size={14} className="text-amber-700" />}
           {urgencyStatus === 'NORMAL' && <CheckCircle2 size={14} className="text-emerald-700" />}

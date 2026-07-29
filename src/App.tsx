@@ -14,12 +14,13 @@ import { ArticlePreviewEditorView } from './modules/ai-assistant/views/article-p
 // Diimpor secara default dari direktori modular dashboard [Vite SPA Ready]
 // ============================================================================
 import GisExplorerView from './modules/dashboard/views/gis-explorer.view';
+import { LandingView } from './modules/dashboard/views/landing.view';
 
 const SESSION_FORWARD_DOCS_KEY = 'brida_forward_doc_ids';
 
 export function App() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(true);
-  const [activeRoute, setActiveRoute] = useState('dashboard');
+  const [activeRoute, setActiveRoute] = useState('landing');
   const [initialArticlePrompt, setInitialArticlePrompt] = useState<string | undefined>(undefined);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
 
@@ -35,6 +36,7 @@ export function App() {
   });
 
   const pageTitles: Record<string, string> = {
+    landing: 'Portal Utama & Asisten Analisis BRIDA',
     dashboard: 'Dashboard Spasial & Metrik Perkembangan',
     'gis-explorer': 'Pusat Pengendali Spasial Kabupaten Mimika',
     'knowledge-hub': 'Knowledge Hub & Manajer Dokumen',
@@ -115,6 +117,12 @@ export function App() {
   // Merender konten halaman berdasarkan rute yang aktif
   const renderContent = () => {
     switch (activeRoute) {
+      case 'landing':
+        return (
+          <LandingView
+            onNavigate={handleManualNavigation}
+          />
+        );
       case 'dashboard':
         return (
           <DashboardView
@@ -184,9 +192,8 @@ export function App() {
         );
       default:
         return (
-          <DashboardView
+          <LandingView
             onNavigate={handleManualNavigation}
-            onLogout={() => setIsAuthenticated(false)}
           />
         );
     }
@@ -194,10 +201,11 @@ export function App() {
 
   // ===========================================================================
   // INTERACTION GUARD & LAYOUT BYPASS
-  // Jika rute aktif adalah pusat pengendali spasial ('gis-explorer'),
-  // langsung render rute tanpa dibungkus AppShell global demi mencapai full-bleed 100dvh.
+  // Jika rute aktif adalah pusat pengendali spasial ('gis-explorer') atau portal
+  // landing page ('landing'), langsung render rute tanpa dibungkus AppShell global
+  // demi mencapai full-bleed 100dvh dan tampilan premium.
   // ===========================================================================
-  if (activeRoute === 'gis-explorer') {
+  if (activeRoute === 'gis-explorer' || activeRoute === 'landing') {
     return renderContent();
   }
 
