@@ -1,13 +1,15 @@
 "use client";
 
-import React from "react";
+import { useState } from "react";
 import {
     Layers,
     Settings2,
     Map as MapIcon,
     Sun,
     Moon,
-    Info
+    Info,
+    RefreshCw,
+    Loader2
 } from "lucide-react";
 import { useExplorerStore } from "../../store/useExplorerStore";
 
@@ -18,6 +20,39 @@ export default function LayerControl() {
         activeBaseMap,
         setActiveBaseMap
     } = useExplorerStore();
+
+    const [syncLoading, setSyncLoading] = useState(false);
+    const [syncMessage, setSyncMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+
+    const handleRetroactiveTagging = async () => {
+        setSyncLoading(true);
+        setSyncMessage(null);
+        try {
+            const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
+            const response = await fetch(`${API_BASE_URL}/documents/retroactive-tagging`, {
+                method: 'POST',
+            });
+            const result = await response.json();
+            if (response.ok && result.success) {
+                setSyncMessage({
+                    text: `Sukses! ${result.data.updatedChunksCount} chunk dari ${result.data.updatedDocumentsCount} dokumen berhasil disinkronkan.`,
+                    type: 'success'
+                });
+            } else {
+                setSyncMessage({
+                    text: result.message || 'Gagal menjalankan sinkronisasi.',
+                    type: 'error'
+                });
+            }
+        } catch (err: any) {
+            setSyncMessage({
+                text: err.message || 'Gagal menghubungi server.',
+                type: 'error'
+            });
+        } finally {
+            setSyncLoading(false);
+        }
+    };
 
     // Galeri Basemap dengan deskripsi taksonomi yang komprehensif
     const baseMaps = [
@@ -157,6 +192,46 @@ export default function LayerControl() {
                 <p className="text-[11px] text-slate-600 font-medium leading-relaxed text-justify">
                     Tingkat ketebalan (*opacity*) murni hanya memengaruhi rendering visual peta tematik poligon (*Choropleth*) di layar Bapak Darius untuk memudahkan komparasi wilayah.
                 </p>
+            </div>
+
+            {/* SEKSI 4: SINKRONISASI DATA HISTORIS (UX SENTRIS) */}
+            <div className="flex flex-col">
+                <div className="flex items-center justify-between px-4 py-2 bg-slate-50 border-b border-slate-200 select-none">
+                    <div className="flex items-center gap-2 text-slate-500">
+                        <RefreshCw size={14} className="text-teal-700" />
+                        <h4 className="text-[11px] font-bold uppercase tracking-wider">Pemeliharaan Data</h4>
+                    </div>
+                </div>
+
+                <div className="px-4 py-4 bg-white space-y-3 text-left">
+                    <p className="text-[10px] text-slate-500 font-normal leading-relaxed">
+                        Jika terdapat dokumen lama yang diunggah sebelum penambahan fitur RAG Spasial, klik tombol di bawah untuk memproses ulang pencatatan wilayah secara otomatis.
+                    </p>
+                    <button
+                        onClick={handleRetroactiveTagging}
+                        disabled={syncLoading}
+                        className="w-full py-2 bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center justify-center gap-2 border border-teal-800 shadow-xs cursor-pointer transition-colors disabled:opacity-50 active:scale-95"
+                    >
+                        {syncLoading ? (
+                            <>
+                                <Loader2 size={13} className="animate-spin shrink-0" />
+                                <span>Menyinkronkan...</span>
+                            </>
+                        ) : (
+                            <>
+                                <RefreshCw size={13} className="shrink-0" />
+                                <span>Sinkronisasi Riwayat Dokumen</span>
+                            </>
+                        )}
+                    </button>
+                    {syncMessage && (
+                        <p className={`text-[10px] font-bold uppercase tracking-wider ${
+                            syncMessage.type === 'success' ? 'text-emerald-700' : 'text-rose-700'
+                        }`}>
+                            {syncMessage.text}
+                        </p>
+                    )}
+                </div>
             </div>
 
         </div>
