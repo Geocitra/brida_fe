@@ -1,14 +1,9 @@
 "use client";
 
-import React from "react";
 import {
-    Search,
     Layers,
-    MapPin,
     Info,
-    Map,
-    Building2
-} from "lucide-react";
+    Map} from "lucide-react";
 import { useExplorerStore, type ExplorerPanelType } from "../store/useExplorerStore";
 
 export default function ExplorerSidebar() {
@@ -19,12 +14,6 @@ export default function ExplorerSidebar() {
 
     // Rumpun navigasi pita sempit spasial
     const navigationItems = [
-        {
-            type: "hasil-pencarian" as ExplorerPanelType,
-            label: "Cari",
-            icon: Search,
-            title: "Pencarian Spasial Global"
-        },
         {
             type: "katalog-wilayah" as ExplorerPanelType,
             label: "Wilayah",

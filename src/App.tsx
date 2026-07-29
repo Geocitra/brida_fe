@@ -86,11 +86,26 @@ export function App() {
   /**
    * Guardrail Lifecycle: Membersihkan memori transien jika pengguna melakukan navigasi manual secara sadar
    */
-  const handleManualNavigation = (route: string) => {
+  const handleManualNavigation = (route: string, sessionId?: string | null) => {
     handleClearSharedDocIds();
     setInitialArticlePrompt(undefined);
-    setActiveSessionId(null);
-    setActiveRoute(route);
+
+    let finalRoute = route;
+    let finalSessionId = sessionId || null;
+
+    if (route.includes('?')) {
+      const [rPath, query] = route.split('?');
+      finalRoute = rPath;
+      try {
+        const params = new URLSearchParams(query);
+        finalSessionId = params.get('session') || finalSessionId;
+      } catch (e) {
+        console.error('Gagal memparsing query parameters:', e);
+      }
+    }
+
+    setActiveSessionId(finalSessionId);
+    setActiveRoute(finalRoute);
   };
 
   if (!isAuthenticated) {
@@ -143,6 +158,7 @@ export function App() {
             initialSelectedDocIds={sharedDocIds}
             onClearSharedDocIds={handleClearSharedDocIds}
             onNavigateToGenerator={(prompt) => handleForwardAction(sharedDocIds || [], 'generator', prompt)}
+            initialSessionId={activeSessionId}
           />
         );
       case 'generator':

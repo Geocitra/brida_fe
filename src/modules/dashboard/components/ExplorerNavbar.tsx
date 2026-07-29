@@ -101,7 +101,7 @@ export default function ExplorerNavbar({
             {/* SISI KIRI: Kembalikan ke Portal & Branding BRIDA */}
             <div className="flex items-center gap-6">
                 <button
-                    onClick={() => onNavigate?.('knowledge-hub')} // Kembali ke Repositori Dokumen [Vite Router Bypass]
+                    onClick={() => onNavigate?.('dashboard')} // Kembali ke Repositori Dokumen [Vite Router Bypass]
                     className="group flex items-center gap-2 text-slate-500 hover:text-teal-700 transition-all rounded-none cursor-pointer"
                 >
                     <div className="p-1.5 group-hover:bg-slate-100 transition-colors rounded-none">

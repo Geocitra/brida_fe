@@ -32,6 +32,7 @@ interface MarkdownTableRendererProps {
 }
 
 const MarkdownTableRenderer: React.FC<MarkdownTableRendererProps> = ({ rawTable }) => {
+  const [viewMode, setViewMode] = useState<'table' | 'chart'>('table');
   const lines = rawTable.trim().split('\n');
   if (lines.length < 2) return null;
 
@@ -48,8 +49,80 @@ const MarkdownTableRenderer: React.FC<MarkdownTableRendererProps> = ({ rawTable 
       .filter((_, idx, arr) => idx > 0 && idx < arr.length - 1);
   });
 
+  // Deteksi kolom numerik untuk chart
+  let numericColIdx = -1;
+  for (let c = 1; c < headers.length; c++) {
+    const isNumeric = rows.every(row => {
+      const val = row[c];
+      if (!val) return true;
+      const cleanVal = val.replace(/[^\d.-]/g, '');
+      return !isNaN(parseFloat(cleanVal)) && cleanVal.length > 0;
+    });
+    if (isNumeric && rows.length > 0) {
+      numericColIdx = c;
+      break;
+    }
+  }
+
+  const hasChart = numericColIdx !== -1;
+
+  if (viewMode === 'chart' && hasChart) {
+    const values = rows.map(r => {
+      const cleanVal = r[numericColIdx].replace(/[^\d.-]/g, '');
+      return parseFloat(cleanVal) || 0;
+    });
+    const maxVal = Math.max(...values, 1);
+
+    return (
+      <div className="border border-slate-300 my-3 p-3 bg-white rounded-none">
+        <div className="flex justify-between items-center border-b border-slate-200 pb-2 mb-3 select-none">
+          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Grafik Visualisasi</span>
+          <button 
+            onClick={() => setViewMode('table')}
+            className="px-2.5 py-1 text-[9px] font-bold uppercase tracking-wider border border-slate-300 hover:bg-slate-100 transition-colors rounded-none cursor-pointer"
+          >
+            Tampilkan Tabel
+          </button>
+        </div>
+        <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar">
+          {rows.map((row, idx) => {
+            const label = row[0];
+            const rawVal = row[numericColIdx];
+            const val = values[idx];
+            const pct = Math.max(2, (val / maxVal) * 100);
+            return (
+              <div key={idx} className="flex flex-col text-left space-y-0.5">
+                <div className="flex justify-between text-[10px] font-bold text-slate-700">
+                  <span className="truncate max-w-48">{label}</span>
+                  <span className="font-mono text-teal-800">{rawVal}</span>
+                </div>
+                <div className="w-full bg-slate-100 h-2.5 rounded-none overflow-hidden">
+                  <div 
+                    className="bg-teal-700 h-full rounded-none transition-all duration-500" 
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="overflow-x-auto border border-slate-300 my-3 rounded-none shadow-2xs">
+      {hasChart && (
+        <div className="flex justify-between items-center bg-slate-50 px-3 py-1.5 border-b border-slate-200 select-none">
+          <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Tabel Data</span>
+          <button 
+            onClick={() => setViewMode('chart')}
+            className="px-2.5 py-1 text-[9px] font-bold uppercase tracking-wider border border-slate-300 hover:bg-slate-100 transition-colors rounded-none cursor-pointer"
+          >
+            Tampilkan Grafik
+          </button>
+        </div>
+      )}
       <table className="min-w-full divide-y divide-slate-300 text-xs font-roboto">
         <thead className="bg-slate-100 font-bold text-slate-800 border-b border-slate-300">
           <tr>
@@ -412,6 +485,7 @@ interface ChatPanelProps {
   onArticleIntentDetected?: (promptText: string) => void;
   onLoadingChange?: (loading: boolean) => void;
   onDraftUpdated?: (newDraft: string, title: string) => void; // Sinkronisasi otomatis ke lembar visual kanan [1, 5]
+  initialSessionId?: string | null;
 }
 
 export const ChatPanel: React.FC<ChatPanelProps> = ({
@@ -423,12 +497,13 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   onArticleIntentDetected,
   onLoadingChange,
   onDraftUpdated,
+  initialSessionId,
 }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputQuery, setInputQuery] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [detectedArticlePrompt, setDetectedArticlePrompt] = useState<string | null>(null);
-  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [sessionId, setSessionId] = useState<string | null>(initialSessionId || null);
   const [sessionError, setSessionError] = useState<string | null>(null);
 
   // Cadangan memori kueri terakhir yang gagal dikirim
@@ -473,7 +548,13 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
   useEffect(() => {
     loadQaSessionsHistory();
-  }, []);
+  }, [initialSessionId]);
+
+  useEffect(() => {
+    if (initialSessionId) {
+      handleSelectQaSession(initialSessionId);
+    }
+  }, [initialSessionId]);
 
   const loadQaSessionsHistory = async () => {
     setIsLoadingHistory(true);
@@ -481,8 +562,9 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       const history = await AiAssistantService.listQaSessions();
       setQaSessions(history || []);
 
-      if (!sessionId && history && history.length > 0) {
-        handleSelectQaSession(history[0].id);
+      const targetSessionId = initialSessionId || (history && history.length > 0 ? history[0].id : null);
+      if (targetSessionId) {
+        handleSelectQaSession(targetSessionId);
       }
     } catch (err: any) {
       console.error('Gagal memuat riwayat sesi Q&A:', err);

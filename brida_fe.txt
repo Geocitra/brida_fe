@@ -1903,6 +1903,7 @@ interface MarkdownTableRendererProps {
 }
 
 const MarkdownTableRenderer: React.FC<MarkdownTableRendererProps> = ({ rawTable }) => {
+  const [viewMode, setViewMode] = useState<'table' | 'chart'>('table');
   const lines = rawTable.trim().split('\n');
   if (lines.length < 2) return null;
 
@@ -1919,8 +1920,79 @@ const MarkdownTableRenderer: React.FC<MarkdownTableRendererProps> = ({ rawTable 
       .filter((_, idx, arr) => idx > 0 && idx < arr.length - 1);
   });
 
+  let numericColIdx = -1;
+  for (let c = 1; c < headers.length; c++) {
+    const isNumeric = rows.every(row => {
+      const val = row[c];
+      if (!val) return true;
+      const cleanVal = val.replace(/[^\d.-]/g, '');
+      return !isNaN(parseFloat(cleanVal)) && cleanVal.length > 0;
+    });
+    if (isNumeric && rows.length > 0) {
+      numericColIdx = c;
+      break;
+    }
+  }
+
+  const hasChart = numericColIdx !== -1;
+
+  if (viewMode === 'chart' && hasChart) {
+    const values = rows.map(r => {
+      const cleanVal = r[numericColIdx].replace(/[^\d.-]/g, '');
+      return parseFloat(cleanVal) || 0;
+    });
+    const maxVal = Math.max(...values, 1);
+
+    return (
+      <div className="border border-slate-300 my-3 p-3 bg-white rounded-none">
+        <div className="flex justify-between items-center border-b border-slate-200 pb-2 mb-3 select-none">
+          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Grafik Visualisasi</span>
+          <button
+            onClick={() => setViewMode('table')}
+            className="px-2.5 py-1 text-[9px] font-bold uppercase tracking-wider border border-slate-300 hover:bg-slate-100 transition-colors rounded-none cursor-pointer"
+          >
+            Tampilkan Tabel
+          </button>
+        </div>
+        <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar">
+          {rows.map((row, idx) => {
+            const label = row[0];
+            const rawVal = row[numericColIdx];
+            const val = values[idx];
+            const pct = Math.max(2, (val / maxVal) * 100);
+            return (
+              <div key={idx} className="flex flex-col text-left space-y-0.5">
+                <div className="flex justify-between text-[10px] font-bold text-slate-700">
+                  <span className="truncate max-w-48">{label}</span>
+                  <span className="font-mono text-teal-800">{rawVal}</span>
+                </div>
+                <div className="w-full bg-slate-100 h-2.5 rounded-none overflow-hidden">
+                  <div
+                    className="bg-teal-700 h-full rounded-none transition-all duration-500"
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="overflow-x-auto border border-slate-300 my-3 rounded-none shadow-2xs">
+      {hasChart && (
+        <div className="flex justify-between items-center bg-slate-50 px-3 py-1.5 border-b border-slate-200 select-none">
+          <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Tabel Data</span>
+          <button
+            onClick={() => setViewMode('chart')}
+            className="px-2.5 py-1 text-[9px] font-bold uppercase tracking-wider border border-slate-300 hover:bg-slate-100 transition-colors rounded-none cursor-pointer"
+          >
+            Tampilkan Grafik
+          </button>
+        </div>
+      )}
       <table className="min-w-full divide-y divide-slate-300 text-xs font-roboto">
         <thead className="bg-slate-100 font-bold text-slate-800 border-b border-slate-300">
           <tr>
@@ -7092,12 +7164,6 @@ export default function ExplorerSidebar() {
 
     const navigationItems = [
         {
-            type: "hasil-pencarian" as ExplorerPanelType,
-            label: "Cari",
-            icon: Search,
-            title: "Pencarian Spasial Global"
-        },
-        {
             type: "katalog-wilayah" as ExplorerPanelType,
             label: "Wilayah",
             icon: Map,
@@ -7964,8 +8030,8 @@ export default function MimikaMap({
 --- FILE: src\modules\dashboard\components\PanelOrchestrator.tsx ---
 "use client";
 
-import React, { useEffect, useState, useMemo } from "react";
-import { X, Map as MapIcon, TrendingUp } from "lucide-react";
+import { useEffect, useState, useMemo } from "react";
+import { X, Map as MapIcon } from "lucide-react";
 import { useExplorerStore, type ExplorerPanelType } from "../store/useExplorerStore";
 import { getSemanticColor } from "../utils/gisUtils";
 
@@ -7979,7 +8045,7 @@ function renderPanelContent(
     type: ExplorerPanelType,
     data: any,
     panelId: string,
-    closePanel: (id: string) => void
+    _closePanel: (id: string) => void
 ) {
     switch (type) {
         case "katalog-wilayah":
@@ -7992,16 +8058,7 @@ function renderPanelContent(
             return <LayerControl />;
         case "tentang":
             return <AboutPanel />;
-        case "hasil-pencarian":
-            return (
-                <div className="flex flex-col items-center justify-center h-full text-center space-y-3 text-slate-400 p-4 select-none">
-                    <MapIcon size={32} className="text-teal-600/40" />
-                    <div className="space-y-0.5">
-                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Modul Pencarian</p>
-                        <p className="text-[11px] text-slate-600 mt-1">Fitur pencarian spasial sedang dalam tahap integrasi.</p>
-                    </div>
-                </div>
-            );
+
         default:
             return <div className="text-slate-500 text-[11px] p-4 font-bold italic">Komponen panel belum didefinisikan.</div>;
     }
@@ -8042,7 +8099,7 @@ export default function PanelOrchestrator() {
                             left: `${floatingLeft}px`,
                             top: '16px',
                             bottom: '16px',
-                            width: '280px',
+                            width: '500px',
                             maxWidth: 'calc(100vw - 32px)',
                             zIndex: 50,
                         } : {
@@ -9119,7 +9176,6 @@ import {
     History,
     FileText,
     AlertCircle,
-    TrendingUp,
     X,
     Sparkles,
     Bot,
@@ -9459,6 +9515,19 @@ const MOCK_DRILLDOWN_DETAILS: Record<number, {
 
 type TabType = "umum" | "analisis";
 
+const getCleanMarkdown = (text: string): string => {
+    if (!text) return "";
+    try {
+        const parsed = JSON.parse(text);
+        if (parsed && typeof parsed === 'object') {
+            return parsed.answer || parsed.fullArticleText || text;
+        }
+    } catch {
+
+    }
+    return text;
+};
+
 export interface DetailPanelProps {
     districtId: number | string;
     districtName: string;
@@ -9476,13 +9545,49 @@ export default function DetailPanel({
     const [error, setError] = useState<string | null>(null);
 
     const [activeTab, setActiveTab] = useState<TabType>("umum");
-    const [animateBars, setAnimateBars] = useState(false);
 
     const [isCompareMode, setIsCompareMode] = useState(false);
     const [compareDistrictId, setCompareDistrictId] = useState<string>("");
     const [aiPrompt, setAiPrompt] = useState("");
     const [aiResponse, setAiResponse] = useState<string>("");
     const [aiLoading, setAiLoading] = useState(false);
+    const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (activeTab !== "analisis") return;
+
+        const loadLastSession = async () => {
+            try {
+                const sessions = await AiAssistantService.listQaSessions();
+
+                const matchingSessions = sessions
+                    .filter(s => s.title && s.title.includes(districtName))
+                    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+
+                if (matchingSessions.length > 0) {
+                    const lastSession = matchingSessions[0];
+                    setActiveSessionId(lastSession.id);
+
+                    const details = await AiAssistantService.getQaSessionDetail(lastSession.id);
+                    if (details && details.messages && details.messages.length > 0) {
+
+                        const assistantMsgs = details.messages.filter(m => m.role === 'ASSISTANT');
+                        if (assistantMsgs.length > 0) {
+                            setAiResponse(assistantMsgs[assistantMsgs.length - 1].content);
+                        }
+                    }
+                } else {
+
+                    setActiveSessionId(null);
+                    setAiResponse("");
+                }
+            } catch (err) {
+                console.error("Gagal memuat riwayat sesi:", err);
+            }
+        };
+
+        loadLastSession();
+    }, [activeTab, districtName]);
 
     const quickSuggestions = [
         "Analisis Stunting",
@@ -9509,11 +9614,15 @@ export default function DetailPanel({
                 ? `Komparasi Spasial: ${districtName} vs ${MOCK_DRILLDOWN_DETAILS[Number(compareDistrictId)]?.district_name}`
                 : `Analisis Spasial: ${districtName}`;
 
-            const sessionId = await AiAssistantService.createSession(
-                docIds[0] || "",
-                sessionTitle,
-                docIds
-            );
+            let sessionId = activeSessionId;
+            if (!sessionId) {
+                sessionId = await AiAssistantService.createSession(
+                    docIds[0] || "",
+                    sessionTitle,
+                    docIds
+                );
+                setActiveSessionId(sessionId);
+            }
 
             const districtsToQuery = [districtName];
             if (isCompareMode && compareDistrictId) {
@@ -9553,7 +9662,6 @@ export default function DetailPanel({
 
     useEffect(() => {
         let isMounted = true;
-        setAnimateBars(false);
         setLoading(true);
         setError(null);
 
@@ -9574,28 +9682,6 @@ export default function DetailPanel({
             clearTimeout(timer);
         };
     }, [districtId]);
-
-    useEffect(() => {
-        if (activeTab === "analisis" && data) {
-            const delay = setTimeout(() => setAnimateBars(true), 50);
-            return () => clearTimeout(delay);
-        } else {
-            setAnimateBars(false);
-        }
-    }, [activeTab, data]);
-
-    const totalDatasets = data ? data.categories.reduce((acc: number, curr: any) => acc + curr.total, 0) : 0;
-    const maxCategoryValue = data && data.categories.length > 0
-        ? Math.max(...data.categories.map((c: any) => c.total))
-        : 1;
-
-    const getCategoryColor = (name: string) => {
-        const lowerName = name.toLowerCase();
-        if (lowerName.includes('kesehatan') || lowerName.includes('pendidikan')) return 'bg-rose-500';
-        if (lowerName.includes('sosial') || lowerName.includes('logistik')) return 'bg-indigo-500';
-        if (lowerName.includes('infrastruktur') || lowerName.includes('pekerjaan umum')) return 'bg-amber-500';
-        return 'bg-slate-500';
-    };
 
     if (loading) {
         return (
@@ -9678,7 +9764,7 @@ export default function DetailPanel({
 
             {}
             {activeTab === "umum" && (
-                <div className="flex flex-col pb-6 bg-white animate-in fade-in duration-200">
+                <div className="flex flex-col flex-1 overflow-y-auto pb-6 bg-white animate-in fade-in duration-200">
                     {}
                     <ImageCarousel images={profileImages} altText={`Visualisasi Wilayah ${districtName}`} />
 
@@ -9737,70 +9823,22 @@ export default function DetailPanel({
 
             {}
             {activeTab === "analisis" && (
-                <div className="flex flex-col pb-6 bg-white animate-in fade-in duration-200">
-                    {}
-                    <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 py-2.5 px-4 select-none">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Sebaran Dataset Sektoral</span>
-                        <div className="flex items-center gap-1.5 bg-white border border-slate-200 px-2 py-1 shadow-sm">
-                            <TrendingUp size={12} className="text-teal-700" strokeWidth={2.5} />
-                            <span className="text-[9px] font-black text-teal-800 uppercase tracking-wider">
-                                {totalDatasets} Dataset
-                            </span>
-                        </div>
-                    </div>
+                <div className="flex flex-col flex-1 overflow-y-auto bg-white animate-in fade-in duration-200">
 
                     {}
-                    <div className="flex flex-col bg-white">
-                        {data.categories.map((cat: any) => {
-                            const barPercentage = maxCategoryValue > 0 ? (cat.total / maxCategoryValue) * 100 : 0;
-                            const totalPercentage = totalDatasets > 0 ? ((cat.total / totalDatasets) * 100).toFixed(1) : 0;
-                            const barColor = getCategoryColor(cat.name);
-
-                            return (
-                                <div key={cat.category_id} className="flex flex-col border-b border-slate-100 py-2.5 px-4 gap-1.5 hover:bg-slate-50 transition-colors bg-white text-left">
-                                    <div className="flex justify-between items-end">
-                                        <div className="flex flex-col gap-0.5">
-                                            <span className="text-[11px] font-bold text-slate-700 uppercase tracking-tight">
-                                                {cat.name}
-                                            </span>
-                                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
-                                                {totalPercentage}% dari total wilayah
-                                            </span>
-                                        </div>
-                                        <div className="text-right flex items-baseline gap-1 select-none">
-                                            <span className="text-[13px] font-bold tracking-tight text-slate-800 font-mono">
-                                                {cat.total}
-                                            </span>
-                                            <span className="text-[9px] text-slate-500 font-bold uppercase">Set</span>
-                                        </div>
-                                    </div>
-
-                                    {}
-                                    <div className="w-full h-1 bg-slate-100 rounded-none overflow-hidden mt-0.5 select-none">
-                                        <div
-                                            className={`h-full ${barColor} rounded-none transition-all ease-out duration-1000`}
-                                            style={{ width: animateBars ? `${Math.max(barPercentage, 1)}%` : '0%' }}
-                                        />
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-
-                    {}
-                    <div className="border-t border-slate-200 mt-6 pt-5 px-4 flex flex-col text-left">
-                        <div className="flex items-center gap-2 text-slate-500 mb-1 select-none">
+                    <div className="pt-5 flex flex-col text-left">
+                        <div className="flex items-center gap-2 text-slate-500 mb-1 px-4 select-none">
                             <Sparkles size={13} strokeWidth={2.5} className="text-teal-700 animate-pulse" />
                             <h4 className="text-[10px] font-bold uppercase tracking-wider">Asisten Analitik Spasial AI</h4>
                         </div>
-                        <p className="text-[10px] text-slate-500 mb-4 font-normal leading-relaxed">
+                        <p className="text-[10px] text-slate-500 mb-4 px-4 font-normal leading-relaxed">
                             Tanyakan analisis taktis mengenai kondisi pembangunan, kemiskinan, atau kendala proyek di distrik ini menggunakan referensi dokumen kajian.
                         </p>
 
                         {}
-                        <div className="bg-slate-50 border border-slate-200 p-3 mb-4 rounded-none">
-                            <div className="flex items-center justify-between">
-                                <label className="text-[10px] font-bold text-slate-700 uppercase cursor-pointer select-none" htmlFor="compareToggle">
+                        <div className="bg-slate-50 border-b border-t border-slate-200 p-3 mb-4 rounded-none">
+                            <div className="flex w-full items-center justify-between px-1">
+                                <label className="text-[11px] font-bold text-slate-700 uppercase cursor-pointer select-none" htmlFor="compareToggle">
                                     Bandingkan dengan Distrik Lain
                                 </label>
                                 <input
@@ -9816,7 +9854,7 @@ export default function DetailPanel({
                             </div>
 
                             {isCompareMode && (
-                                <div className="mt-3 flex flex-col gap-1.5 animate-in slide-in-from-top-2 duration-150">
+                                <div className="mt-3 flex flex-col gap-1.5 px-1 animate-in slide-in-from-top-2 duration-150">
                                     <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Pilih Distrik Pembanding:</span>
                                     <select
                                         value={compareDistrictId}
@@ -9836,76 +9874,92 @@ export default function DetailPanel({
                         </div>
 
                         {}
-                        <div className="flex flex-wrap gap-1.5 mb-4">
-                            {quickSuggestions.map((sug, i) => (
-                                <button
-                                    key={i}
-                                    onClick={() => handleSuggestionClick(sug)}
-                                    disabled={aiLoading}
-                                    className="px-2.5 py-1 bg-slate-100 hover:bg-teal-50 border border-slate-200 hover:border-teal-300 text-[10px] font-medium text-slate-600 hover:text-teal-800 rounded-none transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                    {sug}
-                                </button>
-                            ))}
+                        <div className="mb-4 px-4">
+                            <p className="mb-2 text-[9px] font-normal uppercase text-slate-400">
+                                Saran Analisis
+                            </p>
+
+                            <div className="flex flex-col">
+                                {quickSuggestions.map((sug, i) => (
+                                    <button
+                                        key={i}
+                                        onClick={() => handleSuggestionClick(sug)}
+                                        className="
+                                            flex items-center
+                                            py-2
+                                            text-left
+                                            text-[11px]
+                                            text-slate-600
+                                            border-b border-slate-100
+                                            hover:text-teal-700
+                                            hover:bg-slate-50
+                                        "
+                                    >
+                                        <span className="mr-2 text-teal-600">→</span>
+                                        {sug}
+                                    </button>
+                                ))}
+                            </div>
                         </div>
 
                         {}
                         {aiResponse && (
-                            <div className="border border-slate-300 p-3 bg-slate-50/50 mb-4 max-h-[220px] overflow-y-auto custom-scrollbar select-text text-left">
+                            <div className="border-t border-slate-200 p-4 bg-slate-50/30 overflow-y-auto custom-scrollbar select-text text-left">
                                 <div className="flex items-center gap-1.5 border-b border-slate-200 pb-1.5 mb-2 select-none">
                                     <Bot size={12} className="text-teal-700" />
                                     <span className="text-[9px] font-black text-teal-800 uppercase tracking-wider">Hasil Analisis AI</span>
                                 </div>
                                 <div className="text-[11px] leading-relaxed text-slate-700">
-                                    <RichMessageRenderer text={aiResponse} />
+                                    <RichMessageRenderer text={getCleanMarkdown(aiResponse)} />
                                 </div>
                             </div>
                         )}
-
-                        {}
-                        <form onSubmit={handleAiSubmit} className="flex flex-col gap-2 bg-slate-50 border border-slate-200 p-2 rounded-none">
-                            <div className="flex items-center gap-1.5">
-                                <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 bg-teal-800 text-white rounded-none">
-                                    {isCompareMode && compareDistrictId
-                                        ? `Komparasi: ${districtName} vs ${MOCK_DRILLDOWN_DETAILS[Number(compareDistrictId)]?.district_name || '?'}`
-                                        : `Fokus: Distrik ${districtName}`}
-                                </span>
-                            </div>
-                            <div className="flex gap-2 items-center">
-                                <input
-                                    type="text"
-                                    value={aiPrompt}
-                                    onChange={(e) => setAiPrompt(e.target.value)}
-                                    disabled={aiLoading}
-                                    placeholder={isCompareMode && compareDistrictId
-                                        ? `Bandingkan ${districtName} & ${MOCK_DRILLDOWN_DETAILS[Number(compareDistrictId)]?.district_name}...`
-                                        : `Tanyakan kondisi di ${districtName}...`}
-                                    className="flex-1 bg-white border border-slate-200 rounded-none py-1.5 px-3 text-[12px] font-medium text-slate-700 placeholder:text-slate-400 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 transition-all disabled:opacity-50"
-                                />
-                                <button
-                                    type="submit"
-                                    disabled={aiLoading || !aiPrompt.trim()}
-                                    className="p-2 bg-teal-700 hover:bg-teal-800 text-white rounded-none border border-teal-800 transition-colors disabled:opacity-50 cursor-pointer shrink-0"
-                                    title="Kirim Pertanyaan"
-                                >
-                                    {aiLoading ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
-                                </button>
-                            </div>
-                        </form>
                     </div>
                 </div>
             )}
 
             {}
-            <div className="py-2.5 px-4 bg-slate-50 text-slate-500 flex items-center justify-between border-t border-slate-200 mt-auto select-none">
-                <div className="flex items-center gap-2">
-                    <History size={12} strokeWidth={2} />
-                    <span className="text-[9px] font-bold uppercase tracking-wider">Sinkronisasi Terakhir</span>
+            {activeTab === "umum" ? (
+                <div className="py-2.5 px-4 bg-slate-50 text-slate-500 flex items-center justify-between border-t border-slate-200 mt-auto select-none shrink-0">
+                    <div className="flex items-center gap-2">
+                        <History size={12} strokeWidth={2} />
+                        <span className="text-[9px] font-bold uppercase tracking-wider">Sinkronisasi Terakhir</span>
+                    </div>
+                    <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider font-mono">
+                        {data.last_updated ? new Date(data.last_updated).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }) : "-"}
+                    </span>
                 </div>
-                <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider font-mono">
-                    {data.last_updated ? new Date(data.last_updated).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }) : "-"}
-                </span>
-            </div>
+            ) : (
+                <form onSubmit={handleAiSubmit} className="flex flex-col gap-2 bg-slate-50 border-t border-slate-200 p-3 mt-auto shrink-0 select-text">
+                    <div className="flex items-center gap-1.5 px-1">
+                        <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 bg-teal-800 text-white rounded-none">
+                            {isCompareMode && compareDistrictId
+                                ? `Komparasi: ${districtName} vs ${MOCK_DRILLDOWN_DETAILS[Number(compareDistrictId)]?.district_name || '?'}`
+                                : `Fokus: Distrik ${districtName}`}
+                        </span>
+                    </div>
+                    <div className="flex gap-2 items-center px-1">
+                        <input
+                            type="text"
+                            value={aiPrompt}
+                            onChange={(e) => setAiPrompt(e.target.value)}
+                            disabled={aiLoading}
+                            placeholder={isCompareMode && compareDistrictId
+                                ? `Bandingkan ${districtName} & ${MOCK_DRILLDOWN_DETAILS[Number(compareDistrictId)]?.district_name || '?'}`
+                                : `Tanyakan kondisi di ${districtName}...`}
+                            className="flex-1 bg-white border border-slate-200 rounded-none py-1.5 px-3 text-[12px] font-medium text-slate-700 placeholder:text-slate-400 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 transition-all disabled:opacity-50"
+                        />
+                        <button
+                            type="submit"
+                            disabled={aiLoading || !aiPrompt.trim()}
+                            className="p-2 bg-teal-700 hover:bg-teal-800 text-white rounded-none border border-teal-800 transition-colors disabled:opacity-50 cursor-pointer shrink-0"
+                            title="Kirim Pertanyaan"
+                        >
+                            {aiLoading ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                        </button>
+                    </div>
+                </form>
+            )}
 
         </div>
     );

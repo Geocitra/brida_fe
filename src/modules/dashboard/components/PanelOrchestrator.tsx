@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useEffect, useState, useMemo } from "react";
-import { X, Map as MapIcon, TrendingUp } from "lucide-react";
+import { useEffect, useState, useMemo } from "react";
+import { X, Map as MapIcon } from "lucide-react";
 import { useExplorerStore, type ExplorerPanelType } from "../store/useExplorerStore";
 import { getSemanticColor } from "../utils/gisUtils";
 
@@ -23,7 +23,7 @@ function renderPanelContent(
     type: ExplorerPanelType,
     data: any,
     panelId: string,
-    closePanel: (id: string) => void
+    _closePanel: (id: string) => void
 ) {
     switch (type) {
         case "katalog-wilayah":
@@ -36,16 +36,16 @@ function renderPanelContent(
             return <LayerControl />;
         case "tentang":
             return <AboutPanel />;
-        case "hasil-pencarian":
-            return (
-                <div className="flex flex-col items-center justify-center h-full text-center space-y-3 text-slate-400 p-4 select-none">
-                    <MapIcon size={32} className="text-teal-600/40" />
-                    <div className="space-y-0.5">
-                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Modul Pencarian</p>
-                        <p className="text-[11px] text-slate-600 mt-1">Fitur pencarian spasial sedang dalam tahap integrasi.</p>
-                    </div>
-                </div>
-            );
+        // case "hasil-pencarian":
+        //     return (
+        //         <div className="flex flex-col items-center justify-center h-full text-center space-y-3 text-slate-400 p-4 select-none">
+        //             <MapIcon size={32} className="text-teal-600/40" />
+        //             <div className="space-y-0.5">
+        //                 <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Modul Pencarian</p>
+        //                 <p className="text-[11px] text-slate-600 mt-1">Fitur pencarian spasial sedang dalam tahap integrasi.</p>
+        //             </div>
+        //         </div>
+        //     );
         default:
             return <div className="text-slate-500 text-[11px] p-4 font-bold italic">Komponen panel belum didefinisikan.</div>;
     }
@@ -95,7 +95,7 @@ export default function PanelOrchestrator() {
                             left: `${floatingLeft}px`,
                             top: '16px',
                             bottom: '16px',
-                            width: '280px',
+                            width: '500px',
                             maxWidth: 'calc(100vw - 32px)',
                             zIndex: 50,
                         } : {

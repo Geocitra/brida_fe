@@ -14,12 +14,14 @@ interface AiQaViewProps {
   onNavigateToGenerator: (initialPrompt?: string) => void;
   initialSelectedDocIds?: string[]; // Prop baru hasil forward [3]
   onClearSharedDocIds?: () => void;  // Callback pembersihan [3]
+  initialSessionId?: string | null;
 }
 
 export const AiQaView: React.FC<AiQaViewProps> = ({
   onNavigateToGenerator,
   initialSelectedDocIds,
   onClearSharedDocIds,
+  initialSessionId,
 }) => {
   const [documents, setDocuments] = useState<DocumentRecord[]>([]);
   const [selectedDocIds, setSelectedDocIds] = useState<string[]>([]);
@@ -142,6 +144,7 @@ export const AiQaView: React.FC<AiQaViewProps> = ({
           documentTitles={selectedDocs.map((d) => d.title)}
           onArticleIntentDetected={(promptText) => onNavigateToGenerator(promptText)}
           onLoadingChange={(loading) => setIsAiProcessing(loading)}
+          initialSessionId={initialSessionId}
         />
       )}
     </div>
