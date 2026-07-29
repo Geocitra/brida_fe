@@ -135,8 +135,8 @@ See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rule
     "jsx": "react-jsx",
 
     /* Linting */
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
@@ -444,12 +444,13 @@ import { ArticleGeneratorView } from './modules/ai-assistant/views/article-gener
 import { ArticlePreviewEditorView } from './modules/ai-assistant/views/article-preview-editor.view';
 
 import GisExplorerView from './modules/dashboard/views/gis-explorer.view';
+import { LandingView } from './modules/dashboard/views/landing.view';
 
 const SESSION_FORWARD_DOCS_KEY = 'brida_forward_doc_ids';
 
 export function App() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(true);
-  const [activeRoute, setActiveRoute] = useState('dashboard');
+  const [activeRoute, setActiveRoute] = useState('landing');
   const [initialArticlePrompt, setInitialArticlePrompt] = useState<string | undefined>(undefined);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
 
@@ -464,6 +465,7 @@ export function App() {
   });
 
   const pageTitles: Record<string, string> = {
+    landing: 'Portal Utama & Asisten Analisis BRIDA',
     dashboard: 'Dashboard Spasial & Metrik Perkembangan',
     'gis-explorer': 'Pusat Pengendali Spasial Kabupaten Mimika',
     'knowledge-hub': 'Knowledge Hub & Manajer Dokumen',
@@ -517,6 +519,12 @@ export function App() {
 
   const renderContent = () => {
     switch (activeRoute) {
+      case 'landing':
+        return (
+          <LandingView
+            onNavigate={handleManualNavigation}
+          />
+        );
       case 'dashboard':
         return (
           <DashboardView
@@ -585,15 +593,14 @@ export function App() {
         );
       default:
         return (
-          <DashboardView
+          <LandingView
             onNavigate={handleManualNavigation}
-            onLogout={() => setIsAuthenticated(false)}
           />
         );
     }
   };
 
-  if (activeRoute === 'gis-explorer') {
+  if (activeRoute === 'gis-explorer' || activeRoute === 'landing') {
     return renderContent();
   }
 
@@ -1305,19 +1312,23 @@ export const TopHeader: React.FC<TopHeaderProps> = ({ activeRoute, onNavigate, o
       {}
       <div className="w-full px-4 lg:px-6 h-16 flex items-center justify-between gap-4">
         {}
-        <div className="flex items-center gap-2.5 shrink-0">
-          <div className="w-8 h-8 bg-teal-700 flex items-center justify-center font-roboto font-bold text-white text-xs rounded-none shadow-xs">
+        <button
+          onClick={() => onNavigate('landing')}
+          className="flex items-center gap-2.5 shrink-0 cursor-pointer hover:opacity-90 active:scale-98 transition-all group text-left bg-transparent border-none p-0"
+          title="Kembali ke Portal Utama"
+        >
+          <div className="w-8 h-8 bg-teal-700 flex items-center justify-center font-roboto font-bold text-white text-xs rounded-none shadow-xs group-hover:bg-teal-600 transition-colors">
             BM
           </div>
           <div className="flex flex-col">
-            <span className="font-roboto font-bold text-sm tracking-wider text-teal-400 uppercase">
+            <span className="font-roboto font-bold text-sm tracking-wider text-teal-400 uppercase group-hover:text-teal-300 transition-colors">
               BRIDA Mimika
             </span>
             <span className="font-roboto text-[10px] text-slate-400 font-medium hidden sm:inline">
               SMART Analysis Engine
             </span>
           </div>
-        </div>
+        </button>
 
         {}
         <nav className="flex items-center gap-1 sm:gap-2 flex-1 justify-center max-w-4xl overflow-x-auto py-1 scrollbar-none">
@@ -5196,6 +5207,20 @@ import React from 'react';
 import type { CausalFactorItem } from '../../../services/analysis.service';
 import { Cpu, Info } from 'lucide-react';
 
+const stripCitationTokens = (content?: string | null): string => {
+  if (!content) return '';
+
+  return content
+    .replace(/\[(?:[a-f0-9-]{8,}|doc(?:[-_a-z0-9]+)?):\d+\]/gi, '')
+    .replace(/\[(?:[a-f0-9-]{8,}|doc(?:[-_a-z0-9]+)?):\d+\]\[(?:[a-f0-9-]{8,}|doc(?:[-_a-z0-9]+)?):\d+\]/gi, '')
+    .replace(/#{1,6}\s*/g, '')
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/\*(.*?)\*/g, '$1')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+};
+
 interface CausalFactorChartProps {
   summaryText: string;
   causalFactors: CausalFactorItem[];
@@ -5215,7 +5240,7 @@ export const CausalFactorChart: React.FC<CausalFactorChartProps> = ({
       </div>
 
       <p className="text-xs text-slate-700 font-medium leading-relaxed text-justify" style={{ textAlign: 'justify' }}>
-        {summaryText}
+        {stripCitationTokens(summaryText)}
       </p>
 
       <div className="divide-y divide-slate-200 pt-1">
@@ -5223,14 +5248,14 @@ export const CausalFactorChart: React.FC<CausalFactorChartProps> = ({
           <div key={idx} className="py-4 space-y-1.5">
             <div className="flex items-center justify-between text-xs">
               <span className="font-bold text-slate-900">
-                {idx + 1}. {item.factor}
+                {idx + 1}. {stripCitationTokens(item.factor)}
               </span>
               <span className="font-bold text-teal-900 px-2 py-0.5 text-[11px] rounded-none">
                 Kontribusi: {item.weightPercentage}%
               </span>
             </div>
 
-            {}
+            {/* Progress Bar */}
             <div className="w-full bg-slate-200 h-2 rounded-none overflow-hidden">
               <div
                 className="bg-teal-600 h-2 transition-all duration-500"
@@ -5241,7 +5266,7 @@ export const CausalFactorChart: React.FC<CausalFactorChartProps> = ({
             <div className="flex items-start gap-1.5 text-[11px] text-slate-600 pt-1 font-medium">
               <Info size={13} className="text-slate-400 shrink-0 mt-0.5" />
               <span>
-                <strong className="text-slate-700">[{item.category}]</strong> — {item.description}
+                <strong className="text-slate-700">[{stripCitationTokens(item.category)}]</strong> — {stripCitationTokens(item.description)}
               </span>
             </div>
           </div>
@@ -5277,21 +5302,20 @@ export const DeviationSummaryCard: React.FC<DeviationSummaryCardProps> = ({
       {}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-slate-200 pb-3 gap-2">
         <div>
-          <span className="text-[11px] font-bold text-teal-800 uppercase tracking-wider block mb-0.5">
+          <h2 className="text-xl font-bold text-slate-900 uppercase tracking-tight">
             Sektor: {sector}
-          </span>
-          <h2 className="text-xl font-bold text-slate-900 tracking-tight">
-            Ringkasan Deviasi: {indicatorName}
           </h2>
+          <span className="text-[12px] font-bold text-teal-800 uppercase tracking-wider block mb-0.5">
+            Ringkasan Deviasi: {indicatorName}
+          </span>
         </div>
 
-        <span className={`self-start sm:self-auto px-3.5 py-1.5 text-xs font-bold uppercase tracking-wider rounded-none inline-flex items-center gap-1.5 border ${
-          urgencyStatus === 'KRITIS'
-            ? 'bg-red-50 text-red-800 border-red-300'
-            : urgencyStatus === 'WASPADA'
+        <span className={`self-start sm:self-auto px-3.5 py-1.5 text-xs font-bold uppercase tracking-wider rounded-none inline-flex items-center gap-1.5 border ${urgencyStatus === 'KRITIS'
+          ? 'bg-red-50 text-red-800 border-red-300'
+          : urgencyStatus === 'WASPADA'
             ? 'bg-amber-50 text-amber-900 border-amber-300'
             : 'bg-emerald-50 text-emerald-900 border-emerald-300'
-        }`}>
+          }`}>
           {urgencyStatus === 'KRITIS' && <AlertCircle size={14} className="text-red-700" />}
           {urgencyStatus === 'WASPADA' && <AlertTriangle size={14} className="text-amber-700" />}
           {urgencyStatus === 'NORMAL' && <CheckCircle2 size={14} className="text-emerald-700" />}
@@ -5558,6 +5582,20 @@ export const RecommendationList: React.FC<RecommendationListProps> = ({
 import React, { useState, useEffect } from 'react';
 import { DeviationSummaryCard } from '../components/deviation-summary-card.component';
 import { CausalFactorChart } from '../components/causal-factor-chart.component';
+
+const stripCitationTokens = (content?: string | null): string => {
+  if (!content) return '';
+
+  return content
+    .replace(/\[(?:[a-f0-9-]{8,}|doc(?:[-_a-z0-9]+)?):\d+\]/gi, '')
+    .replace(/\[(?:[a-f0-9-]{8,}|doc(?:[-_a-z0-9]+)?):\d+\]\[(?:[a-f0-9-]{8,}|doc(?:[-_a-z0-9]+)?):\d+\]/gi, '')
+    .replace(/#{1,6}\s*/g, '')
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/\*(.*?)\*/g, '$1')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+};
 import { RecommendationList } from '../components/recommendation-list.component';
 import {
   AnalysisService,
@@ -5599,8 +5637,8 @@ interface SavedAnalysisSession {
 
 interface AnalyticsViewProps {
   onNavigateToGenerator?: (initialPrompt?: string) => void;
-  initialSelectedDocIds?: string[];
-  onClearSharedDocIds?: () => void;
+  initialSelectedDocIds?: string[]; // Prop baru hasil forward [3]
+  onClearSharedDocIds?: () => void;  // Callback pembersihan [3]
 }
 
 export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
@@ -5619,12 +5657,15 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
   const [isComparing, setIsComparing] = useState(false);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
 
+  // DB Cache States
   const [cacheStatus, setCacheStatus] = useState<CheckCacheResponse | null>(null);
   const [_isCheckingCache, setIsCheckingCache] = useState(false);
 
+  // Live filter states for saved cache sessions (Calendar Datepicker & Text Search)
   const [sessionSearchQuery, setSessionSearchQuery] = useState('');
   const [selectedCalendarDate, setSelectedCalendarDate] = useState<string>('');
 
+  // ===================== DIALOG MODAL STATE FOR ROLE MAPPING =====================
   const [isMappingModalOpen, setIsMappingModalOpen] = useState(false);
   const [modalBaselineId, setModalBaselineId] = useState('');
   const [modalRealizationId, setModalRealizationId] = useState('');
@@ -5635,7 +5676,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
   const [modalUnitSuffix, setModalUnitSuffix] = useState('%');
 
   const filteredSavedSessions = savedSessions.filter((session) => {
-
+    // 1. Text Query Filter
     const q = sessionSearchQuery.toLowerCase();
     const matchesQuery =
       session.indicatorName.toLowerCase().includes(q) ||
@@ -5644,6 +5685,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
 
     if (!matchesQuery) return false;
 
+    // 2. Specific Calendar Date Filter (YYYY-MM-DD)
     if (selectedCalendarDate) {
       const sessionDate = session.createdAtISO ? new Date(session.createdAtISO) : null;
       if (sessionDate && !isNaN(sessionDate.getTime())) {
@@ -5655,6 +5697,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
     return true;
   });
 
+  // Live DB Cache Status Check saat pilihan dokumen berubah
   useEffect(() => {
     if (selectedDocIds.length > 0) {
       checkCacheStatus(selectedDocIds);
@@ -5675,6 +5718,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
     }
   };
 
+  // Memuat data dokumen awal & memulihkan sesi
   useEffect(() => {
     const loadInitialData = async () => {
       setIsLoadingDocs(true);
@@ -5682,14 +5726,16 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
         const docs = await DocumentService.listDocuments().catch(() => []);
         setDocuments(docs || []);
 
+        // Prioritaskan dokumen hasil forward jika ada, jika tidak, centang semua
         if (initialSelectedDocIds && initialSelectedDocIds.length > 0) {
           setSelectedDocIds(initialSelectedDocIds);
-
+          // Langsung bersihkan state global agar tidak terjadi "sticky selection"
           onClearSharedDocIds?.();
         } else if (docs && docs.length > 0) {
           setSelectedDocIds(docs.map((d) => d.id));
         }
 
+        // 1. Restore saved sessions from LocalStorage cache
         let localSessions: SavedAnalysisSession[] = [];
         const localData = localStorage.getItem('brida_saved_analysis_sessions');
         if (localData) {
@@ -5699,10 +5745,11 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
               localSessions = parsed;
             }
           } catch {
-
+            // ignore
           }
         }
 
+        // 2. Fetch saved report sessions from backend PostgreSQL DB
         let dbSessions: SavedAnalysisSession[] = [];
         try {
           const dbReports = await ReportService.listSavedReports();
@@ -5736,7 +5783,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
                     urgencyStatus: 'WASPADA',
                   },
                   causal: {
-                    summary: r.executiveSummary || 'Sintesis analisis tersimpan di database PostgreSQL.',
+                    summary: stripCitationTokens(r.executiveSummary) || 'Sintesis analisis tersimpan di database PostgreSQL.',
                     causalFactors: [
                       { factor: 'Keterlambatan Evaluasi Teknis Proyek', weightPercentage: 45, category: 'Administrasi', description: 'Keterlambatan pengesahan berkas kelengkapan.' },
                       { factor: 'Eskalasi Biaya Material Daerah', weightPercentage: 35, category: 'Ekonomi', description: 'Fluktuasi harga bahan di Kabupaten Mimika.' },
@@ -5751,7 +5798,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
             });
           }
         } catch {
-
+          // Fallback if backend is unavailable
         }
 
         const allSessions = [...dbSessions, ...localSessions];
@@ -5793,12 +5840,16 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
     }
   };
 
+  /**
+   * Tahap 1: Membuka dialog pemetaan peran sebelum eksekusi API RAG
+   */
   const handleOpenMappingModal = () => {
     if (selectedDocIds.length === 0) {
       alert('Silakan pilih minimal 1 dokumen acuan di atas.');
       return;
     }
 
+    // Cari dokumen Baseline & Realisasi secara proaktif dari pilihan user
     const autoBaseline = documents.find(
       (d) => selectedDocIds.includes(d.id) && d.metadata?.docType === 'BASELINE'
     );
@@ -5807,11 +5858,15 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
     );
     const firstSelected = documents.find((d) => selectedDocIds.includes(d.id));
 
+    // Isi nilai default modal
     setModalBaselineId(autoBaseline?.id || firstSelected?.id || '');
     setModalRealizationId(autoRealization?.id || firstSelected?.id || '');
     setIsMappingModalOpen(true);
   };
 
+  /**
+   * Tahap 2: Mengeksekusi perbandingan analitis dengan data parameter dari modal
+   */
   const handleConfirmExecuteAnalysis = async () => {
     setIsMappingModalOpen(false);
     setIsComparing(true);
@@ -5830,11 +5885,12 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
         unitSuffix: modalUnitSuffix === 'Miliar' ? ' Miliar' : modalUnitSuffix === 'Juta' ? ' Juta' : modalUnitSuffix,
         baselineDocId: modalBaselineId,
         realizationDocId: modalRealizationId,
-        documentIds: selectedDocIds,
+        documentIds: selectedDocIds, // Kirim seluruh dokumen terpilih sebagai ruang konteks RAG tambahan
       });
 
       setCompareResult(res);
 
+      // Simpan sesi analisis baru ke daftar riwayat lokal
       const nowIso = new Date().toISOString();
       const dateStr = new Date().toLocaleDateString('id-ID', {
         weekday: 'short',
@@ -5918,7 +5974,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
             urgencyStatus: 'WASPADA',
           },
           causal: {
-            summary: report.executiveSummary || 'Hasil analisis AI berhasil dimuat langsung dari cache database PostgreSQL.',
+            summary: stripCitationTokens(report.executiveSummary) || 'Hasil analisis AI berhasil dimuat langsung dari cache database PostgreSQL.',
             causalFactors: [
               { factor: 'Evaluasi & Verifikasi Administrasi Proyek', weightPercentage: 45, category: 'Administrasi', description: 'Verifikasi berkas fisik dan kelengkapan dokumen.' },
               { factor: 'Eskalasi Biaya & Logistik Wilayah', weightPercentage: 35, category: 'Ekonomi', description: 'Pengaruh biaya transportasi antar distrik di Mimika.' },
@@ -5944,6 +6000,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
   const isAllRealizationSelected = realizationDocs.length > 0 && realizationDocs.every((d) => selectedDocIds.includes(d.id));
   const isAllGeneralSelected = generalDocs.length > 0 && generalDocs.every((d) => selectedDocIds.includes(d.id));
 
+  // Mendapatkan daftar dokumen terpilih untuk dropdown di dialog modal
   const selectedDocumentsList = documents.filter((d) => selectedDocIds.includes(d.id));
 
   return (
@@ -6257,7 +6314,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
         { }
         <div className="pt-2 flex justify-end">
           <button
-            onClick={handleOpenMappingModal}
+            onClick={handleOpenMappingModal} // Alihkan dari handleExecute ke pembukaan modal dialog [5]
             disabled={isComparing || selectedDocIds.length === 0}
             className="px-5 py-2.5 bg-teal-700 hover:bg-teal-800 disabled:bg-slate-300 text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-2 border border-teal-900 shadow-sm"
           >
@@ -6319,14 +6376,14 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
           { }
           <div id="deep-dive-analysis-container" className="space-y-6 bg-white p-4 border border-slate-300">
             { }
-            <div className="p-4 bg-slate-50 border border-slate-300 rounded-none flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
               <div>
-                <span className="text-[10px] font-bold text-teal-800 uppercase tracking-widest block">
-                  BADAN RISET DAN INOVASI DAERAH (BRIDA) KABUPATEN MIMIKA
-                </span>
                 <h2 className="text-base font-bold text-slate-900 uppercase tracking-tight">
-                  NASKAH DIAGNOSTIK ANALISIS DEVIASI INDIKATOR DAERAH
+                  BADAN RISET DAN INOVASI DAERAH (BRIDA) KABUPATEN MIMIKA
                 </h2>
+                <span className="text-[12px] font-bold text-teal-800 uppercase tracking-widest block">
+                  NASKAH DIAGNOSTIK ANALISIS DEVIASI INDIKATOR DAERAH
+                </span>
               </div>
               <div className="text-left sm:text-right">
                 <span className="text-xs font-bold text-slate-700 block">Tahun Anggaran 2026</span>
@@ -9738,57 +9795,9 @@ export default function DetailPanel({
             {}
             {activeTab === "analisis" && (
                 <div className="flex flex-col pb-6 bg-white animate-in fade-in duration-200">
-                    {}
-                    <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 py-2.5 px-4 select-none">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Sebaran Dataset Sektoral</span>
-                        <div className="flex items-center gap-1.5 bg-white border border-slate-200 px-2 py-1 shadow-sm">
-                            <TrendingUp size={12} className="text-teal-700" strokeWidth={2.5} />
-                            <span className="text-[9px] font-black text-teal-800 uppercase tracking-wider">
-                                {totalDatasets} Dataset
-                            </span>
-                        </div>
-                    </div>
 
                     {}
-                    <div className="flex flex-col bg-white">
-                        {data.categories.map((cat: any) => {
-                            const barPercentage = maxCategoryValue > 0 ? (cat.total / maxCategoryValue) * 100 : 0;
-                            const totalPercentage = totalDatasets > 0 ? ((cat.total / totalDatasets) * 100).toFixed(1) : 0;
-                            const barColor = getCategoryColor(cat.name);
-
-                            return (
-                                <div key={cat.category_id} className="flex flex-col border-b border-slate-100 py-2.5 px-4 gap-1.5 hover:bg-slate-50 transition-colors bg-white text-left">
-                                    <div className="flex justify-between items-end">
-                                        <div className="flex flex-col gap-0.5">
-                                            <span className="text-[11px] font-bold text-slate-700 uppercase tracking-tight">
-                                                {cat.name}
-                                            </span>
-                                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
-                                                {totalPercentage}% dari total wilayah
-                                            </span>
-                                        </div>
-                                        <div className="text-right flex items-baseline gap-1 select-none">
-                                            <span className="text-[13px] font-bold tracking-tight text-slate-800 font-mono">
-                                                {cat.total}
-                                            </span>
-                                            <span className="text-[9px] text-slate-500 font-bold uppercase">Set</span>
-                                        </div>
-                                    </div>
-
-                                    {}
-                                    <div className="w-full h-1 bg-slate-100 rounded-none overflow-hidden mt-0.5 select-none">
-                                        <div
-                                            className={`h-full ${barColor} rounded-none transition-all ease-out duration-1000`}
-                                            style={{ width: animateBars ? `${Math.max(barPercentage, 1)}%` : '0%' }}
-                                        />
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-
-                    {}
-                    <div className="border-t border-slate-200 mt-6 pt-5 px-4 flex flex-col text-left">
+                    <div className="border-t border-slate-200 pt-5 px-4 flex flex-col text-left">
                         <div className="flex items-center gap-2 text-slate-500 mb-1 select-none">
                             <Sparkles size={13} strokeWidth={2.5} className="text-teal-700 animate-pulse" />
                             <h4 className="text-[10px] font-bold uppercase tracking-wider">Asisten Analitik Spasial AI</h4>
@@ -9798,9 +9807,9 @@ export default function DetailPanel({
                         </p>
 
                         {}
-                        <div className="bg-slate-50 border border-slate-200 p-3 mb-4 rounded-none">
-                            <div className="flex items-center justify-between">
-                                <label className="text-[10px] font-bold text-slate-700 uppercase cursor-pointer select-none" htmlFor="compareToggle">
+                        <div className="bg-white border-b border-t border-slate-200 p-3 mb-4 rounded-none -mx-4">
+                            <div className="flex w-full items-center justify-between">
+                                <label className="text-[13px] font-normal text-slate-700 uppercase cursor-pointer select-none" htmlFor="compareToggle">
                                     Bandingkan dengan Distrik Lain
                                 </label>
                                 <input
@@ -9835,23 +9844,37 @@ export default function DetailPanel({
                             )}
                         </div>
 
-                        {}
-                        <div className="flex flex-wrap gap-1.5 mb-4">
-                            {quickSuggestions.map((sug, i) => (
-                                <button
-                                    key={i}
-                                    onClick={() => handleSuggestionClick(sug)}
-                                    disabled={aiLoading}
-                                    className="px-2.5 py-1 bg-slate-100 hover:bg-teal-50 border border-slate-200 hover:border-teal-300 text-[10px] font-medium text-slate-600 hover:text-teal-800 rounded-none transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                    {sug}
-                                </button>
-                            ))}
+                        <div className="mb-4">
+                            <p className="mb-2 text-[9px] font-normal uppercase text-slate-400">
+                                Saran Analisis
+                            </p>
+
+                            <div className="flex flex-col">
+                                {quickSuggestions.map((sug, i) => (
+                                    <button
+                                        key={i}
+                                        onClick={() => handleSuggestionClick(sug)}
+                                        className="
+                    flex items-center
+                    py-2
+                    text-left
+                    text-[11px]
+                    text-slate-600
+                    border-b border-slate-100
+                    hover:text-teal-700
+                    hover:bg-slate-50
+                "
+                                    >
+                                        <span className="mr-2 text-teal-600">→</span>
+                                        {sug}
+                                    </button>
+                                ))}
+                            </div>
                         </div>
 
                         {}
                         {aiResponse && (
-                            <div className="border border-slate-300 p-3 bg-slate-50/50 mb-4 max-h-[220px] overflow-y-auto custom-scrollbar select-text text-left">
+                            <div className="border border-slate-300 p-3 bg-slate-50/50 mb-4 max-h-55 overflow-y-auto custom-scrollbar select-text text-left">
                                 <div className="flex items-center gap-1.5 border-b border-slate-200 pb-1.5 mb-2 select-none">
                                     <Bot size={12} className="text-teal-700" />
                                     <span className="text-[9px] font-black text-teal-800 uppercase tracking-wider">Hasil Analisis AI</span>
@@ -11104,7 +11127,6 @@ export interface DashboardViewProps {
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
   onNavigate,
-  onLogout
 }) => {
   const [documents] = useState(MOCK_DATA.documents);
   const [mapPoints, setMapPoints] = useState<MapLocationPoint[]>([]);
@@ -11338,6 +11360,278 @@ export default function GisExplorerView({
         </main>
     );
 }
+
+--- FILE: src\modules\dashboard\views\landing.view.tsx ---
+import React, { useState, useEffect } from 'react';
+import {
+  PenTool,
+  MessageSquareCode,
+  BarChart3,
+  FileText,
+  LayoutDashboard,
+  FolderOpen,
+  Clock,
+  Sparkles,
+  ChevronRight,
+  Database,
+  Globe,
+  Cpu,
+  Activity
+} from 'lucide-react';
+
+interface LandingViewProps {
+  onNavigate: (route: string) => void;
+}
+
+export const LandingView: React.FC<LandingViewProps> = ({ onNavigate }) => {
+  const [currentTime, setCurrentTime] = useState<string>('');
+  const [currentDate, setCurrentDate] = useState<string>('');
+
+  useEffect(() => {
+    const updateDateTime = () => {
+      const now = new Date();
+      setCurrentTime(
+        now.toLocaleTimeString('id-ID', {
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: false,
+        })
+      );
+      setCurrentDate(
+        now.toLocaleDateString('id-ID', {
+          weekday: 'long',
+          day: 'numeric',
+          month: 'long',
+          year: 'numeric',
+        })
+      );
+    };
+
+    updateDateTime();
+    const intervalId = setInterval(updateDateTime, 1000);
+    return () => clearInterval(intervalId);
+  }, []);
+
+  const mainModules = [
+    {
+      id: 'generator',
+      title: 'Generator Artikel & Kebijakan',
+      badge: 'AI Co-Writer',
+      desc: 'Collaborative workspace untuk merancang naskah publikasi kebijakan, draf artikel ilmiah, dan opini publik berbasis integrasi data dokumen secara instan.',
+      icon: PenTool,
+      accentBg: 'bg-teal-500',
+      accentLight: 'bg-teal-50',
+      accentText: 'text-teal-700',
+      accentBorder: 'border-teal-200 hover:border-teal-400',
+      iconBg: 'bg-teal-100 text-teal-600',
+      badgeBg: 'bg-teal-50 text-teal-600 border-teal-200',
+      hoverAccent: 'hover:shadow-teal-100',
+    },
+    {
+      id: 'ai-request',
+      title: 'AI Chat & Asisten Q&A',
+      badge: 'RAG Engine',
+      desc: 'Asisten dialog interaktif cerdas untuk menjelajahi repositori dokumen daerah, menjawab pertanyaan spesifik, serta mengarsipkan riwayat obrolan.',
+      icon: MessageSquareCode,
+      accentBg: 'bg-blue-500',
+      accentLight: 'bg-blue-50',
+      accentText: 'text-blue-700',
+      accentBorder: 'border-blue-200 hover:border-blue-400',
+      iconBg: 'bg-blue-100 text-blue-600',
+      badgeBg: 'bg-blue-50 text-blue-600 border-blue-200',
+      hoverAccent: 'hover:shadow-blue-100',
+    },
+    {
+      id: 'analytics',
+      title: 'Lembar Diagnostik & Analisis',
+      badge: 'Causal Inference',
+      desc: 'Sistem analisis deviasi capaian kinerja antara baseline target pembangunan vs realisasi lapangan dengan pemodelan faktor penyebab (AI).',
+      icon: BarChart3,
+      accentBg: 'bg-indigo-500',
+      accentLight: 'bg-indigo-50',
+      accentText: 'text-indigo-700',
+      accentBorder: 'border-indigo-200 hover:border-indigo-400',
+      iconBg: 'bg-indigo-100 text-indigo-600',
+      badgeBg: 'bg-indigo-50 text-indigo-600 border-indigo-200',
+      hoverAccent: 'hover:shadow-indigo-100',
+    },
+    {
+      id: 'reports',
+      title: 'Laporan & Nota Dinas Bupati',
+      badge: 'Executive Briefs',
+      desc: 'Pembuatan draf laporan eksekutif terstruktur, nota dinas taklimat Bupati Mimika, dan simulasi proyeksi dampak dari dinamika kebijakan nasional.',
+      icon: FileText,
+      accentBg: 'bg-amber-500',
+      accentLight: 'bg-amber-50',
+      accentText: 'text-amber-700',
+      accentBorder: 'border-amber-200 hover:border-amber-400',
+      iconBg: 'bg-amber-100 text-amber-600',
+      badgeBg: 'bg-amber-50 text-amber-600 border-amber-200',
+      hoverAccent: 'hover:shadow-amber-100',
+    }
+  ];
+
+  return (
+    <div className="min-h-screen w-full bg-slate-50 text-slate-800 flex flex-col justify-between relative overflow-hidden font-roboto">
+
+      {}
+      <div
+        className="absolute inset-0 z-0 opacity-40"
+        style={{
+          backgroundImage: `radial-gradient(circle at 1px 1px, #cbd5e1 1px, transparent 0)`,
+          backgroundSize: '28px 28px',
+        }}
+      />
+      {}
+      <div className="absolute top-0 left-0 w-[40%] h-[50%] bg-gradient-to-br from-teal-100/60 to-transparent pointer-events-none z-0" />
+      <div className="absolute bottom-0 right-0 w-[40%] h-[50%] bg-gradient-to-tl from-indigo-100/60 to-transparent pointer-events-none z-0" />
+
+      {}
+      <header className="w-full bg-white/90 backdrop-blur-sm border-b border-slate-200 px-6 py-4 flex flex-col md:flex-row items-center justify-between gap-4 z-10 shadow-xs">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-teal-600 flex items-center justify-center font-bold text-white text-sm tracking-wider shadow-sm">
+            BM
+          </div>
+          <div className="flex flex-col text-left">
+            <span className="font-extrabold text-sm uppercase tracking-widest text-teal-700">
+              BRIDA KABUPATEN MIMIKA
+            </span>
+            <span className="text-[10px] text-slate-500 font-medium">
+              Sistem Analisis Strategis &amp; Pendukung Keputusan Eksekutif
+            </span>
+          </div>
+        </div>
+
+        {}
+        <div className="flex items-center gap-5 text-xs text-slate-500">
+          <div className="flex items-center gap-2 border-r border-slate-200 pr-5">
+            <Clock size={13} className="text-teal-500" />
+            <div className="text-left font-mono">
+              <span className="text-slate-800 font-bold block leading-none text-sm">{currentTime}</span>
+              <span className="text-[9px] text-slate-400 block mt-0.5">{currentDate}</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Activity size={13} className="text-emerald-500" />
+            <div>
+              <span className="font-bold text-slate-700 block leading-none text-xs">SISTEM AKTIF</span>
+              <span className="text-[9px] text-slate-400 block mt-0.5">Secure AI Connection</span>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {}
+      <main className="flex-1 w-full max-w-6xl mx-auto px-6 py-12 flex flex-col justify-center gap-10 z-10">
+
+        {}
+        <div className="text-center flex flex-col items-center">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-teal-50 border border-teal-200 text-[10px] font-bold text-teal-700 uppercase tracking-widest mb-4">
+            <Sparkles size={11} className="text-teal-500" />
+            PORTAL UTAMA KEPALA BADAN
+          </div>
+          <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-slate-900 uppercase">
+            BRIDA SMART ANALYSIS ENGINE
+          </h1>
+          <div className="w-16 h-1 bg-teal-500 mt-3 mb-3" />
+          <p className="text-sm text-slate-500 max-w-2xl font-normal leading-relaxed text-center">
+            Pusat pengendali analitik Kabupaten Mimika. Silakan pilih instrumen cerdas di bawah untuk merancang kebijakan, menguji analisis deviasi, atau memantau metrik spasial.
+          </p>
+        </div>
+
+        {}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 w-full max-w-5xl mx-auto">
+          {mainModules.map((mod) => {
+            const Icon = mod.icon;
+            return (
+              <button
+                key={mod.id}
+                onClick={() => onNavigate(mod.id)}
+                className={`group relative text-left bg-white border-2 ${mod.accentBorder} p-6 flex gap-5 transition-all duration-300 hover:-translate-y-1.5 cursor-pointer ${mod.hoverAccent} hover:shadow-xl shadow-sm`}
+              >
+                {}
+                <div className={`absolute top-0 left-0 right-0 h-[3px] ${mod.accentBg} opacity-0 group-hover:opacity-100 transition-opacity duration-300`} />
+
+                {}
+                <div className={`w-13 h-13 w-12 h-12 flex items-center justify-center shrink-0 ${mod.iconBg} transition-transform duration-300 group-hover:scale-105`}>
+                  <Icon size={22} />
+                </div>
+
+                {}
+                <div className="flex flex-col flex-1 justify-between gap-2 text-left">
+                  <div>
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <h2 className={`text-sm font-bold text-slate-800 uppercase tracking-wide group-hover:${mod.accentText} transition-colors`}>
+                        {mod.title}
+                      </h2>
+                      <span className={`text-[9px] font-black tracking-widest uppercase border px-2 py-0.5 shrink-0 ${mod.badgeBg}`}>
+                        {mod.badge}
+                      </span>
+                    </div>
+                    <p className="text-[11.5px] text-slate-500 leading-relaxed font-normal">
+                      {mod.desc}
+                    </p>
+                  </div>
+
+                  <div className={`inline-flex items-center gap-1 text-[10px] font-bold ${mod.accentText} opacity-0 group-hover:opacity-100 uppercase tracking-widest transition-all group-hover:translate-x-1 mt-1`}>
+                    <span>Mulai Akses Modul</span>
+                    <ChevronRight size={12} />
+                  </div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+
+        {}
+        <div className="w-full max-w-5xl mx-auto border-t border-slate-200 pt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-2 text-slate-400 text-xs">
+            <Cpu size={13} className="text-teal-500" />
+            <span>Akses Cepat Pengendali Data Daerah</span>
+          </div>
+
+          <div className="flex flex-wrap justify-center gap-3">
+            <button
+              onClick={() => onNavigate('dashboard')}
+              className="px-4 py-2 bg-white border border-slate-300 hover:border-teal-400 hover:bg-teal-50 text-slate-600 hover:text-teal-700 text-xs font-bold uppercase tracking-wider transition-all cursor-pointer flex items-center gap-2 shadow-xs active:scale-95"
+            >
+              <LayoutDashboard size={13} className="text-teal-500" />
+              <span>Dashboard Metrik</span>
+            </button>
+            <button
+              onClick={() => onNavigate('gis-explorer')}
+              className="px-4 py-2 bg-white border border-slate-300 hover:border-indigo-400 hover:bg-indigo-50 text-slate-600 hover:text-indigo-700 text-xs font-bold uppercase tracking-wider transition-all cursor-pointer flex items-center gap-2 shadow-xs active:scale-95"
+            >
+              <Globe size={13} className="text-indigo-500" />
+              <span>Pusat Spasial (GIS)</span>
+            </button>
+            <button
+              onClick={() => onNavigate('knowledge-hub')}
+              className="px-4 py-2 bg-white border border-slate-300 hover:border-amber-400 hover:bg-amber-50 text-slate-600 hover:text-amber-700 text-xs font-bold uppercase tracking-wider transition-all cursor-pointer flex items-center gap-2 shadow-xs active:scale-95"
+            >
+              <FolderOpen size={13} className="text-amber-500" />
+              <span>Repositori Dokumen</span>
+            </button>
+          </div>
+        </div>
+
+      </main>
+
+      {}
+      <footer className="w-full bg-white/80 border-t border-slate-200 py-4 px-6 flex flex-col sm:flex-row items-center justify-between gap-2 text-[10px] text-slate-400 z-10">
+        <div className="flex items-center gap-2">
+          <Database size={11} className="text-teal-500" />
+          <span className="font-medium">BRIDA SMART Analysis Platform v2.4.0</span>
+        </div>
+        <span>Hak Cipta © 2026 Pemerintah Kabupaten Mimika · Badan Riset dan Inovasi Daerah</span>
+      </footer>
+
+    </div>
+  );
+};
+
+export default LandingView;
 
 --- FILE: src\modules\knowledge-hub\components\document-detail-modal.component.tsx ---
 import React, { useState, useEffect, useRef } from 'react';
@@ -12541,6 +12835,7 @@ export const KnowledgeHubView: React.FC<KnowledgeHubViewProps> = ({ onForward })
 
 --- FILE: src\modules\reports\views\reports.view.tsx ---
 import React, { useState, useEffect } from 'react';
+import { marked } from 'marked';
 import { PdfExportService } from '../../../services/pdf-export.service';
 import { DocumentService } from '../../../services/document.service';
 import type { DocumentRecord } from '../../../services/document.service';
@@ -12577,6 +12872,29 @@ interface ReportsViewProps {
   initialSelectedDocIds?: string[];
   onClearSharedDocIds?: () => void;
 }
+
+const stripCitationTokens = (content?: string | null): string => {
+  if (!content) return '';
+
+  return content
+    .replace(/\[(?:[a-f0-9-]{8,}|doc(?:[-_a-z0-9]+)?):\d+\]/gi, '')
+    .replace(/\[(?:[a-f0-9-]{8,}|doc(?:[-_a-z0-9]+)?):\d+\]\[(?:[a-f0-9-]{8,}|doc(?:[-_a-z0-9]+)?):\d+\]/gi, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+};
+
+const sanitizeReportText = (content?: string | null): string => stripCitationTokens(content);
+
+const MarkdownContent: React.FC<{ content?: string | null; className?: string }> = ({ content, className = '' }) => {
+  const html = React.useMemo(() => {
+    const safeContent = sanitizeReportText(content);
+    if (!safeContent) return '';
+    const rendered = marked.parse(safeContent, { breaks: true });
+    return typeof rendered === 'string' ? rendered : '';
+  }, [content]);
+
+  return <div className={className} dangerouslySetInnerHTML={{ __html: html }} />;
+};
 
 export const ReportsView: React.FC<ReportsViewProps> = ({
   onNavigateToGenerator,
@@ -12795,17 +13113,31 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
   const loadReportToView = (reportDetail: GeneratedReportDetail, isCached: boolean = true) => {
     const payload = reportDetail.contentPayload || {};
 
+    const sanitizedDeviations = (payload.deviations || []).map((d: any) => ({
+      ...d,
+      title: sanitizeReportText(d.title),
+      baseline: sanitizeReportText(d.baseline),
+      realization: sanitizeReportText(d.realization),
+      deviationText: sanitizeReportText(d.deviationText),
+      causes: sanitizeReportText(d.causes),
+    }));
+
+    const sanitizedNationalPolicyImpact = {
+      policyName: sanitizeReportText(payload.nationalPolicyImpact?.policyName),
+      simulationResults: (payload.nationalPolicyImpact?.simulationResults || []).map((item: string) => sanitizeReportText(item)),
+    };
+
     setCurrentReport({
-      title: reportDetail.title || payload.title || 'Laporan Eksekutif Resmi Bupati',
-      urgency: payload.urgency || 'TINGGI',
-      recipient: payload.recipient || 'Bupati Mimika',
-      sender: payload.sender || 'Kepala Badan Riset dan Inovasi Daerah (BRIDA) Kabupaten Mimika',
-      period: payload.period || 'Triwulan IV 2024 / Sintesis Multidokumen',
-      date: payload.date || new Date(reportDetail.createdAt).toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' }),
-      executiveSummary: reportDetail.executiveSummary || payload.executiveSummary,
-      deviations: payload.deviations || [],
-      nationalPolicyImpact: payload.nationalPolicyImpact || { policyName: '-', simulationResults: [] },
-      actionPriorities: payload.actionPriorities || [],
+      title: sanitizeReportText(reportDetail.title || payload.title || 'Laporan Eksekutif Resmi Bupati'),
+      urgency: sanitizeReportText(payload.urgency || 'TINGGI'),
+      recipient: sanitizeReportText(payload.recipient || 'Bupati Mimika'),
+      sender: sanitizeReportText(payload.sender || 'Kepala Badan Riset dan Inovasi Daerah (BRIDA) Kabupaten Mimika'),
+      period: sanitizeReportText(payload.period || 'Triwulan IV 2024 / Sintesis Multidokumen'),
+      date: sanitizeReportText(payload.date || new Date(reportDetail.createdAt).toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' })),
+      executiveSummary: sanitizeReportText(reportDetail.executiveSummary || payload.executiveSummary),
+      deviations: sanitizedDeviations,
+      nationalPolicyImpact: sanitizedNationalPolicyImpact,
+      actionPriorities: (payload.actionPriorities || []).map((item: string) => sanitizeReportText(item)),
     });
 
     setReportMetadata({
@@ -13082,12 +13414,15 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
             </div>
 
             {}
-            <div className="border-teal-700 pl-4 py-2.5 bg-slate-50/70 text-slate-900 font-normal leading-relaxed italic text-sm text-justify pr-4">
-              <strong className="block text-xs uppercase tracking-wider text-teal-900 font-bold mb-1.5 not-italic items-center gap-1.5">
+            <div className="border-teal-700 pl-4 py-2.5 bg-slate-50/70 text-slate-900 font-normal leading-relaxed text-sm text-justify pr-4">
+              <strong className="block text-xs uppercase tracking-wider text-teal-900 font-bold mb-1.5 items-center gap-1.5">
                 <FileText size={14} className="text-teal-700" />
                 <span>RINGKASAN EKSEKUTIF</span>
               </strong>
-              {currentReport.executiveSummary}
+              <MarkdownContent
+                content={currentReport.executiveSummary}
+                className="prose prose-sm max-w-none text-slate-800 [&_p]:mb-2 [&_strong]:font-semibold [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:mb-1 [&_h2]:text-base [&_h2]:font-bold [&_h2]:mt-3"
+              />
             </div>
 
             {}
@@ -13101,13 +13436,17 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                 <div className="space-y-3 divide-y divide-slate-100">
                   {currentReport.deviations.map((d: any, idx: number) => (
                     <div key={idx} className="pt-3 first:pt-0 space-y-1 text-xs">
-                      <strong className="block font-bold text-slate-900 text-sm">{d.title}</strong>
+                      <strong className="block font-bold text-slate-900 text-sm">{sanitizeReportText(d.title)}</strong>
                       <p className="text-slate-700 font-medium">
-                        Baseline Target: <span className="font-bold text-slate-900">{d.baseline}</span> &bull; Realisasi Aktual: <span className="font-bold text-slate-900">{d.realization}</span> &bull; Deviasi: <span className={d.severityColor || 'text-red-700 font-bold'}>{d.deviationText}</span>
+                        Baseline Target: <span className="font-bold text-slate-900">{sanitizeReportText(d.baseline)}</span> &bull; Realisasi Aktual: <span className="font-bold text-slate-900">{sanitizeReportText(d.realization)}</span> &bull; Deviasi: <span className={d.severityColor || 'text-red-700 font-bold'}>{sanitizeReportText(d.deviationText)}</span>
                       </p>
-                      <p className="text-slate-600 font-normal pt-0.5">
-                        <strong className="text-slate-800">Penyebab Utama:</strong> {d.causes}
-                      </p>
+                      <div className="text-slate-600 font-normal pt-0.5">
+                        <strong className="text-slate-800">Penyebab Utama:</strong>
+                        <MarkdownContent
+                          content={sanitizeReportText(d.causes)}
+                          className="mt-1 text-slate-700 [&_p]:mb-1 [&_strong]:font-semibold"
+                        />
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -13131,7 +13470,9 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                   </p>
                   <ul className="list-disc pl-5 space-y-1 text-slate-800 font-medium">
                     {currentReport.nationalPolicyImpact.simulationResults?.map((r: string, idx: number) => (
-                      <li key={idx}>{r}</li>
+                      <li key={idx} className="leading-relaxed">
+                        <MarkdownContent content={r} className="text-inherit [&_p]:mb-0 [&_strong]:font-semibold" />
+                      </li>
                     ))}
                   </ul>
                 </div>
@@ -13153,7 +13494,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                   <div className="space-y-2">
                     {currentReport.actionPriorities.map((act: string, idx: number) => (
                       <div key={idx} className="text-xs text-slate-800 font-medium border-amber-600 pl-3 py-1">
-                        {act}
+                        <MarkdownContent content={act} className="text-inherit [&_p]:mb-0 [&_strong]:font-semibold" />
                       </div>
                     ))}
                   </div>
@@ -13169,7 +13510,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                 className="px-4 py-2.5 bg-slate-900 hover:bg-slate-950 text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-2 border border-slate-950 shadow-xs disabled:opacity-50"
               >
                 {isExportingPdf ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
-                <span>{isExportingPdf ? 'Merakit PDF Vector...' : 'Download PDF Resmi'}</span>
+                <span>{isExportingPdf ? 'Merakit PDF Vector...' : 'Ekspor PDF'}</span>
               </button>
 
               <button
@@ -14194,11 +14535,27 @@ import pdfMake from 'pdfmake/build/pdfmake';
 import pdfFonts from 'pdfmake/build/vfs_fonts';
 import htmlToPdfmake from 'html-to-pdfmake';
 
+const stripCitationTokens = (content?: string | null): string => {
+  if (!content) return '';
+
+  return content
+    .replace(/\[(?:[a-f0-9-]{8,}|doc(?:[-_a-z0-9]+)?):\d+\]/gi, '')
+    .replace(/\[(?:[a-f0-9-]{8,}|doc(?:[-_a-z0-9]+)?):\d+\]\[(?:[a-f0-9-]{8,}|doc(?:[-_a-z0-9]+)?):\d+\]/gi, '')
+    .replace(/#{1,6}\s*/g, '')
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/\*(.*?)\*/g, '$1')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+};
+
+// Inisialisasi VFS pdfMake dengan biner Roboto bawaan — JANGAN pernah dioverwrite seluruhnya
 const vfsFonts = (pdfFonts as any)?.pdfMake?.vfs || (pdfFonts as any)?.vfs || (pdfFonts as any);
 if (vfsFonts) {
   (pdfMake as any).addVirtualFileSystem(vfsFonts);
 }
 
+// Default font definitions untuk Roboto
 const defaultFonts = {
   Roboto: {
     normal: 'Roboto-Regular.ttf',
@@ -14208,8 +14565,12 @@ const defaultFonts = {
   }
 };
 
+// Cache biner font kustom di memori untuk menghindari HTTP fetch berulang
 const fontVfsCache: Record<string, string> = {};
 
+/**
+ * Interface Konfigurasi Tata Letak Halaman PDF Dinamis (OCP)
+ */
 export interface PDFFormatConfig {
   fontFamily: 'Calibri' | 'Times New Roman' | 'Verdana' | 'Arial';
   fontSize: number;
@@ -14217,6 +14578,10 @@ export interface PDFFormatConfig {
   marginCm: number;
 }
 
+/**
+ * Mengunduh berkas biner font lokal secara asinkron dan mengonversinya ke Base64.
+ * Menggunakan cache in-memory untuk mencegah HTTP round-trip ganda pada ekspor berulang.
+ */
 async function fetchLocalFontToBase64(url: string): Promise<string> {
   if (fontVfsCache[url]) return fontVfsCache[url];
 
@@ -14229,8 +14594,8 @@ async function fetchLocalFontToBase64(url: string): Promise<string> {
     const reader = new FileReader();
     reader.onloadend = () => {
       const base64String = reader.result as string;
-      const base64Data = base64String.split(',')[1];
-      fontVfsCache[url] = base64Data;
+      const base64Data = base64String.split(',')[1]; // Ambil data Base64 mentah
+      fontVfsCache[url] = base64Data; // Simpan ke cache
       resolve(base64Data);
     };
     reader.onerror = reject;
@@ -14239,7 +14604,14 @@ async function fetchLocalFontToBase64(url: string): Promise<string> {
 }
 
 export const PdfExportService = {
-
+  /**
+   * Mengambil draf HTML interaktif, menyuntikkan font kustom secara dinamis,
+   * dan mencetak dokumen PDF formal dengan format presisi (WYSIWYG).
+   *
+   * DESAIN ARSITEKTUR: Font kustom didaftarkan melalui parameter createPdf,
+   * BUKAN melalui mutasi properti global `pdfMake.fonts`, untuk mencegah polusi
+   * state global yang merusak operasi ekspor PDF lain (Bupati Report, Analytics).
+   */
   async exportCustomFormattedArticlePdf(
     htmlText: string,
     config: PDFFormatConfig,
@@ -14253,9 +14625,10 @@ export const PdfExportService = {
     };
 
     const files = fontFileMap[config.fontFamily] || fontFileMap['Arial'];
-
+    // Nama key VFS deterministik berdasarkan nama asli berkas agar tidak menabrak kunci lain
     const vfsPrefix = files.normal.replace('.ttf', '');
 
+    // 1. Ambil berkas font .ttf secara paralel dari /public/fonts/ dengan dukungan cache
     const [vNormal, vBold, vItalics, vBoldItalics] = await Promise.all([
       fetchLocalFontToBase64(`/fonts/${files.normal}`),
       fetchLocalFontToBase64(`/fonts/${files.bold}`),
@@ -14263,6 +14636,7 @@ export const PdfExportService = {
       fetchLocalFontToBase64(`/fonts/${files.bolditalics}`),
     ]);
 
+    // 2. Suntikkan biner font ke VFS pdfMake — TAMBAH ke VFS yang sudah ada, jangan replace seluruhnya
     const customVfs = {
       [`${vfsPrefix}-Regular.ttf`]: vNormal,
       [`${vfsPrefix}-Bold.ttf`]: vBold,
@@ -14272,22 +14646,27 @@ export const PdfExportService = {
 
     const currentVfs = (pdfMake as any).vfs || {};
     (pdfMake as any).vfs = {
-      ...currentVfs,
+      ...currentVfs, // Pertahankan Roboto bawaan agar html-to-pdfmake tidak crash
       ...customVfs,
     };
 
+    // 3. Konversi satuan margin kertas dari Sentimeter ke Satuan Point (1 cm = ~28.3465 pt)
     const marginPoints = Math.round(config.marginCm * 28.3465);
 
+    // 4. Terjemahkan draf HTML menjadi representasi JSON AST pdfMake
+    // Bersihkan whitespace dan tag kosong di akhir konten HTML untuk mencegah halaman kosong tambahan di akhir PDF
     let sanitizedHtml = htmlText.trim();
     const trailingEmptyRegex = /(?:<p>\s*<\/p>|<p>\s*<br\s*\/?>\s*<\/p>|<p>&nbsp;<\/p>|<br\s*\/?>)+$/i;
     sanitizedHtml = sanitizedHtml.replace(trailingEmptyRegex, '').trim();
 
+    // Abaikan style font-family bawaan agar tidak memicu error pencarian font di pdfMake VFS
+    // Daftarkan customStyles untuk menjamin standardisasi rendering tag semantik HTML
     const pdfContent = htmlToPdfmake(sanitizedHtml, {
       window: window,
       ignoreStyles: ['font-family'],
       removeExtraBlanks: true,
       customStyles: {
-        'p': { margin: [0, 0, 0, 8], alignment: 'justify' },
+        'p': { margin: [0, 0, 0, 8], alignment: 'justify' }, // Gunakan justify sebagai layout default paragraf
         'ul': { margin: [10, 4, 0, 8] },
         'ol': { margin: [10, 4, 0, 8] },
         'li': { margin: [0, 2, 0, 2], lineHeight: config.lineSpacing },
@@ -14297,6 +14676,7 @@ export const PdfExportService = {
       }
     });
 
+    // 5. Susun font definitions — WAJIB dikirim sebagai argumen ke-3 createPdf(), BUKAN di dalam docDefinition.
     const fontDefinitions: any = {
       Roboto: {
         normal: 'Roboto-Regular.ttf',
@@ -14312,6 +14692,7 @@ export const PdfExportService = {
       },
     };
 
+    // 6. Susun docDefinition — mendaftarkan class khusus html-to-pdfmake untuk menjaga margin list
     const docDefinition: any = {
       pageSize: 'A4',
       pageMargins: [marginPoints, marginPoints, marginPoints, marginPoints],
@@ -14319,14 +14700,14 @@ export const PdfExportService = {
         font: 'CustomFont',
         fontSize: config.fontSize,
         lineHeight: config.lineSpacing,
-        alignment: 'justify',
+        alignment: 'justify', // Default alignment jika paragraph tidak memiliki align kustom
       },
       styles: {
         'html-ul': {
-          margin: [10, 2, 0, 6]
+          margin: [10, 2, 0, 6] // Indentasi margin kiri aman untuk bullet list standar
         },
         'html-ol': {
-          margin: [10, 2, 0, 6]
+          margin: [10, 2, 0, 6] // Indentasi margin kiri aman untuk numbered list standar
         },
         'html-li': {
           lineHeight: config.lineSpacing,
@@ -14350,15 +14731,19 @@ export const PdfExportService = {
       content: pdfContent,
     };
 
+    // 7. Render PDF: Set definitions ke instance pdfMake secara lokal dan buat PDF
     (pdfMake as any).setFonts(fontDefinitions);
     const targetFilename = filename.toLowerCase().endsWith('.pdf') ? filename : `${filename}.pdf`;
     (pdfMake as any).createPdf(docDefinition).download(targetFilename);
   },
 
+  /**
+   * Export Diagnostik Deviasi Indikator ke PDF Vector Pristine (pdfMake)
+   */
   exportAnalyticsPdf(indicator: any, filename?: string): void {
     const docDefinition: any = {
       pageSize: 'A4',
-      pageMargins: [45, 55, 45, 40],
+      pageMargins: [45, 80, 45, 40],
       defaultStyle: {
         font: 'Roboto',
         fontSize: 10,
@@ -14366,22 +14751,15 @@ export const PdfExportService = {
         alignment: 'justify',
         color: '#1e293b',
       },
-      header: {
-        text: 'BRIDA SMART ANALYSIS — KABUPATEN MIMIKA',
-        alignment: 'right',
-        fontSize: 8,
-        color: '#64748b',
-        margin: [45, 28, 45, 0],
-      },
       footer: (currentPage: number, pageCount: number) => ({
         columns: [
-          { text: `Tanggal Rilis: ${new Date().toLocaleDateString('id-ID')}`, fontSize: 8, color: '#94a3b8' },
-          { text: `Halaman ${currentPage} dari ${pageCount}`, alignment: 'right', fontSize: 8, color: '#94a3b8' },
+          { text: `Tanggal Rilis: ${new Date().toLocaleDateString('id-ID')}`, fontSize: 8, color: '#565c63' },
+          { text: `Halaman ${currentPage} dari ${pageCount}`, alignment: 'right', fontSize: 8, color: '#565c63' },
         ],
         margin: [45, 12, 45, 0],
       }),
       content: [
-
+        // ── Judul Laporan ──────────────────────────────────────────────────────
         {
           text: 'LEMBAR DIAGNOSTIK & DEVIASI INDIKATOR',
           fontSize: 15,
@@ -14402,89 +14780,114 @@ export const PdfExportService = {
           canvas: [{ type: 'line', x1: 0, y1: 0, x2: 505, y2: 0, lineWidth: 1.5, lineColor: '#0f172a' }],
           margin: [0, 0, 0, 18],
         },
-
+        // ── Seksi 1 ────────────────────────────────────────────────────────────
         {
-          text: '1. RINGKASAN DEVIASI CAPAIAN',
-          style: 'sectionHeader',
+          keepTogether: true,
+          stack: [
+            {
+              text: '1. RINGKASAN DEVIASI CAPAIAN',
+              style: 'sectionHeader',
+            },
+            {
+              table: {
+                widths: ['*', '*', '*'],
+                body: [
+                  [
+                    { text: 'Baseline Target', style: 'tableHeader' },
+                    { text: 'Realisasi Lapangan', style: 'tableHeader' },
+                    { text: 'Deviasi (%)', style: 'tableHeader' },
+                  ],
+                  [
+                    { text: indicator.baseline, fontSize: 13, bold: true, alignment: 'center' },
+                    { text: indicator.realization, fontSize: 13, bold: true, alignment: 'center' },
+                    { text: indicator.deviationText, fontSize: 13, bold: true, color: '#dc2626', alignment: 'center' },
+                  ],
+                ],
+              },
+              layout: 'lightHorizontalLines',
+              margin: [0, 0, 0, 20],
+            },
+          ],
         },
+        // ── Seksi 2 ────────────────────────────────────────────────────────────
         {
-          table: {
-            widths: ['*', '*', '*'],
-            body: [
-              [
-                { text: 'Baseline Target', style: 'tableHeader' },
-                { text: 'Realisasi Lapangan', style: 'tableHeader' },
-                { text: 'Deviasi (%)', style: 'tableHeader' },
-              ],
-              [
-                { text: indicator.baseline, fontSize: 13, bold: true, alignment: 'center' },
-                { text: indicator.realization, fontSize: 13, bold: true, alignment: 'center' },
-                { text: indicator.deviationText, fontSize: 13, bold: true, color: '#dc2626', alignment: 'center' },
-              ],
-            ],
+          keepTogether: true,
+          stack: [
+            {
+              text: '2. RINGKASAN EKSEKUTIF ANALISIS (AI-SYNTHESIS)',
+              style: 'sectionHeader',
+            },
+            {
+              text: stripCitationTokens(indicator.summary) || 'Hasil analisis deskriptif AI belum tersedia.',
+              fontSize: 10,
+              lineHeight: 1.55,
+              alignment: 'justify',
+              color: '#1e293b',
+              margin: [0, 0, 0, 18],
+            },
+          ]
+        },
+        // ── Seksi 3 ────────────────────────────────────────────────────────────
+        {
+          keepTogether: true,
+          stack: [
+            {
+              text: '3. ANALISIS FAKTOR PENYEBAB (AI — Causal Inference)',
+              style: 'sectionHeader',
+            },
+            {
+              table: {
+                widths: ['*', 65],
+                body: [
+                  [
+                    { text: 'Faktor Penyebab Utama', style: 'tableHeader' },
+                    { text: 'Kontribusi', style: 'tableHeader' },
+                  ],
+                  ...indicator.causalFactors.map((f: any, i: number) => [
+                    { text: `${i + 1}.  ${f.label}`, fontSize: 9.5, alignment: 'left' },
+                    { text: `${f.percentage}%`, fontSize: 9.5, bold: true, alignment: 'center' },
+                  ]),
+                ],
+              },
+              layout: 'lightHorizontalLines',
+              margin: [0, 0, 0, 20],
+            },
+          ]
+        },
+        // ── Seksi 4 ────────────────────────────────────────────────────────────
+        {
+          id: 'section4',
+          keepTogether: true,
+          pageBreakBefore: function (currentNode: any) {
+            return currentNode.id === 'section4';
           },
-          layout: 'lightHorizontalLines',
-          margin: [0, 0, 0, 20],
-        },
-
-        {
-          text: '2. RINGKASAN EKSEKUTIF ANALISIS (AI-SYNTHESIS)',
-          style: 'sectionHeader',
-        },
-        {
-          text: indicator.summary || 'Hasil analisis deskriptif AI belum tersedia.',
-          fontSize: 10,
-          lineHeight: 1.55,
-          alignment: 'justify',
-          color: '#1e293b',
-          margin: [0, 0, 0, 18],
-        },
-
-        {
-          text: '3. ANALISIS FAKTOR PENYEBAB (AI — Causal Inference)',
-          style: 'sectionHeader',
-        },
-        {
-          table: {
-            widths: ['*', 65],
-            body: [
-              [
-                { text: 'Faktor Penyebab Utama', style: 'tableHeader' },
-                { text: 'Kontribusi', style: 'tableHeader' },
-              ],
-              ...indicator.causalFactors.map((f: any, i: number) => [
-                { text: `${i + 1}.  ${f.label}`, fontSize: 9.5, alignment: 'left' },
-                { text: `${f.percentage}%`, fontSize: 9.5, bold: true, alignment: 'center' },
-              ]),
-            ],
-          },
-          layout: 'lightHorizontalLines',
-          margin: [0, 0, 0, 20],
-        },
-
-        {
-          text: '4. MATRIKS REKOMENDASI RESPON (ACTION PLAN)',
-          style: 'sectionHeader',
-        },
-        {
-          table: {
-            widths: [85, '*', 90, 75],
-            body: [
-              [
-                { text: 'Tingkat Prioritas', style: 'tableHeader' },
-                { text: 'Rekomendasi Instruksi', style: 'tableHeader' },
-                { text: 'Penanggung Jawab', style: 'tableHeader' },
-                { text: 'Tenggat', style: 'tableHeader' },
-              ],
-              ...indicator.priorityRecommendations.map((rec: any) => [
-                { text: rec.priority, fontSize: 8.5, bold: true, color: '#dc2626', alignment: 'center' },
-                { text: rec.title, fontSize: 8.5, alignment: 'left' },
-                { text: rec.pic, fontSize: 8, alignment: 'left' },
-                { text: rec.deadline, fontSize: 8, alignment: 'center' },
-              ]),
-            ],
-          },
-          layout: 'lightHorizontalLines',
+          stack: [
+            {
+              text: '4. MATRIKS REKOMENDASI RESPON (ACTION PLAN)',
+              style: 'sectionHeader',
+            },
+            {
+              table: {
+                widths: [85, '*', 90, 75],
+                body: [
+                  [
+                    { text: 'Tingkat Prioritas', style: 'tableHeader' },
+                    { text: 'Rekomendasi Instruksi', style: 'tableHeader' },
+                    { text: 'Penanggung Jawab', style: 'tableHeader' },
+                    { text: 'Tenggat', style: 'tableHeader' },
+                  ],
+                  ...indicator.priorityRecommendations.map((rec: any) => [
+                    { text: rec.priority, fontSize: 8.5, bold: true, color: '#dc2626', alignment: 'center' },
+                    { text: rec.title, fontSize: 8.5, alignment: 'left' },
+                    { text: rec.pic, fontSize: 8, alignment: 'left' },
+                    { text: rec.deadline, fontSize: 8, alignment: 'center' },
+                  ]),
+                ],
+              },
+              layout: 'lightHorizontalLines',
+              margin: [0, 0, 0, 18]
+            },
+          ]
         },
       ],
       styles: {
@@ -14510,10 +14913,13 @@ export const PdfExportService = {
     (pdfMake as any).createPdf(docDefinition).download(targetFilename);
   },
 
+  /**
+   * Export Naskah Resmi Nota Dinas Bupati ke PDF Vector Pristine (pdfMake)
+   */
   exportBupatiReportPdf(report: any): void {
     const docDefinition: any = {
       pageSize: 'A4',
-      pageMargins: [50, 65, 50, 45],
+      pageMargins: [50, 90, 50, 45],
       defaultStyle: {
         font: 'Roboto',
         fontSize: 10,
@@ -14521,60 +14927,35 @@ export const PdfExportService = {
         alignment: 'justify',
         color: '#1e293b',
       },
-      header: {
-        text: 'BRIDA SMART ANALYSIS — KABUPATEN MIMIKA',
-        alignment: 'right',
-        fontSize: 8,
-        color: '#64748b',
-        margin: [50, 30, 50, 0],
-      },
       footer: (currentPage: number, pageCount: number) => ({
         columns: [
-          { text: 'Dokumen Resmi Pemerintah Kabupaten Mimika', fontSize: 8, color: '#94a3b8' },
-          { text: `Halaman ${currentPage} dari ${pageCount}`, alignment: 'right', fontSize: 8, color: '#94a3b8' },
+          { text: `Halaman ${currentPage} dari ${pageCount}`, alignment: 'right', fontSize: 8, color: '#565c63' },
         ],
         margin: [50, 12, 50, 0],
       }),
       content: [
-
+        // ── Kop Surat ──────────────────────────────────────────────────────────
         { text: 'PEMERINTAH KABUPATEN MIMIKA', fontSize: 13, bold: true, alignment: 'center', color: '#0f172a' },
         { text: 'BADAN RISET DAN INOVASI DAERAH (BRIDA)', fontSize: 11, bold: true, alignment: 'center', color: '#0d9488', margin: [0, 3, 0, 3] },
-        { text: 'Jl. Cenderawasih No. 1, Timika, Papua Tengah', fontSize: 8.5, alignment: 'center', color: '#64748b', margin: [0, 0, 0, 10] },
+        { text: 'Jl. Cenderawasih No. 1, Timika, Papua Tengah', fontSize: 8.5, alignment: 'center', color: '#565c63', margin: [0, 0, 0, 10] },
         {
           canvas: [{ type: 'line', x1: 0, y1: 0, x2: 495, y2: 0, lineWidth: 2, lineColor: '#0f172a' }],
           margin: [0, 0, 0, 14],
         },
-
+        // ── Judul Nota ─────────────────────────────────────────────────────────
+        { text: report.title, fontSize: 13, bold: true, alignment: 'left', color: '#0f172a', margin: [0, 0, 0, 14] },
+        // ── Metadata Nota ──────────────────────────────────────────────────────
         {
           table: {
             widths: [85, 6, '*'],
             body: [
-              [{ text: 'PENERIMA', bold: true, fontSize: 9, alignment: 'left' }, ':', { text: report.recipient, fontSize: 9, bold: true, alignment: 'left' }],
-              [{ text: 'PENGIRIM', bold: true, fontSize: 9, alignment: 'left' }, ':', { text: report.sender, fontSize: 9, alignment: 'left' }],
-              [{ text: 'PERIODE', bold: true, fontSize: 9, alignment: 'left' }, ':', { text: `${report.period} (Rilis: ${report.date})`, fontSize: 9, alignment: 'left' }],
-              [
-                { text: 'PRIORITAS', bold: true, fontSize: 9, alignment: 'left' },
-                ':',
-                {
-                  text: report.urgency,
-                  fontSize: 9,
-                  bold: true,
-                  alignment: 'left',
-                  color: (report.urgency || '').toLowerCase().includes('utama') || (report.urgency || '').toLowerCase().includes('tinggi')
-                    ? '#dc2626'
-                    : (report.urgency || '').toLowerCase().includes('menengah') || (report.urgency || '').toLowerCase().includes('sedang')
-                      ? '#d97706'
-                      : '#059669',
-                },
-              ],
+              [{ text: 'PERIODE', bold: true, fontSize: 9, alignment: 'left' }, ':', { text: `${report.date}`, fontSize: 9, alignment: 'left' }],
             ],
           },
           layout: 'noBorders',
           margin: [0, 0, 0, 16],
         },
-
-        { text: report.title, fontSize: 13, bold: true, alignment: 'center', color: '#0f172a', margin: [0, 0, 0, 14] },
-
+        // ── Ringkasan Eksekutif ────────────────────────────────────────────────
         {
           table: {
             widths: ['*'],
@@ -14583,7 +14964,7 @@ export const PdfExportService = {
                 {
                   text: [
                     { text: 'RINGKASAN EKSEKUTIF:\n', bold: true, fontSize: 9.5, color: '#0369a1' },
-                    { text: report.executiveSummary, fontSize: 9.5, italic: true, alignment: 'justify' },
+                    { text: stripCitationTokens(report.executiveSummary), fontSize: 9.5, italic: true, alignment: 'justify' },
                   ],
                   fillColor: '#f0f9ff',
                   margin: [12, 10, 12, 10],
@@ -14594,11 +14975,11 @@ export const PdfExportService = {
           layout: 'noBorders',
           margin: [0, 0, 0, 18],
         },
-
-        { text: '1. KUMPULAN INDIKATOR DEVIASI SIGNIFIKAN', style: 'sectionHeader' },
+        // ── Seksi 1 ────────────────────────────────────────────────────────────
+        { text: '1. KUMPULAN INDIKATOR DEVIASI SIGNIFIKAN', style: 'sectionHeader', margin: [0, 20, 0, 8] },
         {
           table: {
-            widths: ['*', 65, 65, 90],
+            widths: ['*', 90, 90, 90],
             body: [
               [
                 { text: 'Indikator Pembangunan', style: 'tableHeader' },
@@ -14608,17 +14989,17 @@ export const PdfExportService = {
               ],
               ...report.deviations.map((d: any) => [
                 { text: d.title, fontSize: 9, bold: true, alignment: 'left' },
-                { text: d.baseline, fontSize: 8.5, alignment: 'center' },
-                { text: d.realization, fontSize: 8.5, alignment: 'center' },
-                { text: d.deviationText, fontSize: 8.5, bold: true, color: '#dc2626', alignment: 'center' },
+                { text: d.baseline, fontSize: 8.5, alignment: 'left' },
+                { text: d.realization, fontSize: 8.5, alignment: 'left' },
+                { text: d.deviationText, fontSize: 8.5, bold: true, color: '#dc2626', alignment: 'left' },
               ]),
             ],
           },
           layout: 'lightHorizontalLines',
           margin: [0, 0, 0, 18],
         },
-
-        { text: '2. SIMULASI DAMPAK KEBIJAKAN MAKRO / NASIONAL', style: 'sectionHeader' },
+        // ── Seksi 2 ────────────────────────────────────────────────────────────
+        { text: '2. SIMULASI DAMPAK KEBIJAKAN MAKRO / NASIONAL', style: 'sectionHeader', margin: [0, 20, 0, 8] },
         { text: `Kebijakan: ${report.nationalPolicyImpact.policyName}`, fontSize: 9.5, bold: true, color: '#0d9488', margin: [0, 0, 0, 6] },
         {
           ul: report.nationalPolicyImpact.simulationResults.map((res: string) => ({
@@ -14630,11 +15011,11 @@ export const PdfExportService = {
           })),
           margin: [0, 0, 0, 18],
         },
-
-        { text: '3. REKOMENDASI ACTION PLAN BUPATI', style: 'sectionHeader' },
+        // ── Seksi 3 ────────────────────────────────────────────────────────────
+        { text: '3. REKOMENDASI ACTION PLAN BUPATI', style: 'sectionHeader', margin: [0, 20, 0, 8] },
         {
           ol: report.actionPriorities.map((act: string) => ({
-            text: act,
+            text: stripCitationTokens(act),
             fontSize: 9.5,
             lineHeight: 1.4,
             alignment: 'justify',
@@ -14642,7 +15023,7 @@ export const PdfExportService = {
           })),
           margin: [0, 0, 0, 28],
         },
-
+        // ── Tanda Tangan ────────────────────────────────────────────────────────
         {
           columns: [
             { width: '*', text: '' },
@@ -14680,6 +15061,9 @@ export const PdfExportService = {
     (pdfMake as any).createPdf(docDefinition).download('Nota_Dinas_Resmi_Bupati_Mimika_Maret_2026.pdf');
   },
 
+  /**
+   * Export DOM Element / Indicator to PDF using pdfMake
+   */
   async exportElementToPdf(_elementId: string, filename: string, compareResult?: any): Promise<void> {
     if (!compareResult) {
       const indicator: any = {

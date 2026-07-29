@@ -31,19 +31,23 @@ export const TopHeader: React.FC<TopHeaderProps> = ({ activeRoute, onNavigate, o
       {/* Top Main Navbar Row */}
       <div className="w-full px-4 lg:px-6 h-16 flex items-center justify-between gap-4">
         {/* Brand Logo & Title */}
-        <div className="flex items-center gap-2.5 shrink-0">
-          <div className="w-8 h-8 bg-teal-700 flex items-center justify-center font-roboto font-bold text-white text-xs rounded-none shadow-xs">
+        <button
+          onClick={() => onNavigate('landing')}
+          className="flex items-center gap-2.5 shrink-0 cursor-pointer hover:opacity-90 active:scale-98 transition-all group text-left bg-transparent border-none p-0"
+          title="Kembali ke Portal Utama"
+        >
+          <div className="w-8 h-8 bg-teal-700 flex items-center justify-center font-roboto font-bold text-white text-xs rounded-none shadow-xs group-hover:bg-teal-600 transition-colors">
             BM
           </div>
           <div className="flex flex-col">
-            <span className="font-roboto font-bold text-sm tracking-wider text-teal-400 uppercase">
+            <span className="font-roboto font-bold text-sm tracking-wider text-teal-400 uppercase group-hover:text-teal-300 transition-colors">
               BRIDA Mimika
             </span>
             <span className="font-roboto text-[10px] text-slate-400 font-medium hidden sm:inline">
               SMART Analysis Engine
             </span>
           </div>
-        </div>
+        </button>
 
         {/* Horizontal Navigation Items Bar (Full Spanning Compact Bar) */}
         <nav className="flex items-center gap-1 sm:gap-2 flex-1 justify-center max-w-4xl overflow-x-auto py-1 scrollbar-none">

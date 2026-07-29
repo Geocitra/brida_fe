@@ -15,7 +15,6 @@ export interface DashboardViewProps {
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
   onNavigate,
-  onLogout
 }) => {
   const [documents] = useState(MOCK_DATA.documents);
   const [mapPoints, setMapPoints] = useState<MapLocationPoint[]>([]);
