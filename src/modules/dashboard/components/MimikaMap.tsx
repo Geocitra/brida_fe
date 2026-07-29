@@ -317,6 +317,7 @@ export default function MimikaMap({
     const activeUnit = useExplorerStore((state) => state.activeUnit);
     const activeDirection = useExplorerStore((state) => state.activeDirection);
     const activeIndicator = useExplorerStore((state) => state.activeIndicator);
+    const mapOpacity = useExplorerStore((state) => state.mapOpacity);
 
     const geoJsonRef = useRef<L.GeoJSON>(null);
 
@@ -537,11 +538,8 @@ export default function MimikaMap({
     const SafePolygon = Polygon as any;
 
     const getMaskingOpacity = () => {
-        const state = useExplorerStore.getState();
         if (zoomLevel >= 14) return 0;
-        if (state.activeBaseMap === 'dark') return 0.7;
-        if (state.activeBaseMap === 'street') return 0.4;
-        return 0.5;
+        return mapOpacity / 100;
     };
 
     return (
@@ -593,6 +591,23 @@ export default function MimikaMap({
                         ref={geoJsonRef}
                         data={geoData}
                         onEachFeature={onEachFeature}
+                        style={(feature: any) => {
+                            const districtName = feature.properties?.district_name || "";
+                            const stateSnapshot = {
+                                focusedDistrict: useExplorerStore.getState().focusedDistrict,
+                                activeIndicator: useExplorerStore.getState().activeIndicator,
+                                mapOpacity: useExplorerStore.getState().mapOpacity,
+                                activeBaseMap: useExplorerStore.getState().activeBaseMap
+                            };
+                            return calculateLayerStyle(
+                                districtName,
+                                stateSnapshot,
+                                indicatorValuesRef.current,
+                                minValueRef.current,
+                                maxValueRef.current,
+                                zoomLevel
+                            );
+                        }}
                     />
                 )}
 

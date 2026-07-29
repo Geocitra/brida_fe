@@ -107,7 +107,6 @@ export default function ExplorerNavbar({
                     <div className="p-1.5 group-hover:bg-slate-100 transition-colors rounded-none">
                         <ChevronLeft size={20} />
                     </div>
-                    <span className="text-xs font-bold uppercase tracking-widest hidden md:block">Portal</span>
                 </button>
 
                 <div className="h-6 w-px bg-slate-200 mx-2 hidden sm:block"></div>
