@@ -205,11 +205,11 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
                     summary: stripCitationTokens(r.executiveSummary) || 'Sintesis analisis tersimpan di database PostgreSQL.',
                     causalFactors: [
                       { factor: 'Keterlambatan Evaluasi Teknis Proyek', weightPercentage: 45, category: 'Administrasi', description: 'Keterlambatan pengesahan berkas kelengkapan.' },
-                      { factor: 'Eskalasi Biaya Material Daerah', weightPercentage: 35, category: 'Ekonomi', description: 'Fluktuasi harga bahan di Kabupaten Mimika.' },
+                      { factor: 'Eskalasi Biaya Material Daerah', weightPercentage: 35, category: 'Ekonomi', description: 'Fluktuasi harga bahan daerah.' },
                       { factor: 'Kondisi Cuaca Ekstrem', weightPercentage: 20, category: 'Lingkungan', description: 'Hambatan cuaca pada pengerjaan fisik.' },
                     ],
                     recommendations: [
-                      { id: 'db-rec-1', actionTitle: 'Percepatan Evaluasi & Verifikasi Proyek', pic: 'Dinas PU & BRIDA', deadline: '30 Hari', estimatedCostText: 'Rp 100 Juta', priority: 'TINGGI', status: 'IN_PROGRESS' },
+                      { id: 'db-rec-1', actionTitle: 'Percepatan Evaluasi & Verifikasi Proyek', pic: 'Dinas PU', deadline: '30 Hari', estimatedCostText: 'Rp 100 Juta', priority: 'TINGGI', status: 'IN_PROGRESS' },
                     ],
                   },
                 },
@@ -765,22 +765,11 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
                 <span>{isExportingPdf ? 'Mencetak PDF...' : 'Ekspor PDF'}</span>
               </button>
 
-              <button
-                onClick={() =>
-                  alert(`Kirim Laporan Nota Eksekutif ${compareResult?.math?.indicatorName} langsung ke WhatsApp Bupati Mimika.`)
-                }
-                disabled={!compareResult}
-                className="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 disabled:bg-slate-400 text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-1.5 border border-emerald-800 shadow-xs"
-              >
-                <Send size={12} />
-                <span>Kirim WA Bupati</span>
-              </button>
-
               {onNavigateToGenerator && compareResult && (
                 <button
                   onClick={() =>
                     onNavigateToGenerator(
-                      `Buatkan artikel publikasi mengenai analisis deviasi ${compareResult.math.indicatorName} di Kabupaten Mimika.`,
+                      `Buatkan artikel publikasi mengenai analisis deviasi ${compareResult.math.indicatorName}.`,
                     )
                   }
                   className="px-3 py-1.5 bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-1.5 border border-teal-700 shadow-xs"
@@ -798,7 +787,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
               <div>
                 <h2 className="text-base font-bold text-slate-900 uppercase tracking-tight">
-                  BADAN RISET DAN INOVASI DAERAH (BRIDA) KABUPATEN MIMIKA
+                  DOKUMEN ANALISIS KEBIJAKAN UTAMA
                 </h2>
                 <span className="text-[12px] font-bold text-teal-800 uppercase tracking-widest block">
                   NASKAH DIAGNOSTIK ANALISIS DEVIASI INDIKATOR DAERAH

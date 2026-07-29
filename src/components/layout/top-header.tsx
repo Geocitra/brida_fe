@@ -37,14 +37,14 @@ export const TopHeader: React.FC<TopHeaderProps> = ({ activeRoute, onNavigate, o
           title="Kembali ke Portal Utama"
         >
           <div className="w-8 h-8 bg-teal-700 flex items-center justify-center font-roboto font-bold text-white text-xs rounded-none shadow-xs group-hover:bg-teal-600 transition-colors">
-            BM
+            PB
           </div>
           <div className="flex flex-col">
             <span className="font-roboto font-bold text-sm tracking-wider text-teal-400 uppercase group-hover:text-teal-300 transition-colors">
-              BRIDA Mimika
+              Policy Brief
             </span>
             <span className="font-roboto text-[10px] text-slate-400 font-medium hidden sm:inline">
-              SMART Analysis Engine
+              Analysis Engine
             </span>
           </div>
         </button>

@@ -19,10 +19,10 @@ export const WelcomeHeader: React.FC = () => {
                     <span>Sistem Manajemen Pengetahuan Terintegrasi</span>
                 </span>
                 <h1 className="text-lg font-bold text-slate-900 tracking-tight uppercase">
-                    Selamat Datang, Bapak Darius Sabon Rain, S.E., M.Ec.Dev.
+                    Selamat Datang 
                 </h1>
                 <p className="text-xs text-slate-500 font-normal leading-relaxed max-w-3xl">
-                    Portal Analisis Kebijakan, Inovasi, dan Pusat Pengendali Spasial Badan Riset dan Inovasi Daerah (BRIDA) Kabupaten Mimika.
+                    Portal Analisis Kebijakan, Inovasi, dan Pusat Pengendali Spasial Terintegrasi.
                 </p>
             </div>
 
@@ -38,7 +38,7 @@ export const WelcomeHeader: React.FC = () => {
                     </span>
                     <span className="text-[10px] text-emerald-700 font-extrabold flex items-center gap-1.5">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                        Otorisasi Kepala BRIDA Aktif
+                        Otorisasi Executive Aktif
                     </span>
                 </div>
             </div>

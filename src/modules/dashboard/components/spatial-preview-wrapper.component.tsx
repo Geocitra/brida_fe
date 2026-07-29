@@ -54,7 +54,7 @@ export const SpatialPreviewWrapper: React.FC<SpatialPreviewWrapperProps> = ({
                         <span>Satelit Spasial & Pemetaan Wilayah</span>
                     </span>
                     <h3 className="text-sm font-black uppercase tracking-wider text-slate-900">
-                        Pratinjau Peta Sebaran Wilayah Mimika
+                        Pratinjau Peta Sebaran Wilayah
                     </h3>
                     <p className="text-[11px] text-slate-500 font-medium leading-relaxed">
                         Sistem PostGIS Spatial Engine pemantauan logistik fisik dan indikator pembangunan daerah.
@@ -129,7 +129,7 @@ export const SpatialPreviewWrapper: React.FC<SpatialPreviewWrapperProps> = ({
                             Command Center Spasial
                         </span>
                         <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider mb-1 leading-snug">
-                            Pusat Pengendali Mimika
+                            Pusat Pengendali
                         </h3>
 
                         <p className="text-[10px] text-slate-600 font-semibold leading-relaxed mb-4 max-w-[280px]">

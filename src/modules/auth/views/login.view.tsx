@@ -28,10 +28,10 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
             <Shield size={24} />
           </div>
           <h1 className="text-xl font-bold text-white tracking-wide uppercase">
-            BRIDA SMART Analysis
+            Policy Brief
           </h1>
           <p className="text-xs text-teal-400 font-medium mt-1">
-            Portal Eksekutif Kepala BRIDA Kabupaten Mimika
+            Portal Eksekutif
           </p>
         </div>
 
@@ -66,7 +66,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
 
             <div className="p-3 bg-teal-50 border border-teal-200 text-teal-800 text-xs flex items-center gap-2 rounded-none">
               <CheckCircle2 size={16} className="text-teal-600 shrink-0" />
-              <span>Akses Khusus Terotentikasi Kepala BRIDA Mimika</span>
+              <span>Akses Khusus Terotentikasi Executive</span>
             </div>
 
             <button
@@ -84,7 +84,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
         {/* Footer info */}
         <div className="px-6 py-3 bg-slate-100 border-t border-slate-300 text-center">
           <span className="text-[11px] text-slate-500 font-medium">
-            Zero-Knowledge Public Policy Engine &bull; Kabupaten Mimika
+            Zero-Knowledge Public Policy Engine
           </span>
         </div>
       </div>

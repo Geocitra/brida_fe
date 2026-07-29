@@ -47,7 +47,7 @@ const MOCK_DRILLDOWN_DETAILS: Record<number, {
         profile: {
             luas_wilayah: 2216,
             jumlah_penduduk: 142000,
-            deskripsi: "Distrik Mimika Baru berpusat di kota Timika, berfungsi sebagai episentrum aktivitas perekonomian, perbankan, industri kreatif, serta pusat pemerintahan Kabupaten Mimika. Kepadatan infrastruktur dasar di distrik ini merupakan yang paling maju di seluruh kabupaten.",
+            deskripsi: "Distrik Mimika Baru berpusat di kota Timika, berfungsi sebagai episentrum aktivitas perekonomian, perbankan, industri kreatif, serta pusat pemerintahan. Kepadatan infrastruktur dasar di distrik ini merupakan yang paling maju di seluruh kabupaten.",
             batas_wilayah: "Utara: Kuala Kencana, Selatan: Wania, Barat: Iwaka, Timur: Mimika Timur",
             images: ["https://picsum.photos/seed/m-baru-d1/320/180", "https://picsum.photos/seed/m-baru-d2/320/180"]
         },

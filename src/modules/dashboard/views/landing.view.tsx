@@ -94,9 +94,9 @@ export const LandingView: React.FC<LandingViewProps> = ({ onNavigate }) => {
     },
     {
       id: 'reports',
-      title: 'Laporan & Nota Dinas Bupati',
+      title: 'Laporan & Nota Dinas',
       badge: 'Executive Briefs',
-      desc: 'Pembuatan draf laporan eksekutif terstruktur, nota dinas taklimat Bupati Mimika, dan simulasi proyeksi dampak dari dinamika kebijakan nasional.',
+      desc: 'Pembuatan draf laporan eksekutif terstruktur, nota dinas taklimat eksekutif, dan simulasi proyeksi dampak dari dinamika kebijakan nasional.',
       icon: FileText,
       accentBg: 'bg-amber-500',
       accentLight: 'bg-amber-50',
@@ -181,11 +181,11 @@ export const LandingView: React.FC<LandingViewProps> = ({ onNavigate }) => {
       <header className="w-full bg-white/90 backdrop-blur-sm border-b border-slate-200 px-6 py-4 flex flex-col md:flex-row items-center justify-between gap-4 z-10 shadow-xs">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-teal-600 flex items-center justify-center font-bold text-white text-sm tracking-wider shadow-sm">
-            BM
+            PB
           </div>
           <div className="flex flex-col text-left">
             <span className="font-extrabold text-sm uppercase tracking-widest text-teal-700">
-              BRIDA KABUPATEN MIMIKA
+              POLICY BRIEF
             </span>
             <span className="text-[10px] text-slate-500 font-medium">
               Sistem Analisis Strategis &amp; Pendukung Keputusan Eksekutif
@@ -219,14 +219,14 @@ export const LandingView: React.FC<LandingViewProps> = ({ onNavigate }) => {
         <div className="text-center flex flex-col items-center">
           <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-teal-50 border border-teal-200 text-[10px] font-bold text-teal-700 uppercase tracking-widest mb-4">
             <Sparkles size={11} className="text-teal-500" />
-            PORTAL UTAMA KEPALA BADAN
+            PORTAL UTAMA EKSEKUTIF
           </div>
           <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-slate-900 uppercase">
-            BRIDA SMART ANALYSIS ENGINE
+            APLIKASI POLICY BRIEF
           </h1>
           <div className="w-16 h-1 bg-teal-500 mt-3 mb-3" />
           <p className="text-sm text-slate-500 max-w-2xl font-normal leading-relaxed text-center">
-            Pusat pengendali analitik Kabupaten Mimika. Silakan pilih instrumen cerdas di bawah untuk merancang kebijakan, menguji analisis deviasi, atau memantau metrik spasial.
+            Pusat pengendali analitik terintegrasi. Silakan pilih instrumen cerdas di bawah untuk merancang kebijakan, menguji analisis deviasi, atau memantau metrik spasial.
           </p>
         </div>
 
@@ -312,9 +312,9 @@ export const LandingView: React.FC<LandingViewProps> = ({ onNavigate }) => {
       <footer className="w-full bg-white/80 border-t border-slate-200 py-4 px-6 flex flex-col sm:flex-row items-center justify-between gap-2 text-[10px] text-slate-400 z-10">
         <div className="flex items-center gap-2">
           <Database size={11} className="text-teal-500" />
-          <span className="font-medium">BRIDA SMART Analysis Platform v2.4.0</span>
+          <span className="font-medium">Policy Brief Platform v2.4.0</span>
         </div>
-        <span>Hak Cipta © 2026 Pemerintah Kabupaten Mimika · Badan Riset dan Inovasi Daerah</span>
+        <span>Hak Cipta © 2026 Policy Brief</span>
       </footer>
 
     </div>

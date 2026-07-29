@@ -36,9 +36,9 @@ export function App() {
   });
 
   const pageTitles: Record<string, string> = {
-    landing: 'Portal Utama & Asisten Analisis BRIDA',
+    landing: 'Portal Utama & Asisten Analisis',
     dashboard: 'Dashboard Spasial & Metrik Perkembangan',
-    'gis-explorer': 'Pusat Pengendali Spasial Kabupaten Mimika',
+    'gis-explorer': 'Pusat Pengendali Spasial',
     'knowledge-hub': 'Knowledge Hub & Manajer Dokumen',
     analytics: 'Analisis Deterministik Statis',
     reports: 'Laporan Terstruktur & Matriks Rekap',

@@ -179,7 +179,7 @@ export const UploadDropzone: React.FC<UploadDropzoneProps> = ({ onUploadSuccess 
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="Contoh: RPJMD Kabupaten Mimika 2026"
+              placeholder="Contoh: RPJMD Daerah 2026"
               required
               className="w-full bg-white border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:border-teal-600 rounded-none"
             />

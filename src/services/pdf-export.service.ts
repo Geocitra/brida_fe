@@ -182,7 +182,7 @@ export const PdfExportService = {
         }
       },
       header: {
-        text: 'BRIDA SMART ANALYSIS — KABUPATEN MIMIKA',
+        text: 'POLICY BRIEF ANALYSIS',
         alignment: 'right',
         fontSize: 8,
         color: '#94a3b8',
@@ -190,7 +190,7 @@ export const PdfExportService = {
       },
       footer: (currentPage: number, pageCount: number) => ({
         columns: [
-          { text: 'Naskah Publikasi Resmi BRIDA Kabupaten Mimika', fontSize: 8, color: '#94a3b8' },
+          { text: 'Naskah Publikasi Resmi', fontSize: 8, color: '#94a3b8' },
           { text: `Halaman ${currentPage} dari ${pageCount}`, alignment: 'right', fontSize: 8, color: '#94a3b8' },
         ],
         margin: [marginPoints, 10, marginPoints, 0],
@@ -402,9 +402,9 @@ export const PdfExportService = {
       }),
       content: [
         // ── Kop Surat ──────────────────────────────────────────────────────────
-        { text: 'PEMERINTAH KABUPATEN MIMIKA', fontSize: 13, bold: true, alignment: 'center', color: '#0f172a' },
-        { text: 'BADAN RISET DAN INOVASI DAERAH (BRIDA)', fontSize: 11, bold: true, alignment: 'center', color: '#0d9488', margin: [0, 3, 0, 3] },
-        { text: 'Jl. Cenderawasih No. 1, Timika, Papua Tengah', fontSize: 8.5, alignment: 'center', color: '#565c63', margin: [0, 0, 0, 10] },
+        { text: 'DOKUMEN REKOMENDASI KEBIJAKAN', fontSize: 13, bold: true, alignment: 'center', color: '#0f172a' },
+        { text: 'ANALISIS POLICY BRIEF', fontSize: 11, bold: true, alignment: 'center', color: '#0d9488', margin: [0, 3, 0, 3] },
+        { text: 'Sistem Informasi dan Dashboard Kebijakan Terintegrasi', fontSize: 8.5, alignment: 'center', color: '#565c63', margin: [0, 0, 0, 10] },
         {
           canvas: [{ type: 'line', x1: 0, y1: 0, x2: 495, y2: 0, lineWidth: 2, lineColor: '#0f172a' }],
           margin: [0, 0, 0, 14],
@@ -479,7 +479,7 @@ export const PdfExportService = {
           margin: [0, 0, 0, 18],
         },
         // ── Seksi 3 ────────────────────────────────────────────────────────────
-        { text: '3. REKOMENDASI ACTION PLAN BUPATI', style: 'sectionHeader', margin: [0, 20, 0, 8] },
+        { text: '3. REKOMENDASI ACTION PLAN EKSEKUTIF', style: 'sectionHeader', margin: [0, 20, 0, 8] },
         {
           ol: report.actionPriorities.map((act: string) => ({
             text: stripCitationTokens(act),
@@ -497,9 +497,9 @@ export const PdfExportService = {
             {
               width: 200,
               stack: [
-                { text: 'Tim Analis Kebijakan BRIDA,', fontSize: 9, alignment: 'center' },
+                { text: 'Tim Analis Kebijakan,', fontSize: 9, alignment: 'center' },
                 { text: '\n\n\n', fontSize: 9 },
-                { text: 'Kepala BRIDA Kabupaten Mimika', fontSize: 9.5, bold: true, alignment: 'center' },
+                { text: 'Analis Kebijakan Utama', fontSize: 9.5, bold: true, alignment: 'center' },
                 { text: 'NIP. 19780412 200312 1 002', fontSize: 8.5, alignment: 'center', color: '#475569', margin: [0, 2, 0, 0] },
               ],
             },

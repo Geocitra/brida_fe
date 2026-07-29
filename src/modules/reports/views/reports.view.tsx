@@ -311,10 +311,10 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
     };
 
     setCurrentReport({
-      title: sanitizeReportText(reportDetail.title || payload.title || 'Laporan Eksekutif Resmi Bupati'),
+      title: sanitizeReportText(reportDetail.title || payload.title || 'Laporan Eksekutif Resmi'),
       urgency: sanitizeReportText(payload.urgency || 'TINGGI'),
-      recipient: sanitizeReportText(payload.recipient || 'Bupati Mimika'),
-      sender: sanitizeReportText(payload.sender || 'Kepala Badan Riset dan Inovasi Daerah (BRIDA) Kabupaten Mimika'),
+      recipient: sanitizeReportText(payload.recipient || 'Eksekutif'),
+      sender: sanitizeReportText(payload.sender || 'Analis Kebijakan Utama'),
       period: sanitizeReportText(payload.period || 'Triwulan IV 2024 / Sintesis Multidokumen'),
       date: sanitizeReportText(payload.date || new Date(reportDetail.createdAt).toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' })),
       executiveSummary: sanitizeReportText(reportDetail.executiveSummary || payload.executiveSummary),
@@ -549,7 +549,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                 <div>
                   <span className="text-xs font-bold text-teal-800 uppercase tracking-widest block mb-1 items-center gap-1.5">
                     <Building2 size={14} className="text-teal-700" />
-                    <span>PEMERINTAH KABUPATEN MIMIKA &bull; BRIDA SMART ANALYSIS</span>
+                    <span>DOKUMEN REKOMENDASI KEBIJAKAN &bull; POLICY BRIEF</span>
                   </span>
                   <h1 className="text-2xl font-bold text-slate-900 uppercase tracking-wide">
                     {currentReport.title}
@@ -694,14 +694,6 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
               >
                 {isExportingPdf ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
                 <span>{isExportingPdf ? 'Merakit PDF Vector...' : 'Ekspor PDF'}</span>
-              </button>
-
-              <button
-                onClick={handleSendWa}
-                className="px-4 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-2 border border-emerald-800 shadow-xs"
-              >
-                <Send size={14} />
-                <span>Kirim Langsung ke WA Bupati</span>
               </button>
 
               <button
@@ -885,7 +877,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                   type="text"
                   value={uploadTitle}
                   onChange={(e) => setUploadTitle(e.target.value)}
-                  placeholder="Contoh: Laporan Pertumbuhan Ekonomi Kabupaten Mimika 2024"
+                  placeholder="Contoh: Laporan Pertumbuhan Ekonomi Daerah 2024"
                   required
                   className="w-full text-xs p-2.5 border border-slate-300 focus:outline-none focus:border-teal-700"
                 />

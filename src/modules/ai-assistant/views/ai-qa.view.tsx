@@ -93,15 +93,6 @@ export const AiQaView: React.FC<AiQaViewProps> = ({
             Tanyakan konteks atau analisis isi dokumen acuan secara langsung menggunakan model LLM terintegrasi.
           </p>
         </div>
-
-        <button
-          onClick={() => onNavigateToGenerator()}
-          className="px-4 py-2.5 bg-teal-700 hover:bg-teal-800 text-white text-xs font-bold uppercase tracking-wider rounded-none inline-flex items-center gap-2 transition-all cursor-pointer shrink-0 border border-teal-800 shadow-xs"
-        >
-          <PenTool size={14} />
-          <span>Buat Artikel Publikasi</span>
-          <ArrowRight size={14} />
-        </button>
       </div>
 
       {/* Connection error banner if any */}

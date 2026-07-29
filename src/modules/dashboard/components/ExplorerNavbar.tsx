@@ -73,8 +73,8 @@ export default function ExplorerNavbar({
         if (navigator.share) {
             try {
                 await navigator.share({
-                    title: 'Smart Analysis - Eksplorasi Spasial',
-                    text: `Lihat data analisis spasial ${activeIndicator || 'Kabupaten Mimika'} di BRIDA DataHub.`,
+                    title: 'Policy Brief - Eksplorasi Spasial',
+                    text: `Lihat data analisis spasial ${activeIndicator || 'Wilayah'} di DataHub.`,
                     url: shareUrl,
                 });
                 return;
@@ -117,7 +117,7 @@ export default function ExplorerNavbar({
                 >
                     <div className="flex flex-col leading-none text-left">
                         <span className="text-sm font-black text-slate-800 tracking-tighter uppercase">
-                            Smart <span className="text-teal-600">Analysis</span>
+                            Policy <span className="text-teal-600">Brief</span>
                         </span>
                         <span className="text-[9px] text-slate-400 font-bold tracking-[0.2em] uppercase">
                             Eksplorasi Spasial
