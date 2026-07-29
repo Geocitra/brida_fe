@@ -172,11 +172,12 @@ export const AiAssistantService = {
     documentIds?: string[],
     tone?: string,
     targetLength?: string,
+    districts?: string[],
   ): Promise<AiInteractResult> {
     const result = await safeFetch(`${API_BASE_URL}/assistant/interact`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sessionId, query, attachments, currentDraft, documentIds, tone, targetLength }),
+      body: JSON.stringify({ sessionId, query, attachments, currentDraft, documentIds, tone, targetLength, districts }),
     });
     return result.data as AiInteractResult; // Mengembalikan data murni bertipe kuat
   },
