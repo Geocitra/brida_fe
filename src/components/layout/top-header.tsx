@@ -7,6 +7,7 @@ import {
   MessageSquareCode,
   PenTool,
   LogOut,
+  Atom,
 } from 'lucide-react';
 
 
@@ -19,9 +20,9 @@ interface TopHeaderProps {
 export const TopHeader: React.FC<TopHeaderProps> = ({ activeRoute, onNavigate, onLogout }) => {
   const navItems = [
     { id: 'dashboard', label: 'Dashboard Spasial', icon: LayoutDashboard },
-    { id: 'generator', label: 'Generator Artikel', icon: PenTool },
+    { id: 'generator', label: 'Artikel Generator', icon: PenTool },
     { id: 'ai-request', label: 'AI Chat', icon: MessageSquareCode },
-    { id: 'analytics', label: 'Analisis', icon: BarChart3 },
+    { id: 'analytics', label: 'Analisa Kebijakan', icon: BarChart3 },
     { id: 'reports', label: 'Laporan', icon: FileText },
     { id: 'knowledge-hub', label: 'Repositori Dokumen', icon: FolderOpen },
   ];
@@ -36,15 +37,13 @@ export const TopHeader: React.FC<TopHeaderProps> = ({ activeRoute, onNavigate, o
           className="flex items-center gap-2.5 shrink-0 cursor-pointer hover:opacity-90 active:scale-98 transition-all group text-left bg-transparent border-none p-0"
           title="Kembali ke Portal Utama"
         >
-          <div className="w-8 h-8 bg-teal-700 flex items-center justify-center font-roboto font-bold text-white text-xs rounded-none shadow-xs group-hover:bg-teal-600 transition-colors">
-            PB
-          </div>
+          <FileText size={20} className="text-teal-400 group-hover:text-teal-300 transition-colors shrink-0" />
           <div className="flex flex-col">
             <span className="font-roboto font-bold text-sm tracking-wider text-teal-400 uppercase group-hover:text-teal-300 transition-colors">
-              Policy Brief
+              AKLS
             </span>
             <span className="font-roboto text-[10px] text-slate-400 font-medium hidden sm:inline">
-              Analysis Engine
+              Aplikasi Analisa Kebijakan &amp; Laporan Strategis
             </span>
           </div>
         </button>

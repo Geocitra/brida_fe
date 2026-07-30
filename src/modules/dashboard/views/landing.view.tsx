@@ -12,7 +12,8 @@ import {
   Database,
   Globe,
   Cpu,
-  Activity
+  Activity,
+  Atom
 } from 'lucide-react';
 
 interface LandingViewProps {
@@ -52,7 +53,7 @@ export const LandingView: React.FC<LandingViewProps> = ({ onNavigate }) => {
   const mainModules = [
     {
       id: 'generator',
-      title: 'Generator Artikel & Kebijakan',
+      title: 'Generator Artikel & Laporan',
       badge: 'AI Co-Writer',
       desc: 'Collaborative workspace untuk merancang naskah publikasi kebijakan, draf artikel ilmiah, dan opini publik berbasis integrasi data dokumen secara instan.',
       icon: PenTool,
@@ -80,7 +81,7 @@ export const LandingView: React.FC<LandingViewProps> = ({ onNavigate }) => {
     },
     {
       id: 'analytics',
-      title: 'Lembar Diagnostik & Analisis',
+      title: 'Lembar Diagnostik & Analisisa Kebijakan',
       badge: 'Causal Inference',
       desc: 'Sistem analisis deviasi capaian kinerja antara baseline target pembangunan vs realisasi lapangan dengan pemodelan faktor penyebab (AI).',
       icon: BarChart3,
@@ -180,15 +181,13 @@ export const LandingView: React.FC<LandingViewProps> = ({ onNavigate }) => {
       {/* ── HEADER ── */}
       <header className="w-full bg-white/90 backdrop-blur-sm border-b border-slate-200 px-6 py-4 flex flex-col md:flex-row items-center justify-between gap-4 z-10 shadow-xs">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-teal-600 flex items-center justify-center font-bold text-white text-sm tracking-wider shadow-sm">
-            PB
-          </div>
+          <FileText size={24} className="text-teal-600 shrink-0" />
           <div className="flex flex-col text-left">
             <span className="font-extrabold text-sm uppercase tracking-widest text-teal-700">
-              POLICY BRIEF
+              AKLS
             </span>
             <span className="text-[10px] text-slate-500 font-medium">
-              Sistem Analisis Strategis &amp; Pendukung Keputusan Eksekutif
+              Aplikasi Analisa Kebijakan &amp; Laporan Strategis
             </span>
           </div>
         </div>
@@ -222,7 +221,7 @@ export const LandingView: React.FC<LandingViewProps> = ({ onNavigate }) => {
             PORTAL UTAMA EKSEKUTIF
           </div>
           <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-slate-900 uppercase">
-            APLIKASI POLICY BRIEF
+            Aplikasi Analisa Kebijakan &amp; Laporan Strategis
           </h1>
           <div className="w-16 h-1 bg-teal-500 mt-3 mb-3" />
           <p className="text-sm text-slate-500 max-w-2xl font-normal leading-relaxed text-center">
@@ -312,9 +311,9 @@ export const LandingView: React.FC<LandingViewProps> = ({ onNavigate }) => {
       <footer className="w-full bg-white/80 border-t border-slate-200 py-4 px-6 flex flex-col sm:flex-row items-center justify-between gap-2 text-[10px] text-slate-400 z-10">
         <div className="flex items-center gap-2">
           <Database size={11} className="text-teal-500" />
-          <span className="font-medium">Policy Brief Platform v2.4.0</span>
+          <span className="font-medium"> AKLS Platform v1.1.0</span>
         </div>
-        <span>Hak Cipta © 2026 Policy Brief</span>
+        <span>Hak Cipta © 2026 AKLS</span>
       </footer>
 
     </div>

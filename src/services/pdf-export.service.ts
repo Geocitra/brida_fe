@@ -182,7 +182,7 @@ export const PdfExportService = {
         }
       },
       header: {
-        text: 'POLICY BRIEF ANALYSIS',
+        text: 'Geo Analisis ANALYSIS',
         alignment: 'right',
         fontSize: 8,
         color: '#94a3b8',
@@ -403,7 +403,7 @@ export const PdfExportService = {
       content: [
         // ── Kop Surat ──────────────────────────────────────────────────────────
         { text: 'DOKUMEN REKOMENDASI KEBIJAKAN', fontSize: 13, bold: true, alignment: 'center', color: '#0f172a' },
-        { text: 'ANALISIS POLICY BRIEF', fontSize: 11, bold: true, alignment: 'center', color: '#0d9488', margin: [0, 3, 0, 3] },
+        { text: 'ANALISIS Geo Analisis', fontSize: 11, bold: true, alignment: 'center', color: '#0d9488', margin: [0, 3, 0, 3] },
         { text: 'Sistem Informasi dan Dashboard Kebijakan Terintegrasi', fontSize: 8.5, alignment: 'center', color: '#565c63', margin: [0, 0, 0, 10] },
         {
           canvas: [{ type: 'line', x1: 0, y1: 0, x2: 495, y2: 0, lineWidth: 2, lineColor: '#0f172a' }],

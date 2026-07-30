@@ -28,7 +28,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
             <Shield size={24} />
           </div>
           <h1 className="text-xl font-bold text-white tracking-wide uppercase">
-            Policy Brief
+            Geo Analisis
           </h1>
           <p className="text-xs text-teal-400 font-medium mt-1">
             Portal Eksekutif

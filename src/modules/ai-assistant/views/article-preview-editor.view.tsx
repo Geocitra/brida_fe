@@ -325,7 +325,7 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
             <span>Kembali ke AI Editor</span>
           </button>
           <h1 className="text-xl font-bold uppercase text-slate-900 tracking-tight mt-1">
-            Redaksi &amp; Layouting Cetak (A4)
+            Sunting Naskah Artikel &amp; Layouting Cetak (A4)
           </h1>
           <p className="text-xs text-slate-500 font-normal mt-1">
             Sesi Cetak: <span className="font-bold text-slate-700">{articleTitle || activeSession.title}</span>

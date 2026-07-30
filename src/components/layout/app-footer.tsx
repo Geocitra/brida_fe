@@ -11,14 +11,14 @@ export const AppFooter: React.FC = () => {
         <div className="flex flex-col">
           <div className="flex items-center gap-2">
             <span className="text-xs font-bold text-slate-900 tracking-wide uppercase">
-              Policy Brief
+              AKLS
             </span>
             <span className="text-[10px] bg-teal-100 text-teal-800 font-semibold px-1.5 py-0.5 rounded-none uppercase">
               Dashboard
             </span>
           </div>
           <p className="text-[11px] text-slate-500 font-normal mt-1">
-            Sistem Data Analisis &amp; Infrastructure Knowledge Warehouse — © {currentYear} Policy Brief. All rights reserved.
+            Aplikasi Analisa Kebijakan &amp; Laporan Strategis — © {currentYear} Geo Analisis. All rights reserved.
           </p>
         </div>
 

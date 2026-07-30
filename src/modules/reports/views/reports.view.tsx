@@ -400,10 +400,10 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
       <div className="w-full bg-white border border-slate-300 px-6 py-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4 rounded-none shadow-2xs no-print">
         <div className="flex flex-col">
           <h1 className="text-xl font-bold uppercase text-slate-900 tracking-tight">
-            Laporan Strategis &amp; Nota Dinas Bupati
+            Laporan Strategis
           </h1>
           <p className="text-xs text-slate-500 font-normal mt-1">
-            Penyusunan dan generasi laporan eksekutif multidokumen untuk bahan rekomendasi pengambilan keputusan Bupati Mimika.
+            Penyusunan dan generasi laporan eksekutif multidokumen untuk bahan rekomendasi pengambilan keputusan.
           </p>
         </div>
 
@@ -549,7 +549,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                 <div>
                   <span className="text-xs font-bold text-teal-800 uppercase tracking-widest block mb-1 items-center gap-1.5">
                     <Building2 size={14} className="text-teal-700" />
-                    <span>DOKUMEN REKOMENDASI KEBIJAKAN &bull; POLICY BRIEF</span>
+                    <span>DOKUMEN REKOMENDASI KEBIJAKAN &bull; Geo Analisis</span>
                   </span>
                   <h1 className="text-2xl font-bold text-slate-900 uppercase tracking-wide">
                     {currentReport.title}

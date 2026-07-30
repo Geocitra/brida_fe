@@ -428,10 +428,10 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
       <div className="w-full bg-white border border-slate-300 px-6 py-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4 rounded-none shadow-2xs">
         <div className="flex flex-col">
           <h1 className="text-xl font-bold uppercase text-slate-900 tracking-tight">
-            Analisis Deviasi Multidokumen
+            Analisa Kebijakan Berbasis AI
           </h1>
           <p className="text-xs text-slate-500 font-normal mt-1">
-            Pilih dokumen acuan Target dan Realisasi untuk mengeksekusi analisis perbandingan deviasi capaian kinerja secara deterministik.
+            Pilih dokumen acuan Target dan Realisasi untuk mengeksekusi analisis kebijakan dan perbandingan deviasi capaian kinerja.
           </p>
         </div>
 
@@ -753,7 +753,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
           { }
           <div className="flex items-center justify-between bg-white border border-slate-300 p-3 rounded-none">
             <span className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-              Hasil Diagnostik Deviasi: {compareResult?.math?.indicatorName || 'Analisis Multidokumen'}
+              Hasil Analisa Kebijakan: {compareResult?.math?.indicatorName || 'Analisis Multidokumen'}
             </span>
             <div className="flex items-center gap-2">
               <button

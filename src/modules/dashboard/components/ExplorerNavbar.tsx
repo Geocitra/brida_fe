@@ -73,7 +73,7 @@ export default function ExplorerNavbar({
         if (navigator.share) {
             try {
                 await navigator.share({
-                    title: 'Policy Brief - Eksplorasi Spasial',
+                    title: 'Geo Analisis - Eksplorasi Spasial',
                     text: `Lihat data analisis spasial ${activeIndicator || 'Wilayah'} di DataHub.`,
                     url: shareUrl,
                 });
@@ -117,7 +117,7 @@ export default function ExplorerNavbar({
                 >
                     <div className="flex flex-col leading-none text-left">
                         <span className="text-sm font-black text-slate-800 tracking-tighter uppercase">
-                            Policy <span className="text-teal-600">Brief</span>
+                            Aplikasi <span className="text-teal-600">AKLS</span>
                         </span>
                         <span className="text-[9px] text-slate-400 font-bold tracking-[0.2em] uppercase">
                             Eksplorasi Spasial
@@ -164,15 +164,15 @@ export default function ExplorerNavbar({
                 <div className="flex items-center gap-3 py-1.5 group select-none">
                     {/* Square Avatar (Gaya AV Siku Tegas) */}
                     <div className="w-9 h-9 bg-teal-50 text-teal-700 flex items-center justify-center text-xs font-black border border-teal-100/50 rounded-none shrink-0 shadow-sm">
-                        {DARIUS_PROFILE.initials}
+                        US
                     </div>
 
                     <div className="hidden sm:flex flex-col items-start leading-tight">
                         <span className="text-[11px] font-black text-slate-800 uppercase tracking-tight line-clamp-1 max-w-44">
-                            {DARIUS_PROFILE.full_name}
+                            User
                         </span>
                         <span className="text-[9px] text-teal-600 font-bold uppercase tracking-widest mt-0.5">
-                            {DARIUS_PROFILE.role}
+                            Pemda
                         </span>
                     </div>
                 </div>

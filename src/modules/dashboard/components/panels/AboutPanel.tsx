@@ -29,7 +29,7 @@ export default function AboutPanel() {
                 </div>
                 <div className="space-y-1">
                     <h2 className="text-sm font-black text-slate-800 tracking-wider leading-none uppercase">
-                        Policy Brief <span className="text-teal-700">DataHub</span>
+                        Geo Analisis <span className="text-teal-700">DataHub</span>
                     </h2>
                     <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.25em] leading-none mt-1">
                         v1.0.0-dev Spasial Engine
@@ -123,7 +123,7 @@ export default function AboutPanel() {
                 {/* Footer Copyright */}
                 <div className="px-4 py-6 bg-white select-none">
                     <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest text-center leading-relaxed">
-                        © 2026 Policy Brief.
+                        © 2026 Geo Analisis.
                     </p>
                 </div>
             </div>

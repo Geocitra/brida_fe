@@ -4,24 +4,28 @@
 --- FILE: index.html ---
 <!doctype html>
 <html lang="id">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>BRIDA SMART Analysis - Executive Dashboard</title>
 
-    <meta name="theme-color" content="#ffffff" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Geo Analisis - Executive Dashboard</title>
 
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,300;0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
-  </head>
-  <body class="bg-slate-50 text-slate-900 antialiased font-roboto">
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+  <meta name="theme-color" content="#ffffff" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,300;0,400;0,500;0,700;1,400&display=swap"
+    rel="stylesheet">
+</head>
+
+<body class="bg-slate-50 text-slate-900 antialiased font-roboto">
+  <div id="root"></div>
+  <script type="module" src="/src/main.tsx"></script>
+</body>
+
 </html>
 
 --- FILE: package.json ---
@@ -465,9 +469,9 @@ export function App() {
   });
 
   const pageTitles: Record<string, string> = {
-    landing: 'Portal Utama & Asisten Analisis BRIDA',
+    landing: 'Portal Utama & Asisten Analisis',
     dashboard: 'Dashboard Spasial & Metrik Perkembangan',
-    'gis-explorer': 'Pusat Pengendali Spasial Kabupaten Mimika',
+    'gis-explorer': 'Pusat Pengendali Spasial',
     'knowledge-hub': 'Knowledge Hub & Manajer Dokumen',
     analytics: 'Analisis Deterministik Statis',
     reports: 'Laporan Terstruktur & Matriks Rekap',
@@ -506,11 +510,26 @@ export function App() {
     }
   };
 
-  const handleManualNavigation = (route: string) => {
+  const handleManualNavigation = (route: string, sessionId?: string | null) => {
     handleClearSharedDocIds();
     setInitialArticlePrompt(undefined);
-    setActiveSessionId(null);
-    setActiveRoute(route);
+
+    let finalRoute = route;
+    let finalSessionId = sessionId || null;
+
+    if (route.includes('?')) {
+      const [rPath, query] = route.split('?');
+      finalRoute = rPath;
+      try {
+        const params = new URLSearchParams(query);
+        finalSessionId = params.get('session') || finalSessionId;
+      } catch (e) {
+        console.error('Gagal memparsing query parameters:', e);
+      }
+    }
+
+    setActiveSessionId(finalSessionId);
+    setActiveRoute(finalRoute);
   };
 
   if (!isAuthenticated) {
@@ -568,6 +587,7 @@ export function App() {
             initialSelectedDocIds={sharedDocIds}
             onClearSharedDocIds={handleClearSharedDocIds}
             onNavigateToGenerator={(prompt) => handleForwardAction(sharedDocIds || [], 'generator', prompt)}
+            initialSessionId={activeSessionId}
           />
         );
       case 'generator':
@@ -813,6 +833,16 @@ path.leaflet-interactive:focus-visible {
 
   .border {
     border-color: #94a3b8 !important;
+  }
+}
+
+@keyframes scan {
+  0% {
+    transform: translateY(-100vh);
+  }
+
+  100% {
+    transform: translateY(100vh);
   }
 }
 
@@ -1217,14 +1247,14 @@ export const AppFooter: React.FC = () => {
         <div className="flex flex-col">
           <div className="flex items-center gap-2">
             <span className="text-xs font-bold text-slate-900 tracking-wide uppercase">
-              Badan Riset dan Inovasi Daerah (BRIDA)
+              Geo Analisis
             </span>
             <span className="text-[10px] bg-teal-100 text-teal-800 font-semibold px-1.5 py-0.5 rounded-none uppercase">
-              Kabupaten Mimika
+              Dashboard
             </span>
           </div>
           <p className="text-[11px] text-slate-500 font-normal mt-1">
-            Sistem Data Analisis &amp; Infrastructure Knowledge Warehouse — © {currentYear} BRIDA Mimika. All rights reserved.
+            Sistem Data Analisis &amp; Infrastructure Knowledge Warehouse — © {currentYear} Geo Analisis. All rights reserved.
           </p>
         </div>
 
@@ -1289,6 +1319,7 @@ import {
   MessageSquareCode,
   PenTool,
   LogOut,
+  Atom,
 } from 'lucide-react';
 
 interface TopHeaderProps {
@@ -1300,9 +1331,9 @@ interface TopHeaderProps {
 export const TopHeader: React.FC<TopHeaderProps> = ({ activeRoute, onNavigate, onLogout }) => {
   const navItems = [
     { id: 'dashboard', label: 'Dashboard Spasial', icon: LayoutDashboard },
-    { id: 'generator', label: 'Generator Artikel', icon: PenTool },
+    { id: 'generator', label: 'Artikel Generator', icon: PenTool },
     { id: 'ai-request', label: 'AI Chat', icon: MessageSquareCode },
-    { id: 'analytics', label: 'Analisis', icon: BarChart3 },
+    { id: 'analytics', label: 'Analisa Kebijakan', icon: BarChart3 },
     { id: 'reports', label: 'Laporan', icon: FileText },
     { id: 'knowledge-hub', label: 'Repositori Dokumen', icon: FolderOpen },
   ];
@@ -1317,15 +1348,13 @@ export const TopHeader: React.FC<TopHeaderProps> = ({ activeRoute, onNavigate, o
           className="flex items-center gap-2.5 shrink-0 cursor-pointer hover:opacity-90 active:scale-98 transition-all group text-left bg-transparent border-none p-0"
           title="Kembali ke Portal Utama"
         >
-          <div className="w-8 h-8 bg-teal-700 flex items-center justify-center font-roboto font-bold text-white text-xs rounded-none shadow-xs group-hover:bg-teal-600 transition-colors">
-            BM
-          </div>
+          <FileText size={20} className="text-teal-400 group-hover:text-teal-300 transition-colors shrink-0" />
           <div className="flex flex-col">
             <span className="font-roboto font-bold text-sm tracking-wider text-teal-400 uppercase group-hover:text-teal-300 transition-colors">
-              BRIDA Mimika
+              Geo Analisis
             </span>
             <span className="font-roboto text-[10px] text-slate-400 font-medium hidden sm:inline">
-              SMART Analysis Engine
+              Analysis Engine
             </span>
           </div>
         </button>
@@ -2356,6 +2385,7 @@ interface ChatPanelProps {
   onArticleIntentDetected?: (promptText: string) => void;
   onLoadingChange?: (loading: boolean) => void;
   onDraftUpdated?: (newDraft: string, title: string) => void;
+  initialSessionId?: string | null;
 }
 
 export const ChatPanel: React.FC<ChatPanelProps> = ({
@@ -2367,12 +2397,13 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   onArticleIntentDetected,
   onLoadingChange,
   onDraftUpdated,
+  initialSessionId,
 }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputQuery, setInputQuery] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [detectedArticlePrompt, setDetectedArticlePrompt] = useState<string | null>(null);
-  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [sessionId, setSessionId] = useState<string | null>(initialSessionId || null);
   const [sessionError, setSessionError] = useState<string | null>(null);
 
   const [lastFailedQuery, setLastFailedQuery] = useState<string | null>(null);
@@ -2412,7 +2443,13 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
   useEffect(() => {
     loadQaSessionsHistory();
-  }, []);
+  }, [initialSessionId]);
+
+  useEffect(() => {
+    if (initialSessionId) {
+      handleSelectQaSession(initialSessionId);
+    }
+  }, [initialSessionId]);
 
   const loadQaSessionsHistory = async () => {
     setIsLoadingHistory(true);
@@ -2420,8 +2457,9 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       const history = await AiAssistantService.listQaSessions();
       setQaSessions(history || []);
 
-      if (!sessionId && history && history.length > 0) {
-        handleSelectQaSession(history[0].id);
+      const targetSessionId = initialSessionId || (history && history.length > 0 ? history[0].id : null);
+      if (targetSessionId) {
+        handleSelectQaSession(targetSessionId);
       }
     } catch (err: any) {
       console.error('Gagal memuat riwayat sesi Q&A:', err);
@@ -3770,12 +3808,14 @@ interface AiQaViewProps {
   onNavigateToGenerator: (initialPrompt?: string) => void;
   initialSelectedDocIds?: string[];
   onClearSharedDocIds?: () => void;
+  initialSessionId?: string | null;
 }
 
 export const AiQaView: React.FC<AiQaViewProps> = ({
   onNavigateToGenerator,
   initialSelectedDocIds,
   onClearSharedDocIds,
+  initialSessionId,
 }) => {
   const [documents, setDocuments] = useState<DocumentRecord[]>([]);
   const [selectedDocIds, setSelectedDocIds] = useState<string[]>([]);
@@ -3838,15 +3878,6 @@ export const AiQaView: React.FC<AiQaViewProps> = ({
             Tanyakan konteks atau analisis isi dokumen acuan secara langsung menggunakan model LLM terintegrasi.
           </p>
         </div>
-
-        <button
-          onClick={() => onNavigateToGenerator()}
-          className="px-4 py-2.5 bg-teal-700 hover:bg-teal-800 text-white text-xs font-bold uppercase tracking-wider rounded-none inline-flex items-center gap-2 transition-all cursor-pointer shrink-0 border border-teal-800 shadow-xs"
-        >
-          <PenTool size={14} />
-          <span>Buat Artikel Publikasi</span>
-          <ArrowRight size={14} />
-        </button>
       </div>
 
       {}
@@ -3889,6 +3920,7 @@ export const AiQaView: React.FC<AiQaViewProps> = ({
           documentTitles={selectedDocs.map((d) => d.title)}
           onArticleIntentDetected={(promptText) => onNavigateToGenerator(promptText)}
           onLoadingChange={(loading) => setIsAiProcessing(loading)}
+          initialSessionId={initialSessionId}
         />
       )}
     </div>
@@ -5858,11 +5890,11 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
                     summary: stripCitationTokens(r.executiveSummary) || 'Sintesis analisis tersimpan di database PostgreSQL.',
                     causalFactors: [
                       { factor: 'Keterlambatan Evaluasi Teknis Proyek', weightPercentage: 45, category: 'Administrasi', description: 'Keterlambatan pengesahan berkas kelengkapan.' },
-                      { factor: 'Eskalasi Biaya Material Daerah', weightPercentage: 35, category: 'Ekonomi', description: 'Fluktuasi harga bahan di Kabupaten Mimika.' },
+                      { factor: 'Eskalasi Biaya Material Daerah', weightPercentage: 35, category: 'Ekonomi', description: 'Fluktuasi harga bahan daerah.' },
                       { factor: 'Kondisi Cuaca Ekstrem', weightPercentage: 20, category: 'Lingkungan', description: 'Hambatan cuaca pada pengerjaan fisik.' },
                     ],
                     recommendations: [
-                      { id: 'db-rec-1', actionTitle: 'Percepatan Evaluasi & Verifikasi Proyek', pic: 'Dinas PU & BRIDA', deadline: '30 Hari', estimatedCostText: 'Rp 100 Juta', priority: 'TINGGI', status: 'IN_PROGRESS' },
+                      { id: 'db-rec-1', actionTitle: 'Percepatan Evaluasi & Verifikasi Proyek', pic: 'Dinas PU', deadline: '30 Hari', estimatedCostText: 'Rp 100 Juta', priority: 'TINGGI', status: 'IN_PROGRESS' },
                     ],
                   },
                 },
@@ -6081,10 +6113,10 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
       <div className="w-full bg-white border border-slate-300 px-6 py-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4 rounded-none shadow-2xs">
         <div className="flex flex-col">
           <h1 className="text-xl font-bold uppercase text-slate-900 tracking-tight">
-            Analisis Deviasi Multidokumen
+            Analisa Kebijakan Berbasis AI
           </h1>
           <p className="text-xs text-slate-500 font-normal mt-1">
-            Pilih dokumen acuan Target dan Realisasi untuk mengeksekusi analisis perbandingan deviasi capaian kinerja secara deterministik.
+            Pilih dokumen acuan Target dan Realisasi untuk mengeksekusi analisis kebijakan dan perbandingan deviasi capaian kinerja.
           </p>
         </div>
 
@@ -6406,7 +6438,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
           { }
           <div className="flex items-center justify-between bg-white border border-slate-300 p-3 rounded-none">
             <span className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-              Hasil Diagnostik Deviasi: {compareResult?.math?.indicatorName || 'Analisis Multidokumen'}
+              Hasil Analisa Kebijakan: {compareResult?.math?.indicatorName || 'Analisis Multidokumen'}
             </span>
             <div className="flex items-center gap-2">
               <button
@@ -6418,22 +6450,11 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
                 <span>{isExportingPdf ? 'Mencetak PDF...' : 'Ekspor PDF'}</span>
               </button>
 
-              <button
-                onClick={() =>
-                  alert(`Kirim Laporan Nota Eksekutif ${compareResult?.math?.indicatorName} langsung ke WhatsApp Bupati Mimika.`)
-                }
-                disabled={!compareResult}
-                className="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 disabled:bg-slate-400 text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-1.5 border border-emerald-800 shadow-xs"
-              >
-                <Send size={12} />
-                <span>Kirim WA Bupati</span>
-              </button>
-
               {onNavigateToGenerator && compareResult && (
                 <button
                   onClick={() =>
                     onNavigateToGenerator(
-                      `Buatkan artikel publikasi mengenai analisis deviasi ${compareResult.math.indicatorName} di Kabupaten Mimika.`,
+                      `Buatkan artikel publikasi mengenai analisis deviasi ${compareResult.math.indicatorName}.`,
                     )
                   }
                   className="px-3 py-1.5 bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-1.5 border border-teal-700 shadow-xs"
@@ -6451,7 +6472,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
               <div>
                 <h2 className="text-base font-bold text-slate-900 uppercase tracking-tight">
-                  BADAN RISET DAN INOVASI DAERAH (BRIDA) KABUPATEN MIMIKA
+                  DOKUMEN ANALISIS KEBIJAKAN UTAMA
                 </h2>
                 <span className="text-[12px] font-bold text-teal-800 uppercase tracking-widest block">
                   NASKAH DIAGNOSTIK ANALISIS DEVIASI INDIKATOR DAERAH
@@ -6705,10 +6726,10 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
             <Shield size={24} />
           </div>
           <h1 className="text-xl font-bold text-white tracking-wide uppercase">
-            BRIDA SMART Analysis
+            Geo Analisis
           </h1>
           <p className="text-xs text-teal-400 font-medium mt-1">
-            Portal Eksekutif Kepala BRIDA Kabupaten Mimika
+            Portal Eksekutif
           </p>
         </div>
 
@@ -6743,7 +6764,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
 
             <div className="p-3 bg-teal-50 border border-teal-200 text-teal-800 text-xs flex items-center gap-2 rounded-none">
               <CheckCircle2 size={16} className="text-teal-600 shrink-0" />
-              <span>Akses Khusus Terotentikasi Kepala BRIDA Mimika</span>
+              <span>Akses Khusus Terotentikasi Executive</span>
             </div>
 
             <button
@@ -6761,7 +6782,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
         {}
         <div className="px-6 py-3 bg-slate-100 border-t border-slate-300 text-center">
           <span className="text-[11px] text-slate-500 font-medium">
-            Zero-Knowledge Public Policy Engine &bull; Kabupaten Mimika
+            Zero-Knowledge Public Policy Engine
           </span>
         </div>
       </div>
@@ -7077,8 +7098,8 @@ export default function ExplorerNavbar({
         if (navigator.share) {
             try {
                 await navigator.share({
-                    title: 'Smart Analysis - Eksplorasi Spasial',
-                    text: `Lihat data analisis spasial ${activeIndicator || 'Kabupaten Mimika'} di BRIDA DataHub.`,
+                    title: 'Geo Analisis - Eksplorasi Spasial',
+                    text: `Lihat data analisis spasial ${activeIndicator || 'Wilayah'} di DataHub.`,
                     url: shareUrl,
                 });
                 return;
@@ -7105,13 +7126,12 @@ export default function ExplorerNavbar({
             {}
             <div className="flex items-center gap-6">
                 <button
-                    onClick={() => onNavigate?.('knowledge-hub')}
+                    onClick={() => onNavigate?.('dashboard')}
                     className="group flex items-center gap-2 text-slate-500 hover:text-teal-700 transition-all rounded-none cursor-pointer"
                 >
                     <div className="p-1.5 group-hover:bg-slate-100 transition-colors rounded-none">
                         <ChevronLeft size={20} />
                     </div>
-                    <span className="text-xs font-bold uppercase tracking-widest hidden md:block">Portal</span>
                 </button>
 
                 <div className="h-6 w-px bg-slate-200 mx-2 hidden sm:block"></div>
@@ -7122,7 +7142,7 @@ export default function ExplorerNavbar({
                 >
                     <div className="flex flex-col leading-none text-left">
                         <span className="text-sm font-black text-slate-800 tracking-tighter uppercase">
-                            Smart <span className="text-teal-600">Analysis</span>
+                            Geo <span className="text-teal-600">Analisis</span>
                         </span>
                         <span className="text-[9px] text-slate-400 font-bold tracking-[0.2em] uppercase">
                             Eksplorasi Spasial
@@ -7169,15 +7189,15 @@ export default function ExplorerNavbar({
                 <div className="flex items-center gap-3 py-1.5 group select-none">
                     {}
                     <div className="w-9 h-9 bg-teal-50 text-teal-700 flex items-center justify-center text-xs font-black border border-teal-100/50 rounded-none shrink-0 shadow-sm">
-                        {DARIUS_PROFILE.initials}
+                        US
                     </div>
 
                     <div className="hidden sm:flex flex-col items-start leading-tight">
                         <span className="text-[11px] font-black text-slate-800 uppercase tracking-tight line-clamp-1 max-w-44">
-                            {DARIUS_PROFILE.full_name}
+                            User
                         </span>
                         <span className="text-[9px] text-teal-600 font-bold uppercase tracking-widest mt-0.5">
-                            {DARIUS_PROFILE.role}
+                            Pemda
                         </span>
                     </div>
                 </div>
@@ -7203,15 +7223,10 @@ export default function ExplorerNavbar({
 --- FILE: src\modules\dashboard\components\ExplorerSidebar.tsx ---
 "use client";
 
-import React from "react";
 import {
-    Search,
     Layers,
-    MapPin,
     Info,
-    Map,
-    Building2
-} from "lucide-react";
+    Map} from "lucide-react";
 import { useExplorerStore, type ExplorerPanelType } from "../store/useExplorerStore";
 
 export default function ExplorerSidebar() {
@@ -7451,7 +7466,7 @@ const MOCK_DISTRICT_PROFILES: Record<number, {
     1: {
         luas_wilayah: 2216,
         jumlah_penduduk: 142000,
-        deskripsi: "Distrik Mimika Baru merupakan pusat pemerintahan dan ekonomi Kabupaten Mimika (Kota Timika). Memiliki kepadatan penduduk tertinggi dengan aktivitas perdagangan dan jasa yang sangat dinamis.",
+        deskripsi: "Distrik Mimika Baru merupakan pusat pemerintahan dan ekonomi daerah (Kota Timika). Memiliki kepadatan penduduk tertinggi dengan aktivitas perdagangan dan jasa yang sangat dinamis.",
         batas_wilayah: "Utara: Kuala Kencana, Selatan: Wania, Barat: Iwaka, Timur: Mimika Timur",
         images: ["https://picsum.photos/seed/mimika-baru/320/180"]
     },
@@ -7721,6 +7736,7 @@ export default function MimikaMap({
     const activeUnit = useExplorerStore((state) => state.activeUnit);
     const activeDirection = useExplorerStore((state) => state.activeDirection);
     const activeIndicator = useExplorerStore((state) => state.activeIndicator);
+    const mapOpacity = useExplorerStore((state) => state.mapOpacity);
 
     const geoJsonRef = useRef<L.GeoJSON>(null);
 
@@ -7932,11 +7948,8 @@ export default function MimikaMap({
     const SafePolygon = Polygon as any;
 
     const getMaskingOpacity = () => {
-        const state = useExplorerStore.getState();
         if (zoomLevel >= 14) return 0;
-        if (state.activeBaseMap === 'dark') return 0.7;
-        if (state.activeBaseMap === 'street') return 0.4;
-        return 0.5;
+        return mapOpacity / 100;
     };
 
     return (
@@ -7988,6 +8001,23 @@ export default function MimikaMap({
                         ref={geoJsonRef}
                         data={geoData}
                         onEachFeature={onEachFeature}
+                        style={(feature: any) => {
+                            const districtName = feature.properties?.district_name || "";
+                            const stateSnapshot = {
+                                focusedDistrict: useExplorerStore.getState().focusedDistrict,
+                                activeIndicator: useExplorerStore.getState().activeIndicator,
+                                mapOpacity: useExplorerStore.getState().mapOpacity,
+                                activeBaseMap: useExplorerStore.getState().activeBaseMap
+                            };
+                            return calculateLayerStyle(
+                                districtName,
+                                stateSnapshot,
+                                indicatorValuesRef.current,
+                                minValueRef.current,
+                                maxValueRef.current,
+                                zoomLevel
+                            );
+                        }}
                     />
                 )}
 
@@ -8284,8 +8314,256 @@ function MapLegend({ indicatorKey }: { indicatorKey: string }) {
     );
 }
 
+--- FILE: src\modules\dashboard\components\recent-workspace-cards.component.tsx ---
+import React, { useState } from 'react';
+import { PenTool, MessageSquareCode, Plus, ArrowRight, Clock, BookOpen, FileText } from 'lucide-react';
+
+export interface RecentChat {
+    id: string;
+    title: string;
+    lastMessage: string;
+    updatedAt: string;
+    sourcesCount: number;
+    sources: string[];
+}
+
+export interface RecentArticle {
+    id: string;
+    title: string;
+    snippet: string;
+    updatedAt: string;
+    sourcesCount: number;
+    sources: string[];
+    tone?: string;
+    targetLength?: string;
+}
+
+interface RecentWorkspaceCardsProps {
+    recentChats: RecentChat[];
+    recentArticles: RecentArticle[];
+    onNavigate: (route: string) => void;
+    onNavigateToEditor?: (sessionId: string) => void;
+}
+
+export const RecentWorkspaceCards: React.FC<RecentWorkspaceCardsProps> = ({
+    recentChats,
+    recentArticles,
+    onNavigate,
+    onNavigateToEditor,
+}) => {
+    const [activeTab, setActiveTab] = useState<'ARTICLE' | 'CHAT'>('ARTICLE');
+
+    const cleanContentPreview = (text: string) => {
+        if (!text) return '';
+        return text
+            .replace(/[#*`_>_\-]/g, '')     // Bersihkan tanda formatting markdown
+            .replace(/\[doc-.*?\]/g, '')     // Bersihkan token sitasi internal
+            .replace(/\s+/g, ' ')            // Satukan spasi berlebih
+            .trim();
+    };
+
+    const formatDate = (dateStr: string) => {
+        try {
+            return new Date(dateStr).toLocaleDateString('id-ID', {
+                day: 'numeric',
+                month: 'short',
+                year: 'numeric',
+            });
+        } catch {
+            return '-';
+        }
+    };
+
+    const displayedArticles = recentArticles.slice(0, 3);
+    const displayedChats = recentChats.slice(0, 3);
+
+    const handleCreateNewActivity = () => {
+        if (activeTab === 'ARTICLE') {
+            onNavigate('generator');
+        } else {
+            onNavigate('ai-request');
+        }
+    };
+
+    return (
+        <div className="w-full space-y-5 font-roboto no-print">
+
+            {/* 1. HEADER SEKSI & TAB SWITCHER MINIMALIS */}
+            <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 border-b border-slate-200 pb-3 select-none">
+                <div className="space-y-1 text-left">
+                    <h2 className="text-base font-black tracking-tight text-slate-900 uppercase">
+                        Aktivitas Sesi Kerja Terbaru
+                    </h2>
+                    <p className="text-[11px] text-slate-500 font-medium">
+                        Lanjutkan draf rilis kebijakan atau tinjau kembali asisten Q&A berdasarkan subjek dokumen daerah.
+                    </p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-6">
+                    {/* Tab Underline Datar */}
+                    <div className="flex items-center gap-6">
+                        <button
+                            onClick={() => setActiveTab('ARTICLE')}
+                            className={`pb-3 text-xs font-black uppercase tracking-widest transition-all cursor-pointer rounded-none flex items-center gap-2 border-b-2 ${activeTab === 'ARTICLE'
+                                ? 'border-teal-700 text-teal-900 font-extrabold'
+                                : 'border-transparent text-slate-400 hover:text-slate-700'
+                                }`}
+                        >
+                            <PenTool size={13} />
+                            <span>Draf Artikel ({recentArticles.length})</span>
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('CHAT')}
+                            className={`pb-3 text-xs font-black uppercase tracking-widest transition-all cursor-pointer rounded-none flex items-center gap-2 border-b-2 ${activeTab === 'CHAT'
+                                ? 'border-teal-700 text-teal-900 font-extrabold'
+                                : 'border-transparent text-slate-400 hover:text-slate-700'
+                                }`}
+                        >
+                            <MessageSquareCode size={13} />
+                            <span>Diskusi AI ({recentChats.length})</span>
+                        </button>
+                    </div>
+
+                    {/* Tombol Plus Aksi */}
+                    <button
+                        onClick={handleCreateNewActivity}
+                        className="mb-1 px-4 py-2 bg-teal-700 hover:bg-teal-800 text-white text-[11px] font-black uppercase tracking-wider rounded-none inline-flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer"
+                    >
+                        <Plus size={14} strokeWidth={2.5} />
+                        <span>
+                            {activeTab === 'ARTICLE' ? 'Buat Naskah' : 'Mulai Chat'}
+                        </span>
+                    </button>
+                </div>
+            </div>
+
+            {/* 2. PITA TERHUBUNG (Unified Connected Ribbon - Hanya Dipisahkan Garis Slate Tipis) */}
+            <div className="w-full bg-white border border-slate-200 flex flex-col md:flex-row divide-y md:divide-y-0 md:divide-x divide-slate-200 rounded-none shadow-2xs overflow-hidden">
+
+                {activeTab === 'ARTICLE' ? (
+                    <>
+                        {/* Iterasi Artikel */}
+                        {displayedArticles.map((article) => (
+                            <div
+                                key={article.id}
+                                onClick={() => onNavigateToEditor ? onNavigateToEditor(article.id) : onNavigate('generator')}
+                                className="flex-1 p-5 flex flex-col justify-between h-48 hover:bg-slate-50/50 cursor-pointer transition-all duration-300 rounded-none relative text-left group"
+                            >
+                                <div className="space-y-2">
+                                    <div className="flex items-center justify-between select-none">
+                                        <span className="text-[9px] font-black text-teal-800 bg-teal-50 px-2 py-0.5 border border-teal-150 uppercase tracking-widest">
+                                            {article.tone || 'Solutif'}
+                                        </span>
+                                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
+                                            {article.targetLength || 'Medium'}
+                                        </span>
+                                    </div>
+                                    <h3 className="text-xs font-bold text-slate-800 group-hover:text-teal-800 line-clamp-2 leading-snug transition-colors">
+                                        {cleanContentPreview(article.title)}
+                                    </h3>
+                                    <p className="text-[11px] text-slate-500 line-clamp-3 leading-relaxed font-normal">
+                                        {cleanContentPreview(article.snippet) || 'Mempersiapkan rilis naskah komprehensif daerah...'}
+                                    </p>
+                                </div>
+
+                                <div className="flex items-center justify-between pt-3 border-t border-slate-100 mt-2 text-[10px] text-slate-400 font-semibold select-none">
+                                    <span className="flex items-center gap-1.5">
+                                        <BookOpen size={11} className="text-slate-400" />
+                                        <span>{article.sourcesCount} Rujukan</span>
+                                    </span>
+                                    <span className="flex items-center gap-1.5">
+                                        <Clock size={11} />
+                                        <span>{formatDate(article.updatedAt)}</span>
+                                    </span>
+                                </div>
+                            </div>
+                        ))}
+
+                        {/* Placeholder kosong jika draf 0 */}
+                        {displayedArticles.length === 0 && (
+                            <div className="flex-1 p-8 flex flex-col items-center justify-center text-center text-slate-400 h-48 select-none bg-white">
+                                <FileText size={24} className="opacity-40 mb-1" />
+                                <span className="text-xs font-bold uppercase tracking-wider text-slate-700">Belum ada draf naskah rilis</span>
+                                <p className="text-[10px] text-slate-500 max-w-xs mt-1">Gunakan tombol di atas untuk menyusun draf naskah pertama daerah.</p>
+                            </div>
+                        )}
+                    </>
+                ) : (
+                    <>
+                        {/* Iterasi Chat Sesi */}
+                        {displayedChats.map((chat) => (
+                            <div
+                                key={chat.id}
+                                onClick={() => onNavigate(`ai-request?session=${chat.id}`)}
+                                className="flex-1 p-5 flex flex-col justify-between h-48 hover:bg-slate-50/50 cursor-pointer transition-all duration-300 rounded-none relative text-left group"
+                            >
+                                <div className="space-y-2">
+                                    <span className="text-[9px] font-black text-teal-800 bg-teal-50 px-2 py-0.5 border border-teal-150 uppercase tracking-widest select-none inline-block">
+                                        Diskusi Faktual RAG
+                                    </span>
+                                    <h3 className="text-xs font-bold text-slate-800 group-hover:text-teal-800 line-clamp-2 leading-snug transition-colors">
+                                        {cleanContentPreview(chat.title)}
+                                    </h3>
+                                    <p className="text-[11px] text-slate-500 line-clamp-3 leading-relaxed font-normal italic">
+                                        "{cleanContentPreview(chat.lastMessage)}"
+                                    </p>
+                                </div>
+
+                                <div className="flex items-center justify-between pt-3 border-t border-slate-100 mt-2 text-[10px] text-slate-400 font-semibold select-none">
+                                    <span className="flex items-center gap-1.5">
+                                        <BookOpen size={11} className="text-slate-400" />
+                                        <span>{chat.sourcesCount} Dokumen</span>
+                                    </span>
+                                    <span className="flex items-center gap-1.5">
+                                        <Clock size={11} />
+                                        <span>{formatDate(chat.updatedAt)}</span>
+                                    </span>
+                                </div>
+                            </div>
+                        ))}
+
+                        {displayedChats.length === 0 && (
+                            <div className="flex-1 p-8 flex flex-col items-center justify-center text-center text-slate-400 h-48 select-none bg-white">
+                                <MessageSquareCode size={24} className="opacity-40 mb-1" />
+                                <span className="text-xs font-bold uppercase tracking-wider text-slate-700">Belum ada diskusi kasus</span>
+                                <p className="text-[10px] text-slate-500 max-w-xs mt-1">Gunakan tombol di atas untuk meluncurkan ruang diskusi interaktif.</p>
+                            </div>
+                        )}
+                    </>
+                )}
+
+                {}
+                <div
+                    onClick={() => onNavigate(activeTab === 'ARTICLE' ? 'generator' : 'ai-request')}
+                    className="w-full md:w-64 p-5 bg-teal-50/40 hover:bg-teal-50/90 flex flex-col justify-between h-48 transition-all duration-300 rounded-none select-none text-left group"
+                >
+                    <div className="space-y-1.5">
+                        <span className="text-[9px] font-black text-teal-800 uppercase tracking-widest block select-none">
+                            Daftar Riwayat
+                        </span>
+                        <h3 className="text-xs font-black uppercase tracking-wider text-slate-900 leading-snug">
+                            {activeTab === 'ARTICLE' ? 'Buka Ruang Artikel' : 'Tinjau Semua Chat'}
+                        </h3>
+                        <p className="text-[10px] text-slate-600 leading-relaxed font-normal">
+                            Kelola seluruh draf naskah publikasi atau lakukan pembersihan arsip secara berkala di database.
+                        </p>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-3 border-t border-teal-200/50 text-[10px] text-teal-800 font-black tracking-wider uppercase group-hover:text-teal-950 transition-colors">
+                        <span>Lihat Semua</span>
+                        <ArrowRight size={13} className="group-hover:translate-x-1.5 transition-transform duration-300 text-teal-700" />
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    );
+};
+
+export default RecentWorkspaceCards;
+
 --- FILE: src\modules\dashboard\components\spatial-map.component.tsx ---
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -8298,86 +8576,38 @@ export interface MapLocationPoint {
 }
 
 interface SpatialMapProps {
-  locations: MapLocationPoint[];
+  locations?: MapLocationPoint[];
 }
 
-const BASE_LAYERS: Record<string, { label: string; tile: string; attribution: string; maxZoom: number; subdomains?: string }> = {
-  carto: {
-    label: 'CartoDB Voyager',
-    tile: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-    attribution: '&copy; <a href="https://carto.com/" target="_blank">CARTO</a> &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OSM</a>',
-    maxZoom: 19,
-    subdomains: 'abcd',
-  },
-  google_satellite: {
-    label: 'Google Satellite',
-    tile: 'https://mt{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
-    attribution: '&copy; <a href="https://www.google.com/maps" target="_blank">Google Maps</a>',
-    maxZoom: 22,
-    subdomains: '0123',
-  },
-  google_hybrid: {
-    label: 'Google Hybrid',
-    tile: 'https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',
-    attribution: '&copy; <a href="https://www.google.com/maps" target="_blank">Google Maps</a>',
-    maxZoom: 22,
-    subdomains: '0123',
-  },
-  google_streets: {
-    label: 'Google Streets',
-    tile: 'https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
-    attribution: '&copy; <a href="https://www.google.com/maps" target="_blank">Google Maps</a>',
-    maxZoom: 22,
-    subdomains: '0123',
-  },
-  esri_imagery: {
-    label: 'ESRI Imagery',
-    tile: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-    attribution: '&copy; <a href="https://www.esri.com/" target="_blank">Esri</a>',
-    maxZoom: 19,
-  },
-  esri_topo: {
-    label: 'ESRI Topo',
-    tile: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}',
-    attribution: '&copy; <a href="https://www.esri.com/" target="_blank">Esri</a>',
-    maxZoom: 19,
-  },
-};
-
-type BaseLayerKey = keyof typeof BASE_LAYERS;
-
-export const SpatialMap: React.FC<SpatialMapProps> = ({ locations }) => {
+export const SpatialMap: React.FC<SpatialMapProps> = () => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
-  const tileLayerRef = useRef<L.TileLayer | null>(null);
-  const geojsonLayerRef = useRef<L.GeoJSON | null>(null);
-  const maskLayerRef = useRef<L.Polygon | null>(null);
 
-  const [activeLayer, setActiveLayer] = useState<BaseLayerKey>('google_satellite');
-  const [showDistrict, setShowDistrict] = useState(true);
-  const [darkenOutside, setDarkenOutside] = useState(true);
-  const activeLayerRef = useRef<BaseLayerKey>('google_satellite');
+  const STATIC_TILE_URL = 'https://mt{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}';
 
   useEffect(() => {
     if (!mapContainerRef.current || mapInstanceRef.current) return;
 
-    const defaultCenter: [number, number] = [-4.55, 136.88];
+    const defaultCenter: [number, number] = [-4.60, 136.95];
 
     const map = L.map(mapContainerRef.current, {
       center: defaultCenter,
-      zoom: 9,
-      scrollWheelZoom: true,
-      zoomControl: true,
+      zoom: 8.5,
+      zoomControl: false,
+      dragging: false,
+      touchZoom: false,
+      doubleClickZoom: false,
+      scrollWheelZoom: false,
+      boxZoom: false,
+      keyboard: false,
+      attributionControl: false,
     });
 
-    const def = BASE_LAYERS[activeLayerRef.current];
-    const tl = L.tileLayer(def.tile, {
-      attribution: def.attribution,
-      maxZoom: def.maxZoom,
-      subdomains: def.subdomains || 'abc',
-    });
-    tl.addTo(map);
-    tileLayerRef.current = tl;
+    L.tileLayer(STATIC_TILE_URL, {
+      subdomains: '0123',
+      maxZoom: 20,
+    }).addTo(map);
+
     mapInstanceRef.current = map;
 
     fetch('/mimika_18_distrik.json')
@@ -8412,240 +8642,208 @@ export const SpatialMap: React.FC<SpatialMapProps> = ({ locations }) => {
         const maskPolygon = L.polygon([worldOuterRing, ...innerHoles], {
           color: '#000000',
           weight: 0,
-          fillColor: '#0f172a',
-          fillOpacity: 0.65,
+          fillColor: '#090d16',
+          fillOpacity: 0.70,
           interactive: false,
         });
+        maskPolygon.addTo(mapInstanceRef.current);
 
-        if (darkenOutside) {
-          maskPolygon.addTo(mapInstanceRef.current);
-        }
-        maskLayerRef.current = maskPolygon;
-
-        const layer = L.geoJSON(geojson, {
+        const boundaryLayer = L.geoJSON(geojson, {
+          interactive: false,
           style: () => ({
-            color: '#38bdf8',
-            weight: 1.8,
-            opacity: 0.95,
+            color: '#14b8a6',
+            weight: 1.5,
+            opacity: 0.85,
             fillColor: 'transparent',
             fillOpacity: 0,
           }),
-          onEachFeature: (feature, lyr) => {
-            const name = feature?.properties?.district_name || feature?.properties?.WADMKK || 'Distrik';
-
-            lyr.bindTooltip(name, {
-              permanent: false,
-              direction: 'center',
-              className: 'district-tooltip',
-            });
-
-            lyr.on('mouseover', function (this: L.Path) {
-              this.setStyle({ color: '#facc15', weight: 3, fillOpacity: 0.15, fillColor: '#facc15' });
-            });
-            lyr.on('mouseout', function (this: L.Path) {
-              this.setStyle({ color: '#38bdf8', weight: 1.8, fillOpacity: 0, fillColor: 'transparent' });
-            });
-
-            lyr.bindPopup(
-              `<div style="font-family:'Roboto',sans-serif;padding:6px;min-width:170px;">
-                <span style="font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:#0284c7;font-weight:700;display:block;">Distrik Kabupaten Mimika</span>
-                <strong style="font-size:14px;color:#0f172a;display:block;margin-top:2px;">${name}</strong>
-              </div>`,
-            );
-          },
         });
+        boundaryLayer.addTo(mapInstanceRef.current);
 
-        layer.addTo(mapInstanceRef.current);
-        geojsonLayerRef.current = layer;
-
-        const bounds = layer.getBounds();
-        if (bounds.isValid()) mapInstanceRef.current.fitBounds(bounds, { padding: [30, 30] });
+        const bounds = boundaryLayer.getBounds();
+        if (bounds.isValid()) {
+          mapInstanceRef.current.fitBounds(bounds, { padding: [15, 15] });
+        }
       })
-      .catch((err) => console.warn('[SpatialMap] GeoJSON error:', err));
+      .catch((err) => console.warn('[SpatialMap] Gagal memproses GeoJSON:', err));
 
     return () => {
       if (mapInstanceRef.current) {
         mapInstanceRef.current.remove();
         mapInstanceRef.current = null;
-        tileLayerRef.current = null;
-        geojsonLayerRef.current = null;
-        maskLayerRef.current = null;
       }
     };
   }, []);
 
-  useEffect(() => {
-    const map = mapInstanceRef.current;
-    if (!map) return;
-
-    if (tileLayerRef.current) map.removeLayer(tileLayerRef.current);
-
-    const def = BASE_LAYERS[activeLayer];
-    const newTile = L.tileLayer(def.tile, {
-      attribution: def.attribution,
-      maxZoom: def.maxZoom,
-      subdomains: def.subdomains || 'abc',
-    });
-    newTile.addTo(map);
-    tileLayerRef.current = newTile;
-
-    if (maskLayerRef.current && map.hasLayer(maskLayerRef.current)) {
-      maskLayerRef.current.bringToFront();
-    }
-    if (geojsonLayerRef.current && map.hasLayer(geojsonLayerRef.current)) {
-      geojsonLayerRef.current.bringToFront();
-    }
-  }, [activeLayer]);
-
-  useEffect(() => {
-    const map = mapInstanceRef.current;
-    const layer = geojsonLayerRef.current;
-    if (!map || !layer) return;
-
-    if (showDistrict) {
-      if (!map.hasLayer(layer)) layer.addTo(map);
-    } else {
-      if (map.hasLayer(layer)) map.removeLayer(layer);
-    }
-  }, [showDistrict]);
-
-  useEffect(() => {
-    const map = mapInstanceRef.current;
-    const mask = maskLayerRef.current;
-    if (!map || !mask) return;
-
-    if (darkenOutside) {
-      if (!map.hasLayer(mask)) mask.addTo(map);
-      mask.bringToFront();
-      if (geojsonLayerRef.current && map.hasLayer(geojsonLayerRef.current)) {
-        geojsonLayerRef.current.bringToFront();
-      }
-    } else {
-      if (map.hasLayer(mask)) map.removeLayer(mask);
-    }
-  }, [darkenOutside]);
-
-  useEffect(() => {
-    const map = mapInstanceRef.current;
-    if (!map) return;
-
-    map.eachLayer((layer) => {
-      if (layer instanceof L.Marker) map.removeLayer(layer);
-    });
-
-    const customIcon = L.divIcon({
-      className: 'custom-map-marker',
-      html: `<div style="background-color:#0d9488;width:14px;height:14px;border-radius:50%;border:2.5px solid #ffffff;box-shadow:0 2px 8px rgba(0,0,0,0.5);"></div>`,
-      iconSize: [14, 14],
-      iconAnchor: [7, 7],
-    });
-
-    locations.forEach((loc) => {
-      const marker = L.marker([loc.latitude, loc.longitude], { icon: customIcon }).addTo(map);
-      marker.bindPopup(
-        `<div style="font-family:'Roboto',sans-serif;padding:6px;color:#0f172a;">
-          <strong style="display:block;font-size:13px;margin-bottom:2px;color:#0f172a;">${loc.locationName}</strong>
-          ${loc.documentTitle ? `<span style="font-size:11px;color:#475569;">Sumber: ${loc.documentTitle}</span>` : ''}
-        </div>`,
-      );
-    });
-  }, [locations]);
-
   return (
-    <div className="bg-white border border-slate-200 rounded-none overflow-hidden shadow-sm flex flex-col" style={{ height: 540 }}>
+    <div className="w-full h-full bg-[#090d16] overflow-hidden select-none pointer-events-none rounded-none border-none">
       {}
-      <div className="px-4 py-3 border-b border-slate-200 bg-slate-50 flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-h2 text-slate-800">Pemetaan Sebaran Spasial Wilayah (Kabupaten Mimika)</h2>
-
-        <div className="flex items-center gap-2 flex-wrap">
-          {}
-          <select
-            value={activeLayer}
-            onChange={(e) => setActiveLayer(e.target.value as BaseLayerKey)}
-            className="bg-white border border-slate-300 text-slate-800 text-xs font-semibold px-2.5 py-1.5 rounded-none focus:outline-none focus:border-teal-600 shadow-xs"
-          >
-            {Object.entries(BASE_LAYERS).map(([key, { label }]) => (
-              <option key={key} value={key}>{label}</option>
-            ))}
-          </select>
-
-          {}
-          <button
-            onClick={() => setDarkenOutside((v) => !v)}
-            className={`text-xs font-bold px-2.5 py-1.5 border rounded-none shadow-xs transition-colors ${
-              darkenOutside
-                ? 'bg-slate-900 text-amber-300 border-slate-900'
-                : 'bg-white text-slate-700 border-slate-300 hover:border-slate-500'
-            }`}
-          >
-            {darkenOutside ? '🌙 Soliter Mimika (Gelap Luar)' : '☀️ Normal (Tanpa Mask)'}
-          </button>
-
-          {}
-          <button
-            onClick={() => setShowDistrict((v) => !v)}
-            className={`text-xs font-bold px-2.5 py-1.5 border rounded-none shadow-xs transition-colors ${
-              showDistrict
-                ? 'bg-teal-700 text-white border-teal-800'
-                : 'bg-white text-slate-700 border-slate-300 hover:border-teal-500'
-            }`}
-          >
-            {showDistrict ? 'Sembunyikan Garis' : 'Tampilkan Garis'}
-          </button>
-
-          <span className="text-xs font-semibold text-teal-700 bg-teal-50 border border-teal-200 px-2.5 py-1 rounded-none">
-            PostGIS Spatial Engine
-          </span>
-        </div>
-      </div>
-
-      {}
-      <div ref={mapContainerRef} className="flex-1 w-full relative z-0 bg-slate-900" />
-
-      {}
-      <div className="px-4 py-2 border-t border-slate-200 bg-slate-50 flex items-center gap-4 text-[10px] text-slate-500 font-medium flex-wrap">
-        <span className="flex items-center gap-1.5">
-          <span className="inline-block w-4 h-0.5 bg-sky-400" />
-          Garis Batas Distrik Mimika
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="inline-block w-3 h-3 bg-slate-900 opacity-60 border border-slate-600" />
-          Mask Luar Wilayah (Fokus Mimika)
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="inline-block w-2.5 h-2.5 rounded-full bg-teal-600 border border-white" />
-          Titik Lokasi Dokumen
-        </span>
-        <span className="ml-auto">Base: <strong className="text-slate-700">{BASE_LAYERS[activeLayer].label}</strong></span>
-      </div>
-
-      <style>{`
-        .district-tooltip {
-          background: rgba(15,23,42,0.9);
-          color: #f8fafc;
-          border: 1px solid #38bdf8;
-          border-radius: 2px;
-          font-size: 11px;
-          font-weight: 600;
-          padding: 3px 8px;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.4);
-        }
-        .district-tooltip::before { display: none; }
-
-        /* Eliminate focus bounding box / rectangle outline on map paths and elements */
-        .leaflet-container *:focus,
-        .leaflet-container path:focus,
-        .leaflet-interactive:focus,
-        .leaflet-interactive:focus-visible,
-        path.leaflet-interactive:focus,
-        path.leaflet-interactive:focus-visible {
-          outline: none !important;
-          box-shadow: none !important;
-        }
-      `}</style>
+      <div ref={mapContainerRef} className="w-full h-full relative z-0" />
     </div>
   );
 };
+
+export default SpatialMap;
+
+--- FILE: src\modules\dashboard\components\spatial-preview-wrapper.component.tsx ---
+import React, { useState, useEffect } from 'react';
+import { Maximize2, Map, Shield, Radio, Activity } from 'lucide-react';
+import { SpatialMap, type MapLocationPoint } from '../components/spatial-map.component';
+
+interface SpatialPreviewWrapperProps {
+    locations: MapLocationPoint[];
+    onNavigate: (route: string) => void;
+}
+
+export const SpatialPreviewWrapper: React.FC<SpatialPreviewWrapperProps> = ({
+    locations,
+    onNavigate,
+}) => {
+    const [isActivated, setIsActivated] = useState(false);
+    const [isTouchDevice, setIsTouchDevice] = useState(false);
+
+    useEffect(() => {
+        const checkTouch = () => {
+            setIsTouchDevice('ontouchstart' in window || navigator.maxTouchPoints > 0);
+        };
+        checkTouch();
+    }, []);
+
+    const handleInteractiveClick = (e: React.MouseEvent) => {
+        if (isTouchDevice) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (!isActivated) {
+                setIsActivated(true);
+            } else {
+                onNavigate('gis-explorer');
+            }
+        } else {
+            onNavigate('gis-explorer');
+        }
+    };
+
+    const handleMouseLeave = () => {
+        if (!isTouchDevice) {
+            setIsActivated(false);
+        }
+    };
+
+    return (
+        <div className="w-full py-1 flex flex-col rounded-none font-roboto select-none">
+
+            {}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-200 pb-4 mb-4">
+                <div className="space-y-1">
+                    <span className="text-[10px] font-bold tracking-widest text-teal-800 uppercase flex items-center gap-1.5">
+                        <Radio size={12} className="text-teal-700 animate-pulse" />
+                        <span>Satelit Spasial & Pemetaan Wilayah</span>
+                    </span>
+                    <h3 className="text-sm font-black uppercase tracking-wider text-slate-900">
+                        Pratinjau Peta Sebaran Wilayah
+                    </h3>
+                    <p className="text-[11px] text-slate-500 font-medium leading-relaxed">
+                        Sistem PostGIS Spatial Engine pemantauan logistik fisik dan indikator pembangunan daerah.
+                    </p>
+                </div>
+                <span className="text-[10px] font-black uppercase tracking-widest px-2.5 py-1 bg-teal-50 border border-teal-200 text-teal-800 shrink-0 self-start sm:self-auto flex items-center gap-1.5">
+                    <Activity size={12} className="text-teal-700" />
+                    <span>PostGIS Active</span>
+                </span>
+            </div>
+
+            {}
+            <div
+                onClick={handleInteractiveClick}
+                onMouseEnter={() => !isTouchDevice && setIsActivated(true)}
+                onMouseLeave={handleMouseLeave}
+                className="w-full relative overflow-hidden group cursor-pointer border border-slate-300 bg-slate-100"
+                style={{ height: '540px' }}
+            >
+                {}
+                <div className={`w-full h-full transition-all duration-700 ease-out ${isActivated ? 'scale-[1.015] blur-[1.5px] opacity-75' : 'scale-100'
+                    }`}>
+                    <SpatialMap locations={locations} />
+                </div>
+
+                {}
+                <div className={`absolute inset-x-0 top-0 p-4 flex justify-between items-start pointer-events-none transition-all duration-300 z-10 ${isActivated ? 'opacity-0 -translate-y-2' : 'opacity-100 translate-y-0'
+                    }`}>
+                    {}
+                    <div className="bg-white/95 backdrop-blur-md border border-slate-300 px-3 py-1.5 font-mono text-[9px] text-teal-800 font-bold flex items-center gap-2 shadow-sm">
+                        <span className="w-1.5 h-1.5 rounded-full bg-teal-600 animate-ping" />
+                        <span>GPS LOCK: 4°32'S 136°53'E</span>
+                    </div>
+
+                    {}
+                    <div className="bg-white/95 backdrop-blur-md border border-slate-300 px-3 py-1.5 font-mono text-[9px] text-slate-700 font-bold flex items-center gap-1.5 shadow-sm">
+                        <Shield size={10} className="text-teal-600" />
+                        <span>EPSG:32753 (WGS 84 / UTM 53S)</span>
+                    </div>
+                </div>
+
+                {}
+                <div className={`absolute inset-x-0 bottom-0 p-4 flex justify-between items-end pointer-events-none transition-all duration-300 z-10 ${isActivated ? 'opacity-0 translate-y-2' : 'opacity-100 translate-y-0'
+                    }`}>
+                    <span className="bg-white/95 backdrop-blur-md border border-slate-300 px-3 py-1 text-[9px] font-mono font-bold text-slate-600 shadow-sm">
+                        BOUNDS: 136.12° - 137.98° E / -4.11° - -5.15° S
+                    </span>
+                    <span className="bg-teal-50 border border-teal-200 px-3 py-1 text-[9px] font-bold text-teal-800 tracking-wider uppercase select-none shadow-sm">
+                        Scale: 1 : 1,250,000
+                    </span>
+                </div>
+
+                {}
+                <div className={`absolute inset-0 bg-white/20 backdrop-blur-xs flex items-center justify-center transition-all duration-500 z-20 ${isActivated ? 'opacity-100' : 'opacity-0 pointer-events-none'
+                    }`}>
+                    {}
+                    <div className={`border border-slate-300 bg-white p-6 flex flex-col items-center justify-center gap-2 max-w-sm text-center relative rounded-none shadow-2xl transition-all duration-500 ${isActivated ? 'translate-y-0 scale-100' : 'translate-y-4 scale-95'
+                        }`}>
+
+                        {}
+                        <div className="absolute top-0 left-0 w-3 h-3 border-t-2 border-l-2 border-teal-600 -translate-x-0.5 -translate-y-0.5" />
+                        <div className="absolute top-0 right-0 w-3 h-3 border-t-2 border-r-2 border-teal-600 translate-x-0.5 -translate-y-0.5" />
+                        <div className="absolute bottom-0 left-0 w-3 h-3 border-b-2 border-l-2 border-teal-600 -translate-x-0.5 translate-y-0.5" />
+                        <div className="absolute bottom-0 right-0 w-3 h-3 border-b-2 border-r-2 border-teal-600 translate-x-0.5 translate-y-0.5" />
+
+                        {}
+                        <div className="p-3 bg-teal-50 border border-teal-200 rounded-none mb-1 text-teal-700">
+                            <Map size={20} className="animate-pulse" />
+                        </div>
+
+                        <span className="text-[10px] font-black uppercase tracking-[0.25em] text-teal-800 select-none">
+                            Command Center Spasial
+                        </span>
+                        <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider mb-1 leading-snug">
+                            Pusat Pengendali
+                        </h3>
+
+                        <p className="text-[10px] text-slate-600 font-semibold leading-relaxed mb-4 max-w-[280px]">
+                            {isTouchDevice
+                                ? "Ketuk sekali lagi pada layar atau lencana di bawah untuk masuk Pusat Pengendali Spasial penuh."
+                                : "Klik di mana saja untuk mengaktifkan sistem navigasi spasial interaktif penuh (GFW Command Center)."}
+                        </p>
+
+                        <button
+                            type="button"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onNavigate('gis-explorer');
+                            }}
+                            className="px-5 py-2.5 bg-teal-700 hover:bg-teal-800 active:bg-teal-900 text-white text-[10px] font-black uppercase tracking-widest rounded-none inline-flex items-center gap-2 transition-all cursor-pointer border border-teal-800 shadow-md hover:scale-102"
+                        >
+                            <span>Masuk Command Center</span>
+                            <Maximize2 size={11} strokeWidth={2.5} />
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    );
+};
+
+export default SpatialPreviewWrapper;
 
 --- FILE: src\modules\dashboard\components\stat-cards.component.tsx ---
 import React from 'react';
@@ -8700,6 +8898,187 @@ export const StatCards: React.FC<StatCardsProps> = ({
   );
 };
 
+--- FILE: src\modules\dashboard\components\token-budget-guard.component.tsx ---
+import React from 'react';
+import { Coins, Database, Loader2 } from 'lucide-react';
+
+export interface TokenBudget {
+    totalTokens: number;
+    estimatedCostIdr: number;
+    maxMonthlyPaguIdr: number;
+    quotaPercentage: number;
+    paguStatus: 'SAFE' | 'ALERT' | 'WARNING';
+}
+
+interface TokenBudgetGuardProps {
+    budget?: TokenBudget | null;
+    isLoading?: boolean;
+}
+
+export const TokenBudgetGuard: React.FC<TokenBudgetGuardProps> = ({ budget, isLoading = false }) => {
+  if (isLoading) {
+    return (
+      <div className="w-full py-4 flex items-center justify-center gap-2.5 font-roboto select-none">
+        <Loader2 size={16} className="animate-spin text-teal-700" />
+        <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+          Menghitung Sisa Kuota AI Bulan Ini...
+        </span>
+      </div>
+    );
+  }
+
+  if (!budget) return null;
+
+  const { totalTokens, estimatedCostIdr, maxMonthlyPaguIdr, quotaPercentage, paguStatus } = budget;
+
+  const statusConfigs = {
+    SAFE: {
+      badge: 'bg-emerald-100 text-emerald-800 border-emerald-300',
+      bar: 'bg-emerald-600 shadow-[0_0_8px_rgba(16,185,129,0.3)]',
+      label: 'Aman',
+      pulse: 'bg-emerald-500',
+      description: 'Penggunaan AI masih sangat aman. Sisa kuota bulanan Anda masih melimpah.',
+    },
+    ALERT: {
+      badge: 'bg-amber-100 text-amber-800 border-amber-300',
+      bar: 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.3)]',
+      label: 'Waspada',
+      pulse: 'bg-amber-500',
+      description: 'Penggunaan AI sudah setengah jalan dari limit bulanan. Batasi aktivitas yang tidak terlalu penting.',
+    },
+    WARNING: {
+      badge: 'bg-rose-100 text-rose-800 border-rose-300',
+      bar: 'bg-rose-600 shadow-[0_0_8px_rgba(225,29,72,0.3)]',
+      label: 'Hampir Habis / Kritis',
+      pulse: 'bg-rose-500',
+      description: 'Kuota AI Anda sudah kritis dan hampir habis! Harap batasi penggunaan agar sistem tidak terkunci.',
+    },
+  };
+
+  const currentConfig = statusConfigs[paguStatus] || statusConfigs.SAFE;
+
+  return (
+    <div className="w-full py-1 flex flex-col lg:flex-row lg:items-center justify-between gap-6 transition-colors rounded-none font-roboto">
+      {}
+      <div className="flex-1 space-y-3.5 text-left">
+        <div className="flex flex-wrap items-center gap-2.5 select-none">
+          <span className="relative flex h-2 w-2">
+            <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${currentConfig.pulse}`} />
+            <span className={`relative inline-flex h-2 w-2 rounded-full ${currentConfig.pulse}`} />
+          </span>
+          <span className="text-[10px] font-black tracking-widest text-slate-400 uppercase">
+            PEMANTAUAN KUOTA AI BULANAN
+          </span>
+          <span className={`px-2 py-0.5 text-[9px] font-black uppercase border tracking-wider rounded-none ${currentConfig.badge}`}>
+            Status Kuota: {currentConfig.label}
+          </span>
+        </div>
+
+        {}
+        <div className="space-y-1.5">
+          <div className="flex justify-between items-baseline select-none">
+            <span className="text-xs font-semibold text-slate-500">Kuota Bulanan Terpakai:</span>
+            <span className="text-sm font-black text-slate-800 font-mono">{quotaPercentage}%</span>
+          </div>
+          <div className="w-full bg-slate-200/60 h-1.5 rounded-none overflow-hidden border border-slate-300/20 select-none">
+            <div
+              className={`h-full rounded-none transition-all duration-1000 ease-out ${currentConfig.bar}`}
+              style={{ width: `${quotaPercentage}%` }}
+            />
+          </div>
+          <p className="text-[11px] text-slate-500 font-medium leading-relaxed">
+            {currentConfig.description}
+          </p>
+        </div>
+      </div>
+
+      {}
+      <div className="flex items-center divide-x divide-slate-200 min-w-full lg:min-w-0 lg:pl-6 text-left no-print">
+        {}
+        <div className="flex flex-col justify-center pr-6">
+          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5 mb-1.5 select-none">
+            <Coins size={11} className="text-teal-700 shrink-0" />
+            <span>Biaya Terpakai</span>
+          </span>
+          <span className="text-lg font-black text-slate-900 tracking-tight font-mono">
+            Rp {estimatedCostIdr.toLocaleString('id-ID')}
+          </span>
+          <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-1 select-none">
+            Limit: Rp {maxMonthlyPaguIdr.toLocaleString('id-ID')}
+          </span>
+        </div>
+
+        {}
+        <div className="pl-6 flex flex-col justify-center">
+          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5 mb-1.5 select-none">
+            <Database size={11} className="text-teal-700 shrink-0" />
+            <span>Total Token</span>
+          </span>
+          <span className="text-lg font-black text-slate-900 tracking-tight font-mono">
+            {totalTokens.toLocaleString('id-ID')}
+          </span>
+          <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-1 select-none">
+            Sesi Input + Output
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default TokenBudgetGuard;
+
+--- FILE: src\modules\dashboard\components\welcome-header.component.tsx ---
+import React from 'react';
+import { Cpu, Calendar } from 'lucide-react';
+
+export const WelcomeHeader: React.FC = () => {
+
+    const today = new Date().toLocaleDateString('id-ID', {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+    });
+
+    return (
+        <div className="w-full py-1 flex flex-col md:flex-row md:items-center md:justify-between gap-4 font-roboto">
+            {}
+            <div className="flex flex-col text-left space-y-1">
+                <span className="text-[10px] font-bold tracking-widest text-teal-800 uppercase flex items-center gap-1.5 select-none">
+                    <Cpu size={12} className="text-teal-700" />
+                    <span>Sistem Manajemen Pengetahuan Terintegrasi</span>
+                </span>
+                <h1 className="text-lg font-bold text-slate-900 tracking-tight uppercase">
+                    Selamat Datang
+                </h1>
+                <p className="text-xs text-slate-500 font-normal leading-relaxed max-w-3xl">
+                    Portal Analisis Kebijakan, Inovasi, dan Pusat Pengendali Spasial Terintegrasi.
+                </p>
+            </div>
+
+            {}
+            <div className="flex items-center md:border-l md:border-slate-200 md:pl-6 shrink-0 no-print">
+                <div className="text-left space-y-1 select-none">
+                    <span className="text-[9px] uppercase font-bold text-slate-400 tracking-widest block">
+                        Kalender Kerja Sesi
+                    </span>
+                    <span className="text-xs font-bold text-slate-700 block flex items-center gap-1.5">
+                        <Calendar size={13} className="text-slate-500" />
+                        <span>{today}</span>
+                    </span>
+                    <span className="text-[10px] text-emerald-700 font-extrabold flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        Otorisasi Executive Aktif
+                    </span>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+export default WelcomeHeader;
+
 --- FILE: src\modules\dashboard\components\panels\AboutPanel.tsx ---
 "use client";
 
@@ -8722,19 +9101,14 @@ export default function AboutPanel() {
             {}
             <div className="flex flex-col items-center text-center py-6 px-4 bg-slate-50 border-b border-slate-200 select-none">
                 {}
-                <div className="relative w-20 h-20 bg-transparent flex items-center justify-center mb-2.5">
-                    <img
-                        src="/logo-mimika.png"
-                        alt="Logo Pemerintah Kabupaten Mimika"
-                        className="object-contain p-1 w-full h-full"
-                        draggable={false}
-                    />
+                <div className="relative w-16 h-16 bg-teal-50 border border-teal-200 flex items-center justify-center mb-2.5 text-teal-700">
+                    <Building2 size={28} />
                 </div>
                 <div className="space-y-1">
                     <h2 className="text-sm font-black text-slate-800 tracking-wider leading-none uppercase">
-                        Mimika <span className="text-teal-700">DataHub</span>
+                        Geo Analisis <span className="text-teal-700">DataHub</span>
                     </h2>
-                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.25em] leading-none">
+                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.25em] leading-none mt-1">
                         v1.0.0-dev Spasial Engine
                     </p>
                 </div>
@@ -8758,7 +9132,7 @@ export default function AboutPanel() {
                     {[
                         "Konsolidasi Kajian & Dokumen Perencanaan Daerah",
                         "Sintesis Causal Inference AI Berbasis Bukti Lapangan",
-                        "Diseminasi Spasial Dinamis Pendukung Keputusan Bupati"
+                        "Diseminasi Spasial Dinamis Pendukung Keputusan"
                     ].map((item, idx) => (
                         <div key={idx} className="flex items-center gap-3 px-4 py-3 bg-white border-b border-slate-200 w-full hover:bg-slate-50 transition-colors">
                             <CheckCircle2 size={13} strokeWidth={2.5} className="text-teal-600 shrink-0" />
@@ -8780,17 +9154,17 @@ export default function AboutPanel() {
                 <div className="flex flex-col bg-white">
                     <div className="px-4 py-4 border-b border-slate-200 text-left">
                         <p className="text-[11px] text-slate-600 font-medium leading-relaxed text-justify">
-                            Seluruh data spasial, metadata, dan dokumen laporan daerah dikelola secara mandiri oleh Badan Riset dan Inovasi Daerah (BRIDA) sebagai produsen data kognitif Kabupaten Mimika.
+                            Seluruh data spasial, metadata, dan dokumen laporan daerah dikelola secara mandiri oleh tim produsen data kognitif.
                         </p>
                     </div>
 
                     {}
                     <div className="grid grid-cols-2 divide-x divide-y divide-slate-200 border-b border-slate-200 bg-slate-50/50 select-none">
                         {[
-                            { name: "BRIDA Mimika", icon: Cpu },
-                            { name: "Bappeda Mimika", icon: Building2 },
-                            { name: "BPS Kabupaten Mimika", icon: Globe },
-                            { name: "Sekretariat Daerah", icon: Users }
+                            { name: "Analis Kebijakan", icon: Cpu },
+                            { name: "Perencanaan", icon: Building2 },
+                            { name: "Badan Pusat Statistik", icon: Globe },
+                            { name: "Sekretariat", icon: Users }
                         ].map((opd, i) => (
                             <div key={i} className="flex items-center gap-2 px-4 py-3">
                                 <opd.icon size={12} className="text-teal-700 shrink-0" />
@@ -8817,7 +9191,7 @@ export default function AboutPanel() {
                         <div className="flex flex-col gap-1">
                             <p className="text-[11px] font-black text-slate-800 uppercase tracking-widest leading-none">Spasial Engine V1</p>
                             <p className="text-[10px] text-slate-500 font-medium leading-relaxed">
-                                Dibangun secara mandiri oleh tim analis sistem BRIDA Mimika menggunakan tumpukan teknologi modern Next-generation React Klien dan Leaflet Engine.
+                                Dibangun secara mandiri oleh tim analis sistem menggunakan tumpukan teknologi modern Next-generation React Klien dan Leaflet Engine.
                             </p>
                         </div>
                     </div>
@@ -8826,7 +9200,7 @@ export default function AboutPanel() {
                 {}
                 <div className="px-4 py-6 bg-white select-none">
                     <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest text-center leading-relaxed">
-                        © 2026 Badan Riset dan Inovasi Daerah <br /> Pemerintah Kabupaten Mimika.
+                        © 2026 Geo Analisis.
                     </p>
                 </div>
             </div>
@@ -9268,7 +9642,7 @@ const MOCK_DRILLDOWN_DETAILS: Record<number, {
         profile: {
             luas_wilayah: 2216,
             jumlah_penduduk: 142000,
-            deskripsi: "Distrik Mimika Baru berpusat di kota Timika, berfungsi sebagai episentrum aktivitas perekonomian, perbankan, industri kreatif, serta pusat pemerintahan Kabupaten Mimika. Kepadatan infrastruktur dasar di distrik ini merupakan yang paling maju di seluruh kabupaten.",
+            deskripsi: "Distrik Mimika Baru berpusat di kota Timika, berfungsi sebagai episentrum aktivitas perekonomian, perbankan, industri kreatif, serta pusat pemerintahan. Kepadatan infrastruktur dasar di distrik ini merupakan yang paling maju di seluruh kabupaten.",
             batas_wilayah: "Utara: Kuala Kencana, Selatan: Wania, Barat: Iwaka, Timur: Mimika Timur",
             images: ["https://picsum.photos/seed/m-baru-d1/320/180", "https://picsum.photos/seed/m-baru-d2/320/180"]
         },
@@ -11203,10 +11577,14 @@ export const getSectoralStatus = (
 
 --- FILE: src\modules\dashboard\views\dashboard.view.tsx ---
 import React, { useEffect, useState } from 'react';
-import { Maximize2 } from 'lucide-react';
-import { StatCards } from '../components/stat-cards.component';
-import { SpatialMap, type MapLocationPoint } from '../components/spatial-map.component';
+import { WelcomeHeader } from '../components/welcome-header.component';
+import { TokenBudgetGuard, type TokenBudget } from '../components/token-budget-guard.component';
+import { RecentWorkspaceCards, type RecentChat, type RecentArticle } from '../components/recent-workspace-cards.component';
+import { SpatialPreviewWrapper } from '../components/spatial-preview-wrapper.component';
 import { MOCK_DATA } from '../../../services/mock-data.service';
+import type { MapLocationPoint } from '../components/spatial-map.component';
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
 
 export interface DashboardViewProps {
   onNavigate?: (route: string) => void;
@@ -11216,76 +11594,142 @@ export interface DashboardViewProps {
 export const DashboardView: React.FC<DashboardViewProps> = ({
   onNavigate,
 }) => {
-  const [documents] = useState(MOCK_DATA.documents);
   const [mapPoints, setMapPoints] = useState<MapLocationPoint[]>([]);
+  const [dashboardMeta, setDashboardMeta] = useState<{
+    tokenBudget: TokenBudget;
+    recentChats: RecentChat[];
+    recentArticles: RecentArticle[];
+  } | null>(null);
+  const [isLoadingMeta, setIsLoadingMeta] = useState<boolean>(true);
 
   useEffect(() => {
+    let isMounted = true;
+
     setMapPoints(MOCK_DATA.spatialLocations);
+
+    const fetchDashboardMetadata = async () => {
+      try {
+        setIsLoadingMeta(true);
+        const response = await fetch(`${API_BASE_URL}/analysis/dashboard-meta`, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+        });
+
+        const resJson = await response.json();
+        if (isMounted && resJson.success) {
+          setDashboardMeta(resJson.data);
+        }
+      } catch (err) {
+        console.warn(
+          '[Protected Variations] Koneksi server lokal tidak terjangkau. Mengaktifkan data simulasi terpercaya...',
+          err
+        );
+
+        if (isMounted) {
+          setDashboardMeta({
+            tokenBudget: {
+              totalTokens: 412500,
+              estimatedCostIdr: 107250,
+              maxMonthlyPaguIdr: 500000,
+              quotaPercentage: 21.5,
+              paguStatus: 'SAFE'
+            },
+            recentChats: [
+              {
+                id: 'sess-chat-001',
+                title: 'Sesi Q&A: Analisis Anggaran PAD Mimika 2026',
+                lastMessage: 'Penurunan PAD utamanya didorong oleh turunnya proyeksi royalti komoditas tembaga...',
+                updatedAt: new Date(Date.now() - 3600000).toISOString(),
+                sourcesCount: 2,
+                sources: ['Laporan Kebijakan Pembangunan Mimika 2026', 'Dokumen RTRW & Infrastruktur Wilayah']
+              },
+              {
+                id: 'sess-chat-002',
+                title: 'Evaluasi Infrastruktur Distrik Hoya',
+                lastMessage: 'Akses logistik udara menjadi satu-satunya jalur pemenuhan sarana fisik asrama sekolah...',
+                updatedAt: new Date(Date.now() - 7200000).toISOString(),
+                sourcesCount: 1,
+                sources: ['Evaluasi Kualitas Pendidikan Distrik Hoya']
+              }
+            ],
+            recentArticles: [
+              {
+                id: 'sess-art-001',
+                title: 'Rilis Pers: Strategi Penurunan Kemiskinan Ekstrem Mimika',
+                snippet: 'BRIDA Mimika merumuskan 3 rekomendasi taktis akselerasi alokasi dana bantuan sosial pasca penyesuaian tarif BBM daerah...',
+                updatedAt: new Date(Date.now() - 1800000).toISOString(),
+                sourcesCount: 3,
+                sources: ['Laporan Kebijakan Pembangunan Mimika 2026', 'Dokumen RTRW & Infrastruktur Wilayah', 'Audit Investigasi Pengadaan Jalan Agimuga'],
+                tone: 'SOLUTIF',
+                targetLength: 'MEDIUM'
+              },
+              {
+                id: 'sess-art-002',
+                title: 'Analisis Kelayakan Jembatan Gantung Hoya',
+                snippet: 'Pengurangan volume kontrak fisik jembatan gantung memicu urgensi evaluasi audit kepatuhan oleh dinas teknis...',
+                updatedAt: new Date(Date.now() - 86400000).toISOString(),
+                sourcesCount: 1,
+                sources: ['Evaluasi Kualitas Pendidikan Distrik Hoya'],
+                tone: 'KRITIS',
+                targetLength: 'SHORT'
+              }
+            ]
+          });
+        }
+      } finally {
+        if (isMounted) setIsLoadingMeta(false);
+      }
+    };
+
+    fetchDashboardMetadata();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
+  const handleSafeNavigation = (targetRoute: string) => {
+    if (onNavigate) {
+      onNavigate(targetRoute);
+    }
+  };
+
   return (
-    <div className="flex flex-col w-full bg-slate-100/70 p-6 space-y-6 font-roboto">
+    <div className="flex flex-col w-full bg-slate-50 font-roboto min-h-0 overflow-y-auto custom-scrollbar">
 
       {}
-      <div className="w-full bg-white border border-slate-300 px-6 py-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4 rounded-none shadow-2xs">
-        <div className="flex flex-col text-left">
-          <span className="text-[10px] font-bold tracking-widest text-teal-800 uppercase mb-1">
-            Beranda / Dashboard Eksekutif
-          </span>
-          <h1 className="text-xl font-bold uppercase text-slate-900 tracking-tight">
-            Dashboard Spasial &amp; Analitik Eksekutif
-          </h1>
-          <p className="text-xs text-slate-500 font-normal mt-1">
-            Pemantauan real-time wilayah Kabupaten Mimika berbasis data deterministik arsip dokumen dan kueri analitis terstruktur.
-          </p>
-        </div>
-
-        {}
-        <div className="flex items-center md:border-l md:border-slate-300 md:pl-6 shrink-0">
-          <div className="px-1 py-2 flex flex-col justify-center rounded-none text-left">
-            <span className="text-[9px] uppercase font-bold text-slate-500 tracking-wider">
-              Status Operasional
-            </span>
-            <span className="text-xs font-bold text-emerald-700 flex items-center gap-1.5 mt-0.5 select-none">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              ONLINE (Optimal)
-            </span>
-          </div>
-        </div>
+      <div className="w-full bg-white border-b border-slate-200 py-6 px-8 md:px-10">
+        <WelcomeHeader />
       </div>
 
       {}
-      <StatCards
-        totalDocuments={documents.length}
-        totalChunks={documents.reduce((acc, d) => acc + (d.chunkCount || 0), 0)}
-        totalLocations={mapPoints.length}
-        systemStatus="ONLINE (Optimal)"
-      />
-
-      {}
-      <div className="w-full bg-white border border-slate-300 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 rounded-none shadow-2xs">
-        <div className="flex flex-col text-left">
-          <h3 className="text-xs font-black uppercase tracking-wider text-slate-800">
-            Pratinjau Peta Sebaran Wilayah
-          </h3>
-          <p className="text-[11px] text-slate-500 font-medium mt-1 leading-relaxed">
-            Klik tombol di samping untuk mengaktifkan sistem navigasi spasial interaktif penuh (GFW Command Center).
-          </p>
-        </div>
-
-        <button
-          onClick={() => onNavigate?.('gis-explorer')}
-          className="px-5 py-2.5 bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center justify-center gap-2 border border-teal-800 shadow-xs cursor-pointer shrink-0 transition-colors active:scale-95"
-          title="Masuk Mode Teater / Peta Penuh Spasial Mimika"
-        >
-          <span>Buka Pusat Pengendali Spasial (Full Screen GFW Mode)</span>
-          <Maximize2 size={13} className="shrink-0" />
-        </button>
+      <div className="w-full bg-slate-50 border-b border-slate-200 py-6 px-8 md:px-10">
+        <TokenBudgetGuard
+          budget={dashboardMeta?.tokenBudget}
+          isLoading={isLoadingMeta}
+        />
       </div>
 
       {}
-      <div className="w-full border border-slate-300 bg-white p-1 rounded-none shadow-2xs">
-        <SpatialMap locations={mapPoints} />
+      <div className="w-full bg-white border-b border-slate-200 py-6 px-8 md:px-10">
+        <RecentWorkspaceCards
+          recentChats={dashboardMeta?.recentChats || []}
+          recentArticles={dashboardMeta?.recentArticles || []}
+          onNavigate={handleSafeNavigation}
+          onNavigateToEditor={(sessionId) => {
+            if (onNavigate) {
+              onNavigate(`generator?session=${sessionId}`);
+            }
+          }}
+        />
+      </div>
+
+      {}
+      <div className="w-full bg-slate-50 py-6 px-8 md:px-10">
+        <SpatialPreviewWrapper
+          locations={mapPoints}
+          onNavigate={handleSafeNavigation}
+        />
       </div>
 
     </div>
@@ -11464,7 +11908,8 @@ import {
   Database,
   Globe,
   Cpu,
-  Activity
+  Activity,
+  Atom
 } from 'lucide-react';
 
 interface LandingViewProps {
@@ -11504,7 +11949,7 @@ export const LandingView: React.FC<LandingViewProps> = ({ onNavigate }) => {
   const mainModules = [
     {
       id: 'generator',
-      title: 'Generator Artikel & Kebijakan',
+      title: 'Generator Artikel & Laporan',
       badge: 'AI Co-Writer',
       desc: 'Collaborative workspace untuk merancang naskah publikasi kebijakan, draf artikel ilmiah, dan opini publik berbasis integrasi data dokumen secara instan.',
       icon: PenTool,
@@ -11532,7 +11977,7 @@ export const LandingView: React.FC<LandingViewProps> = ({ onNavigate }) => {
     },
     {
       id: 'analytics',
-      title: 'Lembar Diagnostik & Analisis',
+      title: 'Lembar Diagnostik & Analisisa Kebijakan',
       badge: 'Causal Inference',
       desc: 'Sistem analisis deviasi capaian kinerja antara baseline target pembangunan vs realisasi lapangan dengan pemodelan faktor penyebab (AI).',
       icon: BarChart3,
@@ -11546,9 +11991,9 @@ export const LandingView: React.FC<LandingViewProps> = ({ onNavigate }) => {
     },
     {
       id: 'reports',
-      title: 'Laporan & Nota Dinas Bupati',
+      title: 'Laporan & Nota Dinas',
       badge: 'Executive Briefs',
-      desc: 'Pembuatan draf laporan eksekutif terstruktur, nota dinas taklimat Bupati Mimika, dan simulasi proyeksi dampak dari dinamika kebijakan nasional.',
+      desc: 'Pembuatan draf laporan eksekutif terstruktur, nota dinas taklimat eksekutif, dan simulasi proyeksi dampak dari dinamika kebijakan nasional.',
       icon: FileText,
       accentBg: 'bg-amber-500',
       accentLight: 'bg-amber-50',
@@ -11560,30 +12005,82 @@ export const LandingView: React.FC<LandingViewProps> = ({ onNavigate }) => {
     }
   ];
 
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      setMousePos({ x: e.clientX, y: e.clientY });
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    return () => window.removeEventListener('mousemove', handleMouseMove);
+  }, []);
+
   return (
     <div className="min-h-screen w-full bg-slate-50 text-slate-800 flex flex-col justify-between relative overflow-hidden font-roboto">
 
       {}
-      <div
-        className="absolute inset-0 z-0 opacity-40"
-        style={{
-          backgroundImage: `radial-gradient(circle at 1px 1px, #cbd5e1 1px, transparent 0)`,
-          backgroundSize: '28px 28px',
-        }}
-      />
+      <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
+
+        {}
+        <div
+          className="absolute inset-0 opacity-[0.25] transition-transform duration-1000 ease-out"
+          style={{
+            backgroundImage: `radial-gradient(circle at 1px 1px, #94a3b8 1px, transparent 0)`,
+            backgroundSize: '32px 32px',
+
+            transform: `translate(${mousePos.x * 0.01}px, ${mousePos.y * 0.01}px)`,
+          }}
+        />
+
+        {}
+        <div
+          className="absolute inset-0 opacity-[0.12] transition-transform duration-700 ease-out"
+          style={{
+            backgroundImage: `
+              linear-gradient(to right, #cbd5e1 1px, transparent 1px),
+              linear-gradient(to bottom, #cbd5e1 1px, transparent 1px)
+            `,
+            backgroundSize: '128px 128px',
+
+            transform: `translate(${mousePos.x * -0.015}px, ${mousePos.y * -0.015}px)`,
+          }}
+        />
+
+        {}
+        <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-teal-500/20 to-transparent animate-[scan_8s_linear_infinite]" />
+      </div>
+
       {}
-      <div className="absolute top-0 left-0 w-[40%] h-[50%] bg-gradient-to-br from-teal-100/60 to-transparent pointer-events-none z-0" />
-      <div className="absolute bottom-0 right-0 w-[40%] h-[50%] bg-gradient-to-tl from-indigo-100/60 to-transparent pointer-events-none z-0" />
+      <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
+        {}
+        <div
+          className="absolute w-[600px] h-[600px] bg-teal-400/10 rounded-full blur-[120px] transition-transform duration-700 ease-out"
+          style={{
+
+            transform: `translate(${mousePos.x - 300}px, ${mousePos.y - 300}px)`,
+          }}
+        />
+
+        {}
+        <div
+          className="absolute w-[800px] h-[800px] bg-indigo-500/10 rounded-full blur-[140px] transition-transform duration-[1500ms] ease-out"
+          style={{
+            right: '10%',
+            bottom: '10%',
+
+            transform: `translate(${(mousePos.x * -0.03)}px, ${(mousePos.y * -0.03)}px)`,
+          }}
+        />
+      </div>
 
       {}
       <header className="w-full bg-white/90 backdrop-blur-sm border-b border-slate-200 px-6 py-4 flex flex-col md:flex-row items-center justify-between gap-4 z-10 shadow-xs">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-teal-600 flex items-center justify-center font-bold text-white text-sm tracking-wider shadow-sm">
-            BM
-          </div>
+          <FileText size={24} className="text-teal-600 shrink-0" />
           <div className="flex flex-col text-left">
             <span className="font-extrabold text-sm uppercase tracking-widest text-teal-700">
-              BRIDA KABUPATEN MIMIKA
+              Geo Analisis
             </span>
             <span className="text-[10px] text-slate-500 font-medium">
               Sistem Analisis Strategis &amp; Pendukung Keputusan Eksekutif
@@ -11617,14 +12114,14 @@ export const LandingView: React.FC<LandingViewProps> = ({ onNavigate }) => {
         <div className="text-center flex flex-col items-center">
           <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-teal-50 border border-teal-200 text-[10px] font-bold text-teal-700 uppercase tracking-widest mb-4">
             <Sparkles size={11} className="text-teal-500" />
-            PORTAL UTAMA KEPALA BADAN
+            PORTAL UTAMA EKSEKUTIF
           </div>
           <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-slate-900 uppercase">
-            BRIDA SMART ANALYSIS ENGINE
+            APLIKASI Geo Analisis
           </h1>
           <div className="w-16 h-1 bg-teal-500 mt-3 mb-3" />
           <p className="text-sm text-slate-500 max-w-2xl font-normal leading-relaxed text-center">
-            Pusat pengendali analitik Kabupaten Mimika. Silakan pilih instrumen cerdas di bawah untuk merancang kebijakan, menguji analisis deviasi, atau memantau metrik spasial.
+            Pusat pengendali analitik terintegrasi. Silakan pilih instrumen cerdas di bawah untuk merancang kebijakan, menguji analisis deviasi, atau memantau metrik spasial.
           </p>
         </div>
 
@@ -11710,9 +12207,9 @@ export const LandingView: React.FC<LandingViewProps> = ({ onNavigate }) => {
       <footer className="w-full bg-white/80 border-t border-slate-200 py-4 px-6 flex flex-col sm:flex-row items-center justify-between gap-2 text-[10px] text-slate-400 z-10">
         <div className="flex items-center gap-2">
           <Database size={11} className="text-teal-500" />
-          <span className="font-medium">BRIDA SMART Analysis Platform v2.4.0</span>
+          <span className="font-medium">Geo Analisis Platform v2.4.0</span>
         </div>
-        <span>Hak Cipta © 2026 Pemerintah Kabupaten Mimika · Badan Riset dan Inovasi Daerah</span>
+        <span>Hak Cipta © 2026 Geo Analisis</span>
       </footer>
 
     </div>
@@ -12666,7 +13163,7 @@ export const UploadDropzone: React.FC<UploadDropzoneProps> = ({ onUploadSuccess 
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="Contoh: RPJMD Kabupaten Mimika 2026"
+              placeholder="Contoh: RPJMD Daerah 2026"
               required
               className="w-full bg-white border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:border-teal-600 rounded-none"
             />
@@ -13216,10 +13713,10 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
     };
 
     setCurrentReport({
-      title: sanitizeReportText(reportDetail.title || payload.title || 'Laporan Eksekutif Resmi Bupati'),
+      title: sanitizeReportText(reportDetail.title || payload.title || 'Laporan Eksekutif Resmi'),
       urgency: sanitizeReportText(payload.urgency || 'TINGGI'),
-      recipient: sanitizeReportText(payload.recipient || 'Bupati Mimika'),
-      sender: sanitizeReportText(payload.sender || 'Kepala Badan Riset dan Inovasi Daerah (BRIDA) Kabupaten Mimika'),
+      recipient: sanitizeReportText(payload.recipient || 'Eksekutif'),
+      sender: sanitizeReportText(payload.sender || 'Analis Kebijakan Utama'),
       period: sanitizeReportText(payload.period || 'Triwulan IV 2024 / Sintesis Multidokumen'),
       date: sanitizeReportText(payload.date || new Date(reportDetail.createdAt).toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' })),
       executiveSummary: sanitizeReportText(reportDetail.executiveSummary || payload.executiveSummary),
@@ -13454,7 +13951,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                 <div>
                   <span className="text-xs font-bold text-teal-800 uppercase tracking-widest block mb-1 items-center gap-1.5">
                     <Building2 size={14} className="text-teal-700" />
-                    <span>PEMERINTAH KABUPATEN MIMIKA &bull; BRIDA SMART ANALYSIS</span>
+                    <span>DOKUMEN REKOMENDASI KEBIJAKAN &bull; Geo Analisis</span>
                   </span>
                   <h1 className="text-2xl font-bold text-slate-900 uppercase tracking-wide">
                     {currentReport.title}
@@ -13599,14 +14096,6 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
               >
                 {isExportingPdf ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
                 <span>{isExportingPdf ? 'Merakit PDF Vector...' : 'Ekspor PDF'}</span>
-              </button>
-
-              <button
-                onClick={handleSendWa}
-                className="px-4 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-2 border border-emerald-800 shadow-xs"
-              >
-                <Send size={14} />
-                <span>Kirim Langsung ke WA Bupati</span>
               </button>
 
               <button
@@ -13790,7 +14279,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                   type="text"
                   value={uploadTitle}
                   onChange={(e) => setUploadTitle(e.target.value)}
-                  placeholder="Contoh: Laporan Pertumbuhan Ekonomi Kabupaten Mimika 2024"
+                  placeholder="Contoh: Laporan Pertumbuhan Ekonomi Daerah 2024"
                   required
                   className="w-full text-xs p-2.5 border border-slate-300 focus:outline-none focus:border-teal-700"
                 />
@@ -14803,7 +15292,7 @@ export const PdfExportService = {
         }
       },
       header: {
-        text: 'BRIDA SMART ANALYSIS — KABUPATEN MIMIKA',
+        text: 'Geo Analisis ANALYSIS',
         alignment: 'right',
         fontSize: 8,
         color: '#94a3b8',
@@ -14811,7 +15300,7 @@ export const PdfExportService = {
       },
       footer: (currentPage: number, pageCount: number) => ({
         columns: [
-          { text: 'Naskah Publikasi Resmi BRIDA Kabupaten Mimika', fontSize: 8, color: '#94a3b8' },
+          { text: 'Naskah Publikasi Resmi', fontSize: 8, color: '#94a3b8' },
           { text: `Halaman ${currentPage} dari ${pageCount}`, alignment: 'right', fontSize: 8, color: '#94a3b8' },
         ],
         margin: [marginPoints, 10, marginPoints, 0],
@@ -15023,9 +15512,9 @@ export const PdfExportService = {
       }),
       content: [
         // ── Kop Surat ──────────────────────────────────────────────────────────
-        { text: 'PEMERINTAH KABUPATEN MIMIKA', fontSize: 13, bold: true, alignment: 'center', color: '#0f172a' },
-        { text: 'BADAN RISET DAN INOVASI DAERAH (BRIDA)', fontSize: 11, bold: true, alignment: 'center', color: '#0d9488', margin: [0, 3, 0, 3] },
-        { text: 'Jl. Cenderawasih No. 1, Timika, Papua Tengah', fontSize: 8.5, alignment: 'center', color: '#565c63', margin: [0, 0, 0, 10] },
+        { text: 'DOKUMEN REKOMENDASI KEBIJAKAN', fontSize: 13, bold: true, alignment: 'center', color: '#0f172a' },
+        { text: 'ANALISIS Geo Analisis', fontSize: 11, bold: true, alignment: 'center', color: '#0d9488', margin: [0, 3, 0, 3] },
+        { text: 'Sistem Informasi dan Dashboard Kebijakan Terintegrasi', fontSize: 8.5, alignment: 'center', color: '#565c63', margin: [0, 0, 0, 10] },
         {
           canvas: [{ type: 'line', x1: 0, y1: 0, x2: 495, y2: 0, lineWidth: 2, lineColor: '#0f172a' }],
           margin: [0, 0, 0, 14],
@@ -15100,7 +15589,7 @@ export const PdfExportService = {
           margin: [0, 0, 0, 18],
         },
         // ── Seksi 3 ────────────────────────────────────────────────────────────
-        { text: '3. REKOMENDASI ACTION PLAN BUPATI', style: 'sectionHeader', margin: [0, 20, 0, 8] },
+        { text: '3. REKOMENDASI ACTION PLAN EKSEKUTIF', style: 'sectionHeader', margin: [0, 20, 0, 8] },
         {
           ol: report.actionPriorities.map((act: string) => ({
             text: stripCitationTokens(act),
@@ -15118,9 +15607,9 @@ export const PdfExportService = {
             {
               width: 200,
               stack: [
-                { text: 'Tim Analis Kebijakan BRIDA,', fontSize: 9, alignment: 'center' },
+                { text: 'Tim Analis Kebijakan,', fontSize: 9, alignment: 'center' },
                 { text: '\n\n\n', fontSize: 9 },
-                { text: 'Kepala BRIDA Kabupaten Mimika', fontSize: 9.5, bold: true, alignment: 'center' },
+                { text: 'Analis Kebijakan Utama', fontSize: 9.5, bold: true, alignment: 'center' },
                 { text: 'NIP. 19780412 200312 1 002', fontSize: 8.5, alignment: 'center', color: '#475569', margin: [0, 2, 0, 0] },
               ],
             },
