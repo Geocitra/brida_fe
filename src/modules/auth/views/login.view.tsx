@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Shield, Lock, ArrowRight, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
+import { FileText, Lock, ArrowRight, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 import { AuthService } from '../../../services/auth.service';
 
 interface LoginViewProps {
@@ -40,17 +40,19 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
       <div className="absolute inset-0 bg-slate-950/20" />
 
       { }
-      <div className="w-full max-w-md bg-white border border-slate-700 shadow-2xl rounded-none overflow-hidden relative z-10">
-        <div className="bg-slate-950 p-6 border-b border-slate-800 text-center relative">
-          <div className="w-12 h-12 bg-teal-600 border border-teal-400 mx-auto flex items-center justify-center text-white mb-3 rounded-none shadow-md">
-            <Shield size={24} />
+      <div className="w-full max-w-md bg-white border border-slate-300 shadow-2xl rounded-none overflow-hidden relative z-10">
+        <div className="bg-white p-6 border-b border-slate-200 flex items-center justify-center gap-3 relative select-none">
+          <FileText size={28} className="text-blue-600 shrink-0" />
+          <div className="w-px h-8 bg-slate-300 mx-1" />
+          <div className="flex flex-col text-left">
+            <h1 className="text-base font-black tracking-tight leading-none text-slate-900 m-0 p-0 flex items-center">
+              <span>AKLS</span>
+              <span className="text-blue-600 ml-1">Platform</span>
+            </h1>
+            <span className="text-[11px] text-slate-500 font-bold uppercase tracking-wider mt-1">
+              Portal Eksekutif
+            </span>
           </div>
-          <h1 className="text-xl font-bold text-white tracking-wide uppercase">
-            AKLS
-          </h1>
-          <p className="text-xs text-teal-400 font-medium mt-1">
-            Portal Eksekutif
-          </p>
         </div>
 
         <div className="p-8 bg-slate-50">
@@ -88,15 +90,15 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
               />
             </div>
 
-            <div className="p-3 bg-teal-50 border border-teal-200 text-teal-800 text-xs flex items-center gap-2 rounded-none">
-              <CheckCircle2 size={16} className="text-teal-600 shrink-0" />
+            <div className="p-3 bg-blue-50 border border-blue-200 text-blue-800 text-xs flex items-center gap-2 rounded-none">
+              <CheckCircle2 size={16} className="text-blue-600 shrink-0" />
               <span>Akses Khusus Terotentikasi Executive</span>
             </div>
 
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full py-3 bg-teal-600 hover:bg-teal-700 disabled:bg-slate-300 text-white font-bold text-sm uppercase tracking-wider rounded-none flex items-center justify-center gap-2 transition-colors border border-teal-700 shadow-md cursor-pointer disabled:cursor-not-allowed"
+              className="w-full py-3 bg-[#0070c0] hover:bg-blue-700 disabled:bg-slate-300 text-white font-bold text-sm uppercase tracking-wider rounded-none flex items-center justify-center gap-2 transition-colors border border-blue-800 shadow-md cursor-pointer disabled:cursor-not-allowed"
             >
               {isLoading ? (
                 <>
