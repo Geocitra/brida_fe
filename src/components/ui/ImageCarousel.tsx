@@ -9,117 +9,120 @@ interface ImageCarouselProps {
     altText?: string;
 }
 
-/**
- * ImageCarousel - Komponen Slider Media Horizontal
- * Menggunakan mekanisme snap-scroll CSS murni yang sangat cepat dan ringan.
- * Bertindak sebagai pemantik (*trigger*) utama untuk mengaktifkan "Theater Mode" (Gallery Overlay).
- */
 export default function ImageCarousel({
     images,
     altText = "Media Aset"
 }: ImageCarouselProps) {
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const [activeIndex, setActiveIndex] = useState(0);
-
-    // Mengambil aksi Buka Galeri Sinematik dari Store Zustand
     const { openGallery } = useExplorerStore();
 
-    // Skenario A: Tidak ada foto (Render Empty State)
+    // ── KELAS UTAS UNTUK RASIO ASPEK KONSISTEN & HD RENDERING ──
+    // Menggunakan aspect-[16/10] untuk kestabilan layout di semua panel detail wilayah & aset.
+    // Menambahkan class transform-gpu dan backface-visibility untuk memastikan ketajaman (HD) rendering srgb.
+    const containerClasses = "w-full aspect-[16/10] bg-slate-950 border-b border-slate-200 shrink-0 select-none overflow-hidden relative group rounded-none";
+    const imageClasses = "w-full h-full object-cover object-center transform-gpu scale-100 hover:scale-103 transition-transform duration-500 ease-out will-change-transform";
+
+    // 1. Kondisi: Tidak Ada Gambar (Fallback Frame Harus Tetap Konsisten)
     if (!images || images.length === 0) {
         return (
-            <div className="w-full aspect-video bg-slate-100 flex flex-col items-center justify-center border-b border-slate-200 shrink-0 select-none">
-                <Layers size={24} className="text-slate-300 mb-2" />
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+            <div className={`${containerClasses} flex flex-col items-center justify-center bg-slate-100`}>
+                <Layers size={22} className="text-slate-300 mb-1.5 animate-pulse" />
+                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
                     Tidak Ada Visualisasi Foto
                 </span>
             </div>
         );
     }
 
-    // Skenario B: Hanya ada 1 gambar (Klik langsung memicu Teater)
+    // 2. Kondisi: Satu Gambar (Single Image View)
     if (images.length === 1) {
         return (
             <button
+                type="button"
                 onClick={() => openGallery(images, 0, altText)}
-                className="relative w-full aspect-video border-b border-slate-200 bg-slate-100 shrink-0 group block cursor-pointer overflow-hidden rounded-none"
+                className={`${containerClasses} block cursor-pointer border-none p-0`}
             >
                 <img
                     src={images[0]}
                     alt={altText}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+                    className={imageClasses}
+                    loading="lazy"
                     draggable={false}
                 />
-                <div className="absolute inset-0 bg-slate-900/0 group-hover:bg-slate-900/20 transition-colors pointer-events-none" />
+                <div className="absolute inset-0 bg-slate-950/0 group-hover:bg-slate-950/20 transition-colors duration-300 pointer-events-none" />
 
-                {/* Overlay Trigger Hover */}
-                <div className="absolute bottom-2 right-2 bg-slate-900/80 backdrop-blur-md px-2.5 py-1.5 flex items-center gap-1.5 text-white opacity-0 group-hover:opacity-100 transition-opacity border border-white/20 select-none">
-                    <Maximize2 size={12} strokeWidth={2.5} />
-                    <span className="text-[9px] font-bold uppercase tracking-widest">Perbesar</span>
+                {/* Tombol Perbesar Hover */}
+                <div className="absolute bottom-3.5 right-3.5 bg-slate-900/90 backdrop-blur-md px-3 py-2 flex items-center gap-1.5 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-300 border border-white/10 shadow-lg pointer-events-none">
+                    <Maximize2 size={11} strokeWidth={2.5} />
+                    <span className="text-[8px] font-black uppercase tracking-widest">Perbesar</span>
                 </div>
             </button>
         );
     }
 
-    // Sinkronisasi indikator pagination titik (dots) dengan pergeseran scroll kontainer
+    // 3. Kondisi: Banyak Gambar (Carousel Scroller View)
     const handleScroll = () => {
         if (!scrollContainerRef.current) return;
         const scrollPosition = scrollContainerRef.current.scrollLeft;
         const width = scrollContainerRef.current.clientWidth;
-        const newIndex = Math.round(scrollPosition / width);
-        setActiveIndex(newIndex);
+        if (width > 0) {
+            const newIndex = Math.round(scrollPosition / width);
+            setActiveIndex(newIndex);
+        }
     };
 
     return (
-        <div className="relative w-full aspect-video border-b border-slate-200 bg-slate-900 shrink-0 group">
-
-            {/* SCROLL SNAP CONTAINER (Tanpa panah manual untuk menjaga estetika ramping) */}
+        <div className={containerClasses}>
+            {/* Viewport Scroll Horizontal */}
             <div
                 ref={scrollContainerRef}
                 onScroll={handleScroll}
-                className="flex w-full h-full overflow-x-auto snap-x snap-mandatory [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+                className="flex w-full h-full overflow-x-auto snap-x snap-mandatory scroll-smooth [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
             >
                 {images.map((src, idx) => (
                     <button
                         key={idx}
-                        onClick={() => openGallery(images, idx, altText)} // Klik gambar manapun membuka Teater di indeks terkait
+                        type="button"
+                        onClick={() => openGallery(images, idx, altText)}
                         className="w-full h-full shrink-0 snap-center relative block cursor-pointer rounded-none border-none p-0"
                     >
                         <img
                             src={src}
                             alt={`${altText} - Foto ke-${idx + 1}`}
-                            className="w-full h-full object-cover hover:scale-105 transition-transform duration-700"
+                            className={imageClasses}
+                            loading="lazy"
                             draggable={false}
                         />
-                        {/* Gradasi Gelap Bawah agar indikator dots tetap kontras terlihat */}
-                        <div className="absolute inset-0 bg-gradient-to-t from-slate-900/70 via-transparent to-transparent pointer-events-none" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-slate-950/60 via-transparent to-transparent pointer-events-none" />
                     </button>
                 ))}
             </div>
 
-            {/* TRIGGER THEATER OVERLAY - Kanan Bawah */}
+            {/* Tombol Aksi Kerapatan Perbesar Gambar */}
             <button
+                type="button"
                 onClick={() => openGallery(images, activeIndex, altText)}
-                className="absolute bottom-2 right-2 z-10 bg-slate-900/80 hover:bg-teal-600 backdrop-blur-md px-2.5 py-1.5 flex items-center gap-1.5 text-white transition-all border border-white/20 shadow-md group-hover:scale-105 cursor-pointer rounded-none"
+                className="absolute bottom-3 right-3 z-10 bg-slate-900/90 hover:bg-teal-700 backdrop-blur-md px-3 py-2 flex items-center gap-1.5 text-white transition-all duration-300 border border-white/10 shadow-lg cursor-pointer rounded-none hover:scale-102"
             >
-                <Maximize2 size={12} strokeWidth={2.5} />
-                <span className="text-[9px] font-black uppercase tracking-widest select-none">
+                <Maximize2 size={11} strokeWidth={2.5} />
+                <span className="text-[8px] font-black uppercase tracking-widest select-none">
                     Lihat {images.length} Foto
                 </span>
             </button>
 
-            {/* DOTS PAGINATION INDICATOR - Kiri Bawah */}
-            <div className="absolute bottom-3 left-3 flex items-center gap-1.5 z-10 pointer-events-none select-none">
+            {/* Indikator Titik Paginasi */}
+            <div className="absolute bottom-4 left-4 flex items-center gap-1.5 z-10 pointer-events-none select-none">
                 {images.map((_, idx) => (
                     <div
                         key={idx}
-                        className={`transition-all duration-300 rounded-none ${idx === activeIndex
-                            ? "w-4 h-1.5 bg-teal-400 shadow-[0_0_8px_rgba(45,212,191,0.8)]"
-                            : "w-1.5 h-1.5 bg-white/40"
+                        className={`transition-all duration-300 h-1 rounded-none ${idx === activeIndex
+                            ? "w-5 bg-teal-400 shadow-[0_0_8px_rgba(20,184,166,0.8)]"
+                            : "w-1.5 bg-white/40"
                             }`}
                     />
                 ))}
             </div>
-
         </div>
     );
 }

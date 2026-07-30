@@ -1,3 +1,5 @@
+// FILE: src/App.tsx
+
 import { useState, useEffect } from 'react';
 import { AppShell } from './components/layout/app-shell';
 import { LoginView } from './modules/auth/views/login.view';
@@ -264,18 +266,13 @@ export function App() {
     }
   };
 
-  // Jika state penampil modal login aktif, tampilkan LoginView dalam bentuk overlay/modal penuh
+  // Jika state penampil modal login aktif, tampilkan LoginView dalam bentuk modal penuh
   if (showLoginModal) {
     return (
-      <div className="relative">
-        <LoginView onLoginSuccess={handleLoginSuccess} />
-        <button
-          onClick={() => setShowLoginModal(false)}
-          className="absolute top-4 right-4 bg-slate-800 hover:bg-slate-700 text-white px-3 py-1.5 text-xs font-bold uppercase tracking-wider rounded-none cursor-pointer border border-slate-600 shadow-md z-50"
-        >
-          Batal / Kembali ke Landing
-        </button>
-      </div>
+      <LoginView
+        onLoginSuccess={handleLoginSuccess}
+        onClose={() => setShowLoginModal(false)}
+      />
     );
   }
 

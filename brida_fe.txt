@@ -436,7 +436,8 @@ export default defineConfig({
 }
 
 --- FILE: src\App.tsx ---
-import { useState } from 'react';
+
+import { useState, useEffect } from 'react';
 import { AppShell } from './components/layout/app-shell';
 import { LoginView } from './modules/auth/views/login.view';
 import { DashboardView } from './modules/dashboard/views/dashboard.view';
@@ -451,12 +452,23 @@ import GisExplorerView from './modules/dashboard/views/gis-explorer.view';
 import { LandingView } from './modules/dashboard/views/landing.view';
 
 const SESSION_FORWARD_DOCS_KEY = 'brida_forward_doc_ids';
+const AUTH_SESSION_KEY = 'brida_is_authenticated';
+const PENDING_ROUTE_KEY = 'brida_pending_route';
 
 export function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(true);
-  const [activeRoute, setActiveRoute] = useState('landing');
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+    try {
+      return sessionStorage.getItem(AUTH_SESSION_KEY) === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const [activeRoute, setActiveRoute] = useState<string>('landing');
   const [initialArticlePrompt, setInitialArticlePrompt] = useState<string | undefined>(undefined);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+
+  const [showLoginModal, setShowLoginModal] = useState<boolean>(false);
 
   const [sharedDocIds, setSharedDocIds] = useState<string[] | undefined>(() => {
     try {
@@ -467,6 +479,14 @@ export function App() {
       return undefined;
     }
   });
+
+  useEffect(() => {
+    try {
+      window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    } catch (err) {
+      window.scrollTo(0, 0);
+    }
+  }, [activeRoute]);
 
   const pageTitles: Record<string, string> = {
     landing: 'Portal Utama & Asisten Analisis',
@@ -480,14 +500,95 @@ export function App() {
     'article-editor': 'Pratinjau Cetak & Editor Manual',
   };
 
+  const handleLoginSuccess = () => {
+    try {
+      sessionStorage.setItem(AUTH_SESSION_KEY, 'true');
+    } catch (err) {
+      console.warn('[Auth] Gagal menyimpan status login ke session:', err);
+    }
+    setIsAuthenticated(true);
+    setShowLoginModal(false);
+
+    try {
+      const pendingRoute = sessionStorage.getItem(PENDING_ROUTE_KEY);
+      if (pendingRoute) {
+        sessionStorage.removeItem(PENDING_ROUTE_KEY);
+        setActiveRoute(pendingRoute);
+      }
+    } catch (e) {
+      console.error('Gagal membaca pending route:', e);
+    }
+  };
+
+  const handleLogout = () => {
+    try {
+      sessionStorage.removeItem(AUTH_SESSION_KEY);
+      sessionStorage.removeItem(SESSION_FORWARD_DOCS_KEY);
+      sessionStorage.removeItem(PENDING_ROUTE_KEY);
+    } catch (err) {
+      console.warn('[Auth] Gagal membersihkan session saat logout:', err);
+    }
+    setIsAuthenticated(false);
+    setActiveRoute('landing');
+    setActiveSessionId(null);
+    setSharedDocIds(undefined);
+  };
+
+  const handleNavigationAttempt = (route: string, sessionId?: string | null) => {
+
+    const publicRoutes = ['landing', 'gis-explorer'];
+
+    if (!publicRoutes.includes(route) && !isAuthenticated) {
+
+      try {
+        sessionStorage.setItem(PENDING_ROUTE_KEY, route);
+      } catch (err) {
+        console.warn('Gagal menyimpan rute tertunda:', err);
+      }
+      setShowLoginModal(true);
+      return;
+    }
+
+    handleClearSharedDocIds();
+    setInitialArticlePrompt(undefined);
+
+    let finalRoute = route;
+    let finalSessionId = sessionId || null;
+
+    if (route.includes('?')) {
+      const [rPath, query] = route.split('?');
+      finalRoute = rPath;
+      try {
+        const params = new URLSearchParams(query);
+        finalSessionId = params.get('session') || finalSessionId;
+      } catch (e) {
+        console.error('Gagal memparsing query parameters:', e);
+      }
+    }
+
+    setActiveSessionId(finalSessionId);
+    setActiveRoute(finalRoute);
+  };
+
   const handleForwardAction = (documentIds: string[], targetRoute: string, promptText?: string) => {
+
+    if (!isAuthenticated) {
+      try {
+        sessionStorage.setItem(PENDING_ROUTE_KEY, targetRoute);
+        sessionStorage.setItem(SESSION_FORWARD_DOCS_KEY, JSON.stringify(documentIds));
+      } catch (err) {
+        console.warn('Gagal menyimpan state forward tertunda:', err);
+      }
+      setShowLoginModal(true);
+      return;
+    }
+
     try {
       sessionStorage.setItem(SESSION_FORWARD_DOCS_KEY, JSON.stringify(documentIds));
       setSharedDocIds(documentIds);
 
       if (promptText && promptText.startsWith('[TRANSITIONED_SESSION_ID]:')) {
         const transitionedId = promptText.replace('[TRANSITIONED_SESSION_ID]:', '');
-
         setActiveSessionId(transitionedId);
         setInitialArticlePrompt(undefined);
         setActiveRoute('article-editor');
@@ -510,52 +611,26 @@ export function App() {
     }
   };
 
-  const handleManualNavigation = (route: string, sessionId?: string | null) => {
-    handleClearSharedDocIds();
-    setInitialArticlePrompt(undefined);
-
-    let finalRoute = route;
-    let finalSessionId = sessionId || null;
-
-    if (route.includes('?')) {
-      const [rPath, query] = route.split('?');
-      finalRoute = rPath;
-      try {
-        const params = new URLSearchParams(query);
-        finalSessionId = params.get('session') || finalSessionId;
-      } catch (e) {
-        console.error('Gagal memparsing query parameters:', e);
-      }
-    }
-
-    setActiveSessionId(finalSessionId);
-    setActiveRoute(finalRoute);
-  };
-
-  if (!isAuthenticated) {
-    return <LoginView onLoginSuccess={() => setIsAuthenticated(true)} />;
-  }
-
   const renderContent = () => {
     switch (activeRoute) {
       case 'landing':
         return (
           <LandingView
-            onNavigate={handleManualNavigation}
+            onNavigate={handleNavigationAttempt}
           />
         );
       case 'dashboard':
         return (
           <DashboardView
-            onNavigate={handleManualNavigation}
-            onLogout={() => setIsAuthenticated(false)}
+            onNavigate={handleNavigationAttempt}
+            onLogout={handleLogout}
           />
         );
       case 'gis-explorer':
         return (
           <GisExplorerView
-            onNavigate={handleManualNavigation}
-            onLogout={() => setIsAuthenticated(false)}
+            onNavigate={handleNavigationAttempt}
+            onLogout={handleLogout}
           />
         );
       case 'knowledge-hub':
@@ -578,7 +653,7 @@ export function App() {
             initialSelectedDocIds={sharedDocIds}
             onClearSharedDocIds={handleClearSharedDocIds}
             onNavigateToGenerator={(prompt) => handleForwardAction(sharedDocIds || [], 'generator', prompt)}
-            onNavigateToDashboard={() => handleManualNavigation('dashboard')}
+            onNavigateToDashboard={() => handleNavigationAttempt('dashboard')}
           />
         );
       case 'ai-request':
@@ -596,7 +671,7 @@ export function App() {
             initialSelectedDocIds={sharedDocIds}
             onClearSharedDocIds={handleClearSharedDocIds}
             initialPrompt={initialArticlePrompt}
-            onNavigateToQa={() => handleManualNavigation('ai-request')}
+            onNavigateToQa={() => handleNavigationAttempt('ai-request')}
             onNavigateToEditor={(sessionId) => {
               setActiveSessionId(sessionId);
               setActiveRoute('article-editor');
@@ -614,11 +689,20 @@ export function App() {
       default:
         return (
           <LandingView
-            onNavigate={handleManualNavigation}
+            onNavigate={handleNavigationAttempt}
           />
         );
     }
   };
+
+  if (showLoginModal) {
+    return (
+      <LoginView
+        onLoginSuccess={handleLoginSuccess}
+        onClose={() => setShowLoginModal(false)}
+      />
+    );
+  }
 
   if (activeRoute === 'gis-explorer' || activeRoute === 'landing') {
     return renderContent();
@@ -627,9 +711,9 @@ export function App() {
   return (
     <AppShell
       activeRoute={activeRoute}
-      onNavigate={handleManualNavigation}
+      onNavigate={handleNavigationAttempt}
       pageTitle={pageTitles[activeRoute] || 'Executive Dashboard'}
-      onLogout={() => setIsAuthenticated(false)}
+      onLogout={handleLogout}
     >
       {renderContent()}
     </AppShell>
@@ -711,42 +795,44 @@ body {
   line-height: 1.5;
 }
 
-h1,
-.text-h1 {
-  font-size: 1.5rem;
+@layer base {
+  h1,
+  .text-h1 {
+    font-size: 1.5rem;
 
-  font-weight: 700;
-  line-height: 1.25;
-  letter-spacing: -0.025em;
-  color: #0f172a;
-}
+    font-weight: 700;
+    line-height: 1.25;
+    letter-spacing: -0.025em;
+    color: #0f172a;
+  }
 
-h2,
-.text-h2 {
-  font-size: 1.25rem;
+  h2,
+  .text-h2 {
+    font-size: 1.25rem;
 
-  font-weight: 700;
-  line-height: 1.3;
-  color: #0f172a;
-}
+    font-weight: 700;
+    line-height: 1.3;
+    color: #0f172a;
+  }
 
-h3,
-.text-h3 {
-  font-size: 1rem;
+  h3,
+  .text-h3 {
+    font-size: 1rem;
 
-  font-weight: 600;
-  line-height: 1.4;
-  color: #1e293b;
-}
+    font-weight: 600;
+    line-height: 1.4;
+    color: #1e293b;
+  }
 
-p,
-.text-body {
-  font-size: 0.875rem;
+  p,
+  .text-body {
+    font-size: 0.875rem;
 
-  font-weight: 400;
-  line-height: 1.6;
-  text-align: left;
-  color: #334155;
+    font-weight: 400;
+    line-height: 1.6;
+    text-align: left;
+    color: #334155;
+  }
 }
 
 .leaflet-marker-icon,
@@ -844,6 +930,54 @@ path.leaflet-interactive:focus-visible {
   100% {
     transform: translateY(100vh);
   }
+}
+
+.prose table {
+  width: 100% !important;
+  border-collapse: collapse !important;
+  margin-top: 1rem !important;
+  margin-bottom: 1rem !important;
+}
+
+.prose table th,
+.prose table td {
+  border: 1px solid #cbd5e1 !important;
+  padding: 0.5rem 0.75rem !important;
+  text-align: left !important;
+  font-size: 0.825rem !important;
+}
+
+.prose table th {
+  background-color: #f8fafc !important;
+  font-weight: 700 !important;
+  color: #0f172a !important;
+}
+
+.prose ul {
+  list-style-type: disc !important;
+  padding-left: 1.5rem !important;
+  margin-top: 0.75rem !important;
+  margin-bottom: 0.75rem !important;
+}
+
+.prose ol {
+  list-style-type: decimal !important;
+  padding-left: 1.5rem !important;
+  margin-top: 0.75rem !important;
+  margin-bottom: 0.75rem !important;
+}
+
+.prose li {
+  margin-top: 0.25rem !important;
+  margin-bottom: 0.25rem !important;
+  display: list-item !important;
+}
+
+.prose h1, .prose h2, .prose h3, .prose h4 {
+  color: #0f172a !important;
+  font-weight: 700 !important;
+  margin-top: 1.25rem !important;
+  margin-bottom: 0.5rem !important;
 }
 
 --- FILE: src\main.tsx ---
@@ -953,9 +1087,9 @@ export const CategorizedDocumentSelector: React.FC<CategorizedDocumentSelectorPr
   };
 
   return (
-    <div className="space-y-4 font-roboto">
+    <div className="space-y-2.5 font-roboto">
       {}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-200 pb-3">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-200 pb-2">
         <div className="flex items-center gap-2">
           <FileText size={18} className="text-teal-700 shrink-0" />
           <h2 className="text-sm font-bold text-slate-900 tracking-wide uppercase flex items-center gap-2">
@@ -1009,8 +1143,6 @@ export const CategorizedDocumentSelector: React.FC<CategorizedDocumentSelectorPr
           >
             Kosongkan
           </button>
-
-          {}
         </div>
       </div>
 
@@ -1041,7 +1173,7 @@ export const CategorizedDocumentSelector: React.FC<CategorizedDocumentSelectorPr
 
         <div className={`grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-slate-200 border-slate-200 py-1 font-roboto ${isLocked ? 'opacity-50 pointer-events-none' : ''}`}>
           {}
-          <div className="p-3 space-y-2">
+          <div className="p-2 space-y-1.5">
             <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
               <span className="text-xs font-bold text-slate-900 uppercase flex items-center gap-1.5">
                 <Target size={14} className="text-teal-700 shrink-0" />
@@ -1063,7 +1195,7 @@ export const CategorizedDocumentSelector: React.FC<CategorizedDocumentSelectorPr
                 </button>
               )}
             </div>
-            <div className="space-y-1 max-h-48 overflow-y-auto pr-1">
+            <div className="space-y-0.5 max-h-28 overflow-y-auto pr-1 custom-scrollbar">
               {baselineDocs.length === 0 ? (
                 <p className="text-xs text-slate-400 italic py-1">Tidak ada dokumen Target Baseline.</p>
               ) : (
@@ -1073,7 +1205,7 @@ export const CategorizedDocumentSelector: React.FC<CategorizedDocumentSelectorPr
                     <div
                       key={doc.id}
                       onClick={() => onToggleDoc(doc.id)}
-                      className={`p-2 text-xs cursor-pointer flex items-start gap-2 transition-colors rounded-none ${isSelected
+                      className={`py-0.5 px-1.5 text-xs cursor-pointer flex items-start gap-2 transition-colors rounded-none ${isSelected
                         ? 'bg-teal-50 font-bold text-teal-950'
                         : 'hover:bg-slate-50 text-slate-700'
                         }`}
@@ -1092,7 +1224,7 @@ export const CategorizedDocumentSelector: React.FC<CategorizedDocumentSelectorPr
           </div>
 
           {}
-          <div className="p-3 space-y-2">
+          <div className="p-2 space-y-1.5">
             <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
               <span className="text-xs font-bold text-slate-900 uppercase flex items-center gap-1.5">
                 <BarChart3 size={14} className="text-teal-700 shrink-0" />
@@ -1114,7 +1246,7 @@ export const CategorizedDocumentSelector: React.FC<CategorizedDocumentSelectorPr
                 </button>
               )}
             </div>
-            <div className="space-y-1 max-h-48 overflow-y-auto pr-1">
+            <div className="space-y-0.5 max-h-28 overflow-y-auto pr-1 custom-scrollbar">
               {realizationDocs.length === 0 ? (
                 <p className="text-xs text-slate-400 italic py-1">Tidak ada dokumen Realisasi.</p>
               ) : (
@@ -1124,7 +1256,7 @@ export const CategorizedDocumentSelector: React.FC<CategorizedDocumentSelectorPr
                     <div
                       key={doc.id}
                       onClick={() => onToggleDoc(doc.id)}
-                      className={`p-2 text-xs cursor-pointer flex items-start gap-2 transition-colors rounded-none ${isSelected
+                      className={`py-0.5 px-1.5 text-xs cursor-pointer flex items-start gap-2 transition-colors rounded-none ${isSelected
                         ? 'bg-teal-50 font-bold text-teal-950'
                         : 'hover:bg-slate-50 text-slate-700'
                         }`}
@@ -1143,7 +1275,7 @@ export const CategorizedDocumentSelector: React.FC<CategorizedDocumentSelectorPr
           </div>
 
           {}
-          <div className="p-3 space-y-2">
+          <div className="p-2 space-y-1.5">
             <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
               <span className="text-xs font-bold text-slate-900 uppercase flex items-center gap-1.5">
                 <Newspaper size={14} className="text-teal-700 shrink-0" />
@@ -1165,7 +1297,7 @@ export const CategorizedDocumentSelector: React.FC<CategorizedDocumentSelectorPr
                 </button>
               )}
             </div>
-            <div className="space-y-1 max-h-48 overflow-y-auto pr-1">
+            <div className="space-y-0.5 max-h-28 overflow-y-auto pr-1 custom-scrollbar">
               {referenceDocs.length === 0 ? (
                 <p className="text-xs text-slate-400 italic py-1">Tidak ada dokumen Referensi Lain.</p>
               ) : (
@@ -1175,7 +1307,7 @@ export const CategorizedDocumentSelector: React.FC<CategorizedDocumentSelectorPr
                     <div
                       key={doc.id}
                       onClick={() => onToggleDoc(doc.id)}
-                      className={`p-2 text-xs cursor-pointer flex items-start gap-2 transition-colors rounded-none ${isSelected
+                      className={`py-0.5 px-1.5 text-xs cursor-pointer flex items-start gap-2 transition-colors rounded-none ${isSelected
                         ? 'bg-teal-50 font-bold text-teal-950'
                         : 'hover:bg-slate-50 text-slate-700'
                         }`}
@@ -1353,7 +1485,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({ activeRoute, onNavigate, o
             <span className="font-roboto font-bold text-sm tracking-wider text-teal-400 uppercase group-hover:text-teal-300 transition-colors">
               AKLS
             </span>
-            <span className="font-roboto text-[10px] text-slate-400 font-medium hidden sm:inline">
+            <span className="font-roboto text-[12px] text-slate-400 font-medium hidden sm:inline">
               Aplikasi Analisa Kebijakan &amp; Laporan Strategis
             </span>
           </div>
@@ -2210,16 +2342,57 @@ interface SuggestionChipsProps {
   disabled: boolean;
 }
 
+const normalizeSuggestions = (suggestions?: string[]): string[] => {
+  if (!suggestions || suggestions.length === 0) return [];
+
+  if (suggestions.length === 1 && typeof suggestions[0] === 'string') {
+    const raw = suggestions[0];
+
+    if (raw.includes('\n-') || raw.includes(' - ') || raw.includes('? -') || raw.includes('?* -')) {
+      let cleaned = raw.replace(/^##\s*Opsi\s*Lanjutan\s*/i, '').trim();
+
+      const parts = cleaned
+        .split(/(?:\r?\n)?-\s+/)
+        .map(p => p.trim())
+        .filter(p => p.length > 0);
+
+      if (parts.length > 1) {
+        return parts;
+      }
+
+      const inlineParts = cleaned
+        .split(/\?\s+-\s+/)
+        .map((p, idx, arr) => {
+          let item = p.trim();
+          if (idx < arr.length - 1 && !item.endsWith('?')) {
+            item += '?';
+          }
+          return item;
+        })
+        .filter(p => p.length > 0);
+
+      if (inlineParts.length > 1) {
+        return inlineParts;
+      }
+    }
+  }
+
+  return suggestions
+    .map(s => s.replace(/^##\s*Opsi\s*Lanjutan\s*/i, '').replace(/^-\s+/, '').trim())
+    .filter(s => s.length > 0);
+};
+
 const SuggestionChips: React.FC<SuggestionChipsProps> = ({
   suggestions,
   onClick,
   disabled,
 }) => {
-  if (!suggestions || suggestions.length === 0) return null;
+  const normalized = normalizeSuggestions(suggestions);
+  if (normalized.length === 0) return null;
 
   return (
     <div className="flex flex-wrap gap-2 mt-3 pt-2.5 border-t border-slate-100 no-print">
-      {suggestions.map((s, idx) => (
+      {normalized.map((s, idx) => (
         <button
           key={idx}
           type="button"
@@ -2227,7 +2400,7 @@ const SuggestionChips: React.FC<SuggestionChipsProps> = ({
           disabled={disabled}
           className="px-3 py-1.5 bg-teal-50 hover:bg-teal-100 disabled:opacity-50 text-teal-800 hover:text-teal-950 font-bold text-xs border border-teal-200 hover:border-teal-300 rounded-none shadow-2xs transition-colors cursor-pointer disabled:cursor-not-allowed inline-flex items-center gap-1.5"
         >
-          <span>{s}</span>
+          <span>{parseInlineStyles(s)}</span>
           <ArrowRight size={11} className="text-teal-600 shrink-0 animate-pulse" />
         </button>
       ))}
@@ -2388,6 +2561,27 @@ interface ChatPanelProps {
   initialSessionId?: string | null;
 }
 
+const formatLastMessage = (content?: string | null): string => {
+  if (!content) return 'Belum ada pesan.';
+  let text = content;
+  try {
+    const parsed = JSON.parse(content);
+    if (parsed && typeof parsed === 'object') {
+      text = parsed.answer || parsed.fullArticleText || content;
+    }
+  } catch {
+
+  }
+  return text
+    .replace(/\[(?:[a-f0-9-]{8,}|doc(?:[-_a-z0-9]+)?):\d+\]/gi, '')
+    .replace(/#{1,6}\s*/g, '')
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/\*(.*?)\*/g, '$1')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+};
+
 export const ChatPanel: React.FC<ChatPanelProps> = ({
   selectedDocumentId,
   selectedDocumentIds = [],
@@ -2406,15 +2600,18 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const [sessionId, setSessionId] = useState<string | null>(initialSessionId || null);
   const [sessionError, setSessionError] = useState<string | null>(null);
 
+  // Cadangan memori kueri terakhir yang gagal dikirim
   const [lastFailedQuery, setLastFailedQuery] = useState<string | null>(null);
 
   const [qaSessions, setQaSessions] = useState<QaSessionItem[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState<boolean>(false);
   const [showHistorySidebar, setShowHistorySidebar] = useState<boolean>(true);
 
+  // Pengelolaan State Berkas Terlampir (Staged Attachments) [5]
   const [stagedAttachments, setStagedAttachments] = useState<StagedAttachment[]>([]);
   const [isUploadingAttachment, setIsUploadingAttachment] = useState(false);
 
+  // Dialog Transisi Modal
   const [isTransitionModalOpen, setIsTransitionModalOpen] = useState(false);
   const [transitionTitle, setTransitionTitle] = useState('');
   const [transitionTone, setTransitionTone] = useState('solutif');
@@ -2498,7 +2695,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
               }
             }
           } catch {
-
+            // String legacy
           }
         }
 
@@ -2562,6 +2759,9 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     return newSessionId;
   };
 
+  /**
+   * Mengunggah berkas penempelan keyboard (Ctrl+V) atau dari pemilih konvensional secara asinkron [5]
+   */
   const handleUploadStagedAsset = async (file: File) => {
     setIsUploadingAttachment(true);
     setSessionError(null);
@@ -2606,6 +2806,9 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     }
   };
 
+  /**
+   * Menangkap penempelan biner screenshot langsung dari clipboard (Ctrl+V) [5]
+   */
   const handlePaste = async (e: React.ClipboardEvent<HTMLInputElement>) => {
     const items = e.clipboardData.items;
     for (let i = 0; i < items.length; i++) {
@@ -2613,7 +2816,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         const file = items[i].getAsFile();
         if (file) {
           e.preventDefault();
-
+          // Cek batas maksimal ubin gambar (maksimal 3 per prompt) [5]
           const existingImagesCount = stagedAttachments.filter((att) => att.mimeType.startsWith('image/')).length;
           if (existingImagesCount >= 3) {
             setSessionError('Batas Terlampaui: Anda hanya dapat melampirkan maksimal 3 gambar per prompt.');
@@ -2635,6 +2838,9 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     setStagedAttachments((prev) => prev.filter((att) => att.fileId !== fileId));
   };
 
+  /**
+   * Pipa Pemrosesan Pengiriman Pesan Multimodal Utama [5]
+   */
   const executeSendMessage = async (queryText: string) => {
     if (!queryText.trim() && stagedAttachments.length === 0) return;
     if (isLoading) return;
@@ -2655,6 +2861,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     setIsLoading(true);
     setSessionError(null);
 
+    // Salin antrean lampiran aktif ke variabel lokal sebelum di-reset di UI [5]
     const attachmentsPayload = stagedAttachments.map((att) => ({
       fileId: att.fileId,
       classification: att.classification,
@@ -2664,6 +2871,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     try {
       const activeSessionId = await getOrCreateSession();
 
+      // Kirim kueri multimodal terpadu berisi instruksi + draf + daftar lampiran [5]
       const response = await AiAssistantService.sendQuery(
         activeSessionId,
         currentQuery,
@@ -2676,6 +2884,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       const responseSuggestions = response.data.suggestions || [];
       const updatedArticle = response.data.updatedArticle || undefined;
 
+      // Sinkronisasikan naskah draf terbarui langsung ke Pane Kanan secara dinamis (Two-Way Sync) [1, 5]
       if (updatedArticle && onDraftUpdated) {
         onDraftUpdated(updatedArticle.draftMarkdown, updatedArticle.title);
       }
@@ -2686,7 +2895,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         text: responseText,
         status: 'SUCCESS',
         suggestions: responseSuggestions,
-        updatedArticle,
+        updatedArticle, // Rekam snapshot artikel di dalam balon timeline
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
 
@@ -2758,18 +2967,18 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 h-150 lg:h-162.5">
+    <div className="flex flex-col lg:flex-row border border-slate-300 shadow-2xs h-150 lg:h-162.5 rounded-none overflow-hidden bg-white">
       { }
       {showHistorySidebar && (
-        <div className="bg-white border border-slate-300 flex flex-col rounded-none shadow-xs h-full overflow-hidden">
+        <div className="w-full lg:w-80 shrink-0 flex flex-col h-full bg-white border-b lg:border-b-0 lg:border-r border-slate-300 overflow-hidden">
           <div className="p-3 border-b border-slate-300 bg-slate-100 flex items-center justify-between">
-            <h3 className="text-xs font-bold text-slate-900 uppercase flex items-center gap-1.5">
+            <h3 className="text-xs font-bold text-slate-900 uppercase flex items-center gap-1.5 font-roboto">
               <History size={14} className="text-teal-700" />
               <span>Riwayat Chat DB ({qaSessions.length})</span>
             </h3>
             <button
               onClick={handleCreateNewSession}
-              className="px-2 py-1 bg-teal-700 hover:bg-teal-800 text-white font-bold text-[11px] uppercase tracking-wider rounded-none inline-flex items-center gap-1"
+              className="px-2 py-1 bg-teal-700 hover:bg-teal-800 text-white font-bold text-[11px] uppercase tracking-wider rounded-none inline-flex items-center gap-1 cursor-pointer transition-colors"
               title="Mulai Sesi Chat Baru"
             >
               <Plus size={12} />
@@ -2805,13 +3014,13 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                       <span className="truncate font-bold text-slate-900 text-[12px]">{s.title}</span>
                       <button
                         onClick={(e) => handleDeleteQaSession(e, s.id)}
-                        className="text-slate-400 hover:text-red-600 shrink-0"
+                        className="text-slate-400 hover:text-red-600 shrink-0 cursor-pointer"
                         title="Hapus Sesi Ini"
                       >
                         <Trash2 size={12} />
                       </button>
                     </div>
-                    <div className="text-[11px] text-slate-500 truncate">{s.lastMessage || 'Belum ada pesan.'}</div>
+                    <div className="text-[11px] text-slate-500 truncate">{formatLastMessage(s.lastMessage)}</div>
                     <div className="text-[10px] text-slate-400 font-medium flex items-center justify-between pt-0.5">
                       <span>{s.messagesCount} Pesan</span>
                       <span>{new Date(s.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
@@ -2825,13 +3034,13 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       )}
 
       { }
-      <div className={`bg-white border border-slate-300 flex flex-col rounded-none shadow-xs h-full overflow-hidden ${showHistorySidebar ? 'lg:col-span-3' : 'lg:col-span-4'}`}>
+      <div className="flex-1 flex flex-col h-full overflow-hidden bg-white">
         { }
         <div className="px-6 py-3 border-b border-slate-300 bg-slate-100 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button
               onClick={() => setShowHistorySidebar(!showHistorySidebar)}
-              className="p-1 text-slate-600 hover:text-slate-900 bg-white"
+              className="p-1 text-slate-600 hover:text-slate-900 bg-transparent border-0 cursor-pointer focus:outline-none"
               title="Toggle Sidebar Riwayat Chat"
             >
               <History size={16} />
@@ -2915,7 +3124,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                       ) : (
                         <>
                           <RichMessageRenderer text={msg.text} />
-                          {}
+                          {/* Merender Mini Anchor Card secara bersyarat jika draf diperbarui oleh AI [5] */}
                           {msg.updatedArticle && (
                             <MiniAnchorCard title={msg.updatedArticle.title} />
                           )}
@@ -2944,7 +3153,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         </div>
 
         { }
-        {}
+        {/* Antrean Berkas Lampiran / Preview Screenshot Ctrl+V [5] */}
         {stagedAttachments.length > 0 && (
           <div className="px-4 py-2 border-t border-slate-200 bg-slate-50 flex flex-wrap gap-2.5">
             {stagedAttachments.map((att) => (
@@ -3707,29 +3916,6 @@ export class MarkupConverter {
 
                 return content.trim();
             },
-        });
-
-        service.addRule('listStyleNormalization', {
-            filter: ['ul', 'ol'],
-            replacement: (content: string, node: Node) => {
-                const element = node as HTMLElement;
-                const tagName = element.nodeName.toLowerCase();
-                const prefix = tagName === 'ol' ? '1. ' : '- ';
-
-                const lines = content
-                    .split('\n')
-                    .filter((line) => line.trim().length > 0);
-
-                const normalizedLines = lines.map((line) => {
-
-                    if (line.trim().startsWith('-') || line.trim().match(/^\d+\./)) {
-                        return `  ${line}`;
-                    }
-                    return `${prefix}${line}`;
-                });
-
-                return `\n\n${normalizedLines.join('\n')}\n\n`;
-            }
         });
 
         this.turndownService = service;
@@ -5310,18 +5496,13 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
 import React from 'react';
 import type { CausalFactorItem } from '../../../services/analysis.service';
 import { Cpu, Info } from 'lucide-react';
+import { marked } from 'marked';
 
 const stripCitationTokens = (content?: string | null): string => {
   if (!content) return '';
-
   return content
     .replace(/\[(?:[a-f0-9-]{8,}|doc(?:[-_a-z0-9]+)?):\d+\]/gi, '')
     .replace(/\[(?:[a-f0-9-]{8,}|doc(?:[-_a-z0-9]+)?):\d+\]\[(?:[a-f0-9-]{8,}|doc(?:[-_a-z0-9]+)?):\d+\]/gi, '')
-    .replace(/#{1,6}\s*/g, '')
-    .replace(/\*\*(.*?)\*\*/g, '$1')
-    .replace(/\*(.*?)\*/g, '$1')
-    .replace(/`([^`]+)`/g, '$1')
-    .replace(/\s{2,}/g, ' ')
     .trim();
 };
 
@@ -5334,6 +5515,17 @@ export const CausalFactorChart: React.FC<CausalFactorChartProps> = ({
   summaryText,
   causalFactors,
 }) => {
+  const renderedHtml = React.useMemo(() => {
+    const cleaned = stripCitationTokens(summaryText);
+    try {
+      const parsed = marked.parse(cleaned, { breaks: true });
+      return typeof parsed === 'string' ? parsed : '';
+    } catch (err) {
+      console.error('[Markdown Parser Error] Gagal menerjemahkan summaryText:', err);
+      return cleaned;
+    }
+  }, [summaryText]);
+
   return (
     <div className="font-roboto space-y-4">
       <div className="flex items-center justify-between border-b border-slate-200 pb-3">
@@ -5343,9 +5535,11 @@ export const CausalFactorChart: React.FC<CausalFactorChartProps> = ({
         </div>
       </div>
 
-      <p className="text-xs text-slate-700 font-medium leading-relaxed text-justify" style={{ textAlign: 'justify' }}>
-        {stripCitationTokens(summaryText)}
-      </p>
+      <div
+        className="text-xs text-slate-700 leading-relaxed text-justify prose max-w-none font-medium"
+        style={{ textAlign: 'justify' }}
+        dangerouslySetInnerHTML={{ __html: renderedHtml }}
+      />
 
       <div className="divide-y divide-slate-200 pt-1">
         {causalFactors.map((item, idx) => (
@@ -5359,7 +5553,7 @@ export const CausalFactorChart: React.FC<CausalFactorChartProps> = ({
               </span>
             </div>
 
-            {/* Progress Bar */}
+            {}
             <div className="w-full bg-slate-200 h-2 rounded-none overflow-hidden">
               <div
                 className="bg-teal-600 h-2 transition-all duration-500"
@@ -5715,6 +5909,7 @@ import {
   Loader2,
   BarChart3,
   FileCheck2,
+  FileText,
   Target,
   Newspaper,
   Play,
@@ -5768,6 +5963,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
   // Live filter states for saved cache sessions (Calendar Datepicker & Text Search)
   const [sessionSearchQuery, setSessionSearchQuery] = useState('');
   const [selectedCalendarDate, setSelectedCalendarDate] = useState<string>('');
+  const [activeTab, setActiveTab] = useState<'active' | 'history'>('active');
 
   // ===================== DIALOG MODAL STATE FOR ROLE MAPPING =====================
   const [isMappingModalOpen, setIsMappingModalOpen] = useState(false);
@@ -6028,6 +6224,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
   const handleSelectHistorySession = (session: SavedAnalysisSession) => {
     setCompareResult(session.compareResult);
     setActiveSessionId(session.id);
+    setActiveTab('active');
   };
 
   const handleDeleteHistorySession = (id: string, e: React.MouseEvent) => {
@@ -6090,6 +6287,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
           },
         };
         setCompareResult(cachedCompare);
+        setActiveTab('active');
       }
     } catch (err: any) {
       console.error('Gagal memuat cache dari DB:', err);
@@ -6134,45 +6332,339 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
       </div>
 
       { }
-      {cacheStatus?.isCached && (
-        <div className="bg-teal-50 border border-teal-300 p-4 rounded-none flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs font-roboto">
-          <div className="flex items-center gap-2.5">
-            <Database size={18} className="text-teal-700 shrink-0" />
-            <div>
-              <span className="font-bold text-teal-950 block text-sm">
-                Database Cache AI Ditemukan (PostgreSQL DB Ready)
+      {/* SECTION: Tab Navigation */}
+      <div className="flex items-center border-b border-slate-300 no-print">
+        <button
+          onClick={() => setActiveTab('active')}
+          className={`px-5 py-2.5 text-xs font-bold uppercase tracking-wider border-b-2 flex items-center gap-2 rounded-none transition-all cursor-pointer ${activeTab === 'active'
+            ? 'border-teal-700 text-teal-900 bg-white shadow-2xs font-extrabold'
+            : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            }`}
+        >
+          <FileText size={15} />
+          <span>Analisis Aktif</span>
+        </button>
+
+        <button
+          onClick={() => {
+            setActiveTab('history');
+          }}
+          className={`px-5 py-2.5 text-xs font-bold uppercase tracking-wider border-b-2 flex items-center gap-2 rounded-none transition-all cursor-pointer ${activeTab === 'history'
+            ? 'border-teal-700 text-teal-900 bg-white shadow-2xs font-extrabold'
+            : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            }`}
+        >
+          <History size={15} />
+          <span>Riwayat Analisis ({savedSessions.length})</span>
+        </button>
+      </div>
+
+      {activeTab === 'active' && (
+        <>
+          {cacheStatus?.isCached && (
+            <div className="bg-teal-50 border border-teal-300 p-4 rounded-none flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs font-roboto">
+              <div className="flex items-center gap-2.5">
+                <Database size={18} className="text-teal-700 shrink-0" />
+                <div>
+                  <span className="font-bold text-teal-950 block text-sm">
+                    Database Cache AI Ditemukan (PostgreSQL DB Ready)
+                  </span>
+                  <span className="text-teal-800 font-medium">
+                    Hasil analisis AI untuk kombinasi dokumen ini sudah tersimpan di database ({cacheStatus.createdAt ? new Date(cacheStatus.createdAt).toLocaleDateString('id-ID') : 'Tersimpan'}). Dimuat tanpa kuota token baru.
+                  </span>
+                </div>
+              </div>
+              {cacheStatus.reportId && (
+                <button
+                  onClick={() => handleLoadDbCachedReport(cacheStatus.reportId!)}
+                  className="px-4 py-2 bg-teal-800 hover:bg-teal-900 text-white font-bold text-xs uppercase tracking-wider rounded-none cursor-pointer shrink-0 transition-colors"
+                >
+                  Muat Cache dari DB
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Selector Card */}
+          <div className="bg-white border border-slate-200 p-6 rounded-none shadow-xs space-y-4 font-roboto">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+              <div className="flex items-center gap-2">
+                <BarChart3 size={18} className="text-teal-700 shrink-0" />
+                <h2 className="text-sm font-bold text-slate-900 tracking-wide">
+                  Pilih Dokumen Acuan yang Akan Dianalisis
+                </h2>
+              </div>
+              <span className="text-xs font-bold text-teal-800 bg-teal-50 px-2.5 py-0.5 rounded-none">
+                {selectedDocIds.length} Dokumen Terpilih
               </span>
-              <span className="text-teal-800 font-medium">
-                Hasil analisis AI untuk kombinasi dokumen ini sudah tersimpan di database ({cacheStatus.createdAt ? new Date(cacheStatus.createdAt).toLocaleDateString('id-ID') : 'Tersimpan'}). Dimuat tanpa kuota token baru.
-              </span>
+            </div>
+
+            {isLoadingDocs ? (
+              <div className="flex items-center gap-2 py-8 justify-center text-slate-600 text-xs font-bold">
+                <Loader2 size={18} className="animate-spin text-teal-700" />
+                <span>Memuat daftar dokumen dari database...</span>
+              </div>
+            ) : documents.length === 0 ? (
+              <div className="p-6 bg-slate-50 border border-slate-200 text-center space-y-2">
+                <AlertCircle size={24} className="mx-auto text-slate-400" />
+                <p className="text-xs font-semibold text-slate-700">
+                  Belum ada dokumen diunggah di Repositori.
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-slate-200 border-y border-slate-200 py-1">
+                {/* Group 1: Target (Baseline) */}
+                <div className="p-2 space-y-1.5">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
+                    <span className="text-xs font-semibold text-slate-800 flex items-center gap-1.5">
+                      <Target size={14} className="text-teal-600 shrink-0" />
+                      1. Target (Baseline)
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => selectAllCategoryDocs('BASELINE')}
+                      className="text-slate-500 hover:text-teal-700 transition-colors cursor-pointer p-0.5"
+                      title={isAllBaselineSelected ? 'Batal Pilih Semua (Uncheck All)' : 'Pilih Semua (Check All)'}
+                    >
+                      {isAllBaselineSelected ? (
+                        <CheckSquare size={16} className="text-teal-700" />
+                      ) : (
+                        <Square size={16} className="text-slate-400" />
+                      )}
+                    </button>
+                  </div>
+                  <div className="space-y-0.5 max-h-28 overflow-y-auto pr-1 custom-scrollbar">
+                    {baselineDocs.length === 0 ? (
+                      <p className="text-xs text-slate-400 italic py-1">Tidak ada dokumen Target Baseline.</p>
+                    ) : (
+                      baselineDocs.map((doc) => {
+                        const isSelected = selectedDocIds.includes(doc.id);
+                        return (
+                          <div
+                            key={doc.id}
+                            onClick={() => toggleDocumentSelection(doc.id)}
+                            className={`py-0.5 px-1.5 text-xs cursor-pointer flex items-start gap-2 transition-colors rounded-none ${isSelected ? 'bg-teal-50/80 font-semibold text-slate-900' : 'hover:bg-slate-50 text-slate-600'
+                              }`}
+                          >
+                            {isSelected ? <CheckSquare size={15} className="text-teal-700 shrink-0 mt-0.5" /> : <Square size={15} className="text-slate-400 shrink-0 mt-0.5" />}
+                            <span className="truncate">{doc.title}</span>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+
+                {/* Group 2: Realisasi (Capaian) */}
+                <div className="p-2 space-y-1.5">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
+                    <span className="text-xs font-semibold text-slate-800 flex items-center gap-1.5">
+                      <BarChart3 size={14} className="text-teal-600 shrink-0" />
+                      2. Realisasi (Capaian)
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => selectAllCategoryDocs('REALIZATION')}
+                      className="text-slate-500 hover:text-teal-700 transition-colors cursor-pointer p-0.5"
+                      title={isAllRealizationSelected ? 'Batal Pilih Semua (Uncheck All)' : 'Pilih Semua (Check All)'}
+                    >
+                      {isAllRealizationSelected ? (
+                        <CheckSquare size={16} className="text-teal-700" />
+                      ) : (
+                        <Square size={16} className="text-slate-400" />
+                      )}
+                    </button>
+                  </div>
+                  <div className="space-y-0.5 max-h-28 overflow-y-auto pr-1 custom-scrollbar">
+                    {realizationDocs.length === 0 ? (
+                      <p className="text-xs text-slate-400 italic py-1">Tidak ada dokumen Realisasi.</p>
+                    ) : (
+                      realizationDocs.map((doc) => {
+                        const isSelected = selectedDocIds.includes(doc.id);
+                        return (
+                          <div
+                            key={doc.id}
+                            onClick={() => toggleDocumentSelection(doc.id)}
+                            className={`py-0.5 px-1.5 text-xs cursor-pointer flex items-start gap-2 transition-colors rounded-none ${isSelected ? 'bg-teal-50/80 font-semibold text-slate-900' : 'hover:bg-slate-50 text-slate-600'
+                              }`}
+                          >
+                            {isSelected ? <CheckSquare size={15} className="text-teal-700 shrink-0 mt-0.5" /> : <Square size={15} className="text-slate-400 shrink-0 mt-0.5" />}
+                            <span className="truncate">{doc.title}</span>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+
+                {/* Group 3: Referensi (Umum) */}
+                <div className="p-2 space-y-1.5">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
+                    <span className="text-xs font-semibold text-slate-800 flex items-center gap-1.5">
+                      <Newspaper size={14} className="text-teal-600 shrink-0" />
+                      3. Referensi (Umum)
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => selectAllCategoryDocs('GENERAL_REFERENCE')}
+                      className="text-slate-500 hover:text-teal-700 transition-colors cursor-pointer p-0.5"
+                      title={isAllGeneralSelected ? 'Batal Pilih Semua (Uncheck All)' : 'Pilih Semua (Check All)'}
+                    >
+                      {isAllGeneralSelected ? (
+                        <CheckSquare size={16} className="text-teal-700" />
+                      ) : (
+                        <Square size={16} className="text-slate-400" />
+                      )}
+                    </button>
+                  </div>
+                  <div className="space-y-0.5 max-h-28 overflow-y-auto pr-1 custom-scrollbar">
+                    {generalDocs.length === 0 ? (
+                      <p className="text-xs text-slate-400 italic py-1">Tidak ada dokumen Referensi Umum.</p>
+                    ) : (
+                      generalDocs.map((doc) => {
+                        const isSelected = selectedDocIds.includes(doc.id);
+                        return (
+                          <div
+                            key={doc.id}
+                            onClick={() => toggleDocumentSelection(doc.id)}
+                            className={`py-0.5 px-1.5 text-xs cursor-pointer flex items-start gap-2 transition-colors rounded-none ${isSelected ? 'bg-teal-50/80 font-semibold text-slate-900' : 'hover:bg-slate-50 text-slate-600'
+                              }`}
+                          >
+                            {isSelected ? <CheckSquare size={15} className="text-teal-700 shrink-0 mt-0.5" /> : <Square size={15} className="text-slate-400 shrink-0 mt-0.5" />}
+                            <span className="truncate">{doc.title}</span>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="pt-2 flex justify-end">
+              <button
+                onClick={handleOpenMappingModal}
+                disabled={isComparing || selectedDocIds.length === 0}
+                className="px-5 py-2.5 bg-teal-700 hover:bg-teal-800 disabled:bg-slate-300 text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-2 border border-teal-900 shadow-sm cursor-pointer transition-colors"
+              >
+                {isComparing ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <Play size={16} />
+                )}
+                <span>Jalankan Analisis Deviasi Multidokumen</span>
+              </button>
             </div>
           </div>
-          {cacheStatus.reportId && (
-            <button
-              onClick={() => handleLoadDbCachedReport(cacheStatus.reportId!)}
-              className="px-4 py-2 bg-teal-800 hover:bg-teal-900 text-white font-bold text-xs uppercase tracking-wider rounded-none cursor-pointer shrink-0 transition-colors"
-            >
-              Muat Cache dari DB
-            </button>
+
+          {/* Results Block */}
+          {(isComparing || compareResult) && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between bg-white border border-slate-300 p-3 rounded-none">
+                <span className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                  Hasil Analisa Kebijakan: {compareResult?.math?.indicatorName || 'Analisis Multidokumen'}
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleExportPdf}
+                    disabled={isExportingPdf || !compareResult}
+                    className="px-3 py-1.5 bg-teal-700 hover:bg-teal-800 disabled:bg-slate-200 disabled:text-slate-400 text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-1.5 cursor-pointer transition-colors"
+                  >
+                    {isExportingPdf ? <Loader2 size={12} className="animate-spin text-teal-400" /> : <Download size={12} />}
+                    <span>{isExportingPdf ? 'Mencetak PDF...' : 'Ekspor PDF'}</span>
+                  </button>
+
+                  {onNavigateToGenerator && compareResult && (
+                    <button
+                      onClick={() =>
+                        onNavigateToGenerator(
+                          `Buatkan artikel publikasi mengenai analisis deviasi ${compareResult.math.indicatorName}.`,
+                        )
+                      }
+                      className="px-3 py-1.5 bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-1.5 border border-teal-700 shadow-xs cursor-pointer"
+                    >
+                      <PenTool size={12} />
+                      <span>Buat Artikel</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div id="deep-dive-analysis-container" className="space-y-6 bg-white p-4 border border-slate-300">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                  <div>
+                    <h2 className="text-base font-bold text-slate-900 uppercase tracking-tight">
+                      DOKUMEN ANALISIS KEBIJAKAN UTAMA
+                    </h2>
+                    <span className="text-[12px] font-bold text-teal-800 uppercase tracking-widest block">
+                      NASKAH DIAGNOSTIK ANALISIS DEVIASI INDIKATOR DAERAH
+                    </span>
+                  </div>
+                  <div className="text-left sm:text-right">
+                    <span className="text-xs font-bold text-slate-700 block">Tahun Anggaran 2026</span>
+                    <span className="text-[10px] text-teal-800 font-bold flex items-center gap-1 sm:justify-end">
+                      <FileCheck2 size={12} className="text-teal-600" /> Confirmed Factual
+                    </span>
+                  </div>
+                </div>
+
+                {compareResult && (
+                  <>
+                    <hr className="border-slate-200" />
+                    <DeviationSummaryCard
+                      indicatorName={compareResult.math.indicatorName}
+                      sector={compareResult.math.sector}
+                      targetText={compareResult.math.targetText}
+                      realizationText={compareResult.math.realizationText}
+                      deviationPercentage={compareResult.math.deviationPercentage}
+                      urgencyStatus={compareResult.math.urgencyStatus}
+                    />
+                  </>
+                )}
+
+                {isComparing ? (
+                  <div className="bg-white border border-slate-300 p-12 text-center text-slate-600 space-y-2">
+                    <Loader2 size={28} className="animate-spin text-teal-700 mx-auto" />
+                    <p className="font-bold text-sm text-slate-800">
+                      Menganalisis Causal Inference AI dari {selectedDocIds.length} dokumen sumber terpilih...
+                    </p>
+                  </div>
+                ) : compareResult ? (
+                  <>
+                    <hr className="border-slate-200" />
+                    <CausalFactorChart
+                      summaryText={compareResult.causal.summary}
+                      causalFactors={compareResult.causal.causalFactors}
+                    />
+                  </>
+                ) : null}
+
+                {compareResult && (
+                  <>
+                    <hr className="border-slate-200" />
+                    <RecommendationList
+                      recommendations={compareResult.causal.recommendations}
+                    />
+                  </>
+                )}
+              </div>
+            </div>
           )}
-        </div>
+        </>
       )}
 
-      { }
-      {savedSessions.length > 0 && (
-        <div className="bg-white border border-slate-300 p-4 rounded-none shadow-2xs space-y-3 font-roboto">
-          { }
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 border-b border-slate-200 pb-2.5">
+      {activeTab === 'history' && (
+        <div className="bg-white border border-slate-300 p-6 rounded-none shadow-xs space-y-4 font-roboto text-left">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-slate-200 pb-3">
             <div className="flex items-center gap-2">
               <History size={16} className="text-teal-700 shrink-0" />
-              <span className="text-xs font-bold uppercase tracking-wider text-teal-900">
-                Riwayat Analisis Tersimpan ({filteredSavedSessions.length} dari {savedSessions.length} Sesi)
-              </span>
+              <h2 className="text-sm font-bold uppercase tracking-wider text-slate-900">
+                Daftar Sesi Analisis Kebijakan ({filteredSavedSessions.length} dari {savedSessions.length} Tersimpan)
+              </h2>
             </div>
 
-            { }
-            <div className="flex flex-wrap items-center gap-2">
-              { }
+            <div className="flex flex-wrap items-center gap-3">
+              {}
               <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-300 px-2 py-1 text-xs">
                 <Calendar size={13} className="text-teal-700 shrink-0" />
                 <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wider hidden sm:inline">
@@ -6182,12 +6674,12 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
                   type="date"
                   value={selectedCalendarDate}
                   onChange={(e) => setSelectedCalendarDate(e.target.value)}
-                  className="bg-transparent text-slate-900 text-xs font-semibold focus:outline-none cursor-pointer rounded-none"
+                  className="bg-transparent text-slate-900 text-xs font-semibold focus:outline-none cursor-pointer rounded-none border-none"
                 />
                 {selectedCalendarDate && (
                   <button
                     onClick={() => setSelectedCalendarDate('')}
-                    className="p-0.5 text-slate-400 hover:text-red-600 cursor-pointer"
+                    className="p-0.5 text-slate-400 hover:text-red-600 cursor-pointer border-none bg-transparent"
                     title="Hapus tanggal kalender"
                   >
                     <X size={12} />
@@ -6195,7 +6687,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
                 )}
               </div>
 
-              { }
+              {}
               <div className="relative w-full sm:w-56">
                 <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
@@ -6208,7 +6700,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
                 {sessionSearchQuery && (
                   <button
                     onClick={() => setSessionSearchQuery('')}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer border-none bg-transparent"
                     title="Hapus kata kunci filter"
                   >
                     <X size={12} />
@@ -6218,317 +6710,53 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
             </div>
           </div>
 
-          { }
           {filteredSavedSessions.length === 0 ? (
-            <p className="text-xs text-slate-500 py-2 italic font-normal">
-              Tidak ada cache sesi analisis yang cocok dengan filter kata kunci "{sessionSearchQuery}".
-            </p>
+            <div className="p-8 text-center text-slate-500 space-y-2">
+              <AlertCircle size={28} className="mx-auto text-slate-400" />
+              <p className="text-xs font-bold">Tidak ada riwayat sesi analisis yang ditemukan.</p>
+              <p className="text-[11px] text-slate-400">Silakan sesuaikan filter pencarian atau jalankan analisis kebijakan baru pada tab aktif.</p>
+            </div>
           ) : (
-            <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-1">
-              {filteredSavedSessions.map((session) => {
-                const isActive = session.id === activeSessionId;
-                return (
-                  <div
-                    key={session.id}
-                    onClick={() => handleSelectHistorySession(session)}
-                    className={`px-3.5 py-2 border text-xs cursor-pointer flex items-center gap-2.5 shrink-0 transition-all rounded-none ${isActive
-                      ? 'bg-teal-50 border-teal-600 text-teal-950 font-bold shadow-2xs'
-                      : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
-                      }`}
-                  >
-                    <Clock size={13} className="text-teal-700 shrink-0" />
-                    <div className="flex flex-col">
-                      <span className="truncate max-w-50 font-semibold text-slate-900">{session.indicatorName}</span>
-                      <span className="text-[9px] text-slate-500 font-normal">
-                        {session.timestamp} &bull; {session.selectedDocTitles?.length || 1} Dokumen
-                      </span>
+            <div className="divide-y divide-slate-200">
+              {filteredSavedSessions.map((session) => (
+                <div
+                  key={session.id}
+                  className="py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 first:pt-2 last:pb-2"
+                >
+                  <div className="space-y-1 text-left flex-1 min-w-0">
+                    <strong className="text-xs font-bold text-slate-900 block truncate">
+                      {session.indicatorName}
+                    </strong>
+                    <div className="text-xs text-slate-500 font-medium">
+                      Dokumen Acuan: {session.selectedDocTitles?.join(', ') || 'Tidak ada dokumen'}
                     </div>
+                    <div className="text-[11px] text-slate-400 font-bold uppercase tracking-wider flex flex-wrap items-center gap-3 pt-1">
+                      <span>Analisis Sesi: {session.timestamp}</span>
+                      <span>&bull;</span>
+                      <span className="text-teal-700">Status: {session.compareResult?.math?.urgencyStatus || 'NORMAL'}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      onClick={() => handleSelectHistorySession(session)}
+                      className="p-1.5 text-teal-700 hover:text-teal-900 transition-colors cursor-pointer"
+                      title="Buka Sesi"
+                    >
+                      <Clock size={16} />
+                    </button>
                     <button
                       onClick={(e) => handleDeleteHistorySession(session.id, e)}
-                      className="p-1 text-slate-400 hover:text-red-600 ml-1 cursor-pointer"
-                      title="Hapus riwayat ini"
+                      className="p-1.5 text-red-600 hover:text-red-800 transition-colors cursor-pointer"
+                      title="Hapus Sesi"
                     >
-                      <Trash2 size={12} />
+                      <Trash2 size={16} />
                     </button>
                   </div>
-                );
-              })}
+                </div>
+              ))}
             </div>
           )}
-        </div>
-      )}
-
-      { }
-      <div className="bg-white border border-slate-200 p-6 rounded-none shadow-xs space-y-4 font-roboto">
-        <div className="flex items-center justify-between border-b border-slate-200 pb-3">
-          <div className="flex items-center gap-2">
-            <BarChart3 size={18} className="text-teal-700 shrink-0" />
-            <h2 className="text-sm font-bold text-slate-900 tracking-wide">
-              Pilih Dokumen Acuan yang Akan Dianalisis
-            </h2>
-          </div>
-          <span className="text-xs font-bold text-teal-800 bg-teal-50 px-2.5 py-0.5 rounded-none">
-            {selectedDocIds.length} Dokumen Terpilih
-          </span>
-
-        </div>
-
-        {isLoadingDocs ? (
-          <div className="flex items-center gap-2 py-8 justify-center text-slate-600 text-xs font-bold">
-            <Loader2 size={18} className="animate-spin text-teal-700" />
-            <span>Memuat daftar dokumen dari database...</span>
-          </div>
-        ) : documents.length === 0 ? (
-          <div className="p-6 bg-slate-50 border border-slate-200 text-center space-y-2">
-            <AlertCircle size={24} className="mx-auto text-slate-400" />
-            <p className="text-xs font-semibold text-slate-700">
-              Belum ada dokumen diunggah di Repositori.
-            </p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-slate-200 border-y border-slate-200 py-2">
-            { }
-            <div className="p-3 space-y-2.5">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                <span className="text-xs font-semibold text-slate-800 flex items-center gap-1.5">
-                  <Target size={14} className="text-teal-600 shrink-0" />
-                  1. Target (Baseline)
-                </span>
-                <button
-                  type="button"
-                  onClick={() => selectAllCategoryDocs('BASELINE')}
-                  className="text-slate-500 hover:text-teal-700 transition-colors cursor-pointer p-0.5"
-                  title={isAllBaselineSelected ? 'Batal Pilih Semua (Uncheck All)' : 'Pilih Semua (Check All)'}
-                >
-                  {isAllBaselineSelected ? (
-                    <CheckSquare size={16} className="text-teal-700" />
-                  ) : (
-                    <Square size={16} className="text-slate-400" />
-                  )}
-                </button>
-              </div>
-              <div className="space-y-1 max-h-52 overflow-y-auto pr-1">
-                {baselineDocs.length === 0 ? (
-                  <p className="text-xs text-slate-400 italic py-1">Tidak ada dokumen Target Baseline.</p>
-                ) : (
-                  baselineDocs.map((doc) => {
-                    const isSelected = selectedDocIds.includes(doc.id);
-                    return (
-                      <div
-                        key={doc.id}
-                        onClick={() => toggleDocumentSelection(doc.id)}
-                        className={`p-2 text-xs cursor-pointer flex items-start gap-2 transition-colors ${isSelected ? 'bg-teal-50/80 font-semibold text-slate-900' : 'hover:bg-slate-50 text-slate-600'
-                          }`}
-                      >
-                        {isSelected ? <CheckSquare size={15} className="text-teal-700 shrink-0 mt-0.5" /> : <Square size={15} className="text-slate-400 shrink-0 mt-0.5" />}
-                        <span className="truncate">{doc.title}</span>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-
-            { }
-            <div className="p-3 space-y-2.5">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                <span className="text-xs font-semibold text-slate-800 flex items-center gap-1.5">
-                  <BarChart3 size={14} className="text-teal-600 shrink-0" />
-                  2. Realisasi (Capaian)
-                </span>
-                <button
-                  type="button"
-                  onClick={() => selectAllCategoryDocs('REALIZATION')}
-                  className="text-slate-500 hover:text-teal-700 transition-colors cursor-pointer p-0.5"
-                  title={isAllRealizationSelected ? 'Batal Pilih Semua (Uncheck All)' : 'Pilih Semua (Check All)'}
-                >
-                  {isAllRealizationSelected ? (
-                    <CheckSquare size={16} className="text-teal-700" />
-                  ) : (
-                    <Square size={16} className="text-slate-400" />
-                  )}
-                </button>
-              </div>
-              <div className="space-y-1 max-h-52 overflow-y-auto pr-1">
-                {realizationDocs.length === 0 ? (
-                  <p className="text-xs text-slate-400 italic py-1">Tidak ada dokumen Realisasi.</p>
-                ) : (
-                  realizationDocs.map((doc) => {
-                    const isSelected = selectedDocIds.includes(doc.id);
-                    return (
-                      <div
-                        key={doc.id}
-                        onClick={() => toggleDocumentSelection(doc.id)}
-                        className={`p-2 text-xs cursor-pointer flex items-start gap-2 transition-colors ${isSelected ? 'bg-teal-50/80 font-semibold text-slate-900' : 'hover:bg-slate-50 text-slate-600'
-                          }`}
-                      >
-                        {isSelected ? <CheckSquare size={15} className="text-teal-700 shrink-0 mt-0.5" /> : <Square size={15} className="text-slate-400 shrink-0 mt-0.5" />}
-                        <span className="truncate">{doc.title}</span>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-
-            { }
-            <div className="p-3 space-y-2.5">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                <span className="text-xs font-semibold text-slate-800 flex items-center gap-1.5">
-                  <Newspaper size={14} className="text-teal-600 shrink-0" />
-                  3. Referensi (Umum)
-                </span>
-                <button
-                  type="button"
-                  onClick={() => selectAllCategoryDocs('GENERAL_REFERENCE')}
-                  className="text-slate-500 hover:text-teal-700 transition-colors cursor-pointer p-0.5"
-                  title={isAllGeneralSelected ? 'Batal Pilih Semua (Uncheck All)' : 'Pilih Semua (Check All)'}
-                >
-                  {isAllGeneralSelected ? (
-                    <CheckSquare size={16} className="text-teal-700" />
-                  ) : (
-                    <Square size={16} className="text-slate-400" />
-                  )}
-                </button>
-              </div>
-              <div className="space-y-1 max-h-52 overflow-y-auto pr-1">
-                {generalDocs.length === 0 ? (
-                  <p className="text-xs text-slate-400 italic py-1">Tidak ada dokumen Referensi Umum.</p>
-                ) : (
-                  generalDocs.map((doc) => {
-                    const isSelected = selectedDocIds.includes(doc.id);
-                    return (
-                      <div
-                        key={doc.id}
-                        onClick={() => toggleDocumentSelection(doc.id)}
-                        className={`p-2 text-xs cursor-pointer flex items-start gap-2 transition-colors ${isSelected ? 'bg-teal-50/80 font-semibold text-slate-900' : 'hover:bg-slate-50 text-slate-600'
-                          }`}
-                      >
-                        {isSelected ? <CheckSquare size={15} className="text-teal-700 shrink-0 mt-0.5" /> : <Square size={15} className="text-slate-400 shrink-0 mt-0.5" />}
-                        <span className="truncate">{doc.title}</span>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        { }
-        <div className="pt-2 flex justify-end">
-          <button
-            onClick={handleOpenMappingModal} // Alihkan dari handleExecute ke pembukaan modal dialog [5]
-            disabled={isComparing || selectedDocIds.length === 0}
-            className="px-5 py-2.5 bg-teal-700 hover:bg-teal-800 disabled:bg-slate-300 text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-2 border border-teal-900 shadow-sm"
-          >
-            {isComparing ? (
-              <Loader2 size={16} className="animate-spin" />
-            ) : (
-              <Play size={16} />
-            )}
-            <span>Jalankan Analisis Deviasi Multidokumen</span>
-          </button>
-        </div>
-      </div>
-
-      { }
-      {(isComparing || compareResult) && (
-        <div className="space-y-4">
-          { }
-          <div className="flex items-center justify-between bg-white border border-slate-300 p-3 rounded-none">
-            <span className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-              Hasil Analisa Kebijakan: {compareResult?.math?.indicatorName || 'Analisis Multidokumen'}
-            </span>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleExportPdf}
-                disabled={isExportingPdf || !compareResult}
-                className="px-3 py-1.5 bg-teal-700 hover:bg-teal-800 disabled:bg-slate-200 disabled:text-slate-400 text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-1.5 cursor-pointer transition-colors"
-              >
-                {isExportingPdf ? <Loader2 size={12} className="animate-spin text-teal-400" /> : <Download size={12} />}
-                <span>{isExportingPdf ? 'Mencetak PDF...' : 'Ekspor PDF'}</span>
-              </button>
-
-              {onNavigateToGenerator && compareResult && (
-                <button
-                  onClick={() =>
-                    onNavigateToGenerator(
-                      `Buatkan artikel publikasi mengenai analisis deviasi ${compareResult.math.indicatorName}.`,
-                    )
-                  }
-                  className="px-3 py-1.5 bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-1.5 border border-teal-700 shadow-xs"
-                >
-                  <PenTool size={12} />
-                  <span>Buat Artikel</span>
-                </button>
-              )}
-            </div>
-          </div>
-
-          { }
-          <div id="deep-dive-analysis-container" className="space-y-6 bg-white p-4 border border-slate-300">
-            { }
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-              <div>
-                <h2 className="text-base font-bold text-slate-900 uppercase tracking-tight">
-                  DOKUMEN ANALISIS KEBIJAKAN UTAMA
-                </h2>
-                <span className="text-[12px] font-bold text-teal-800 uppercase tracking-widest block">
-                  NASKAH DIAGNOSTIK ANALISIS DEVIASI INDIKATOR DAERAH
-                </span>
-              </div>
-              <div className="text-left sm:text-right">
-                <span className="text-xs font-bold text-slate-700 block">Tahun Anggaran 2026</span>
-                <span className="text-[10px] text-teal-800 font-bold flex items-center gap-1 sm:justify-end">
-                  <FileCheck2 size={12} className="text-teal-600" /> Confirmed Factual
-                </span>
-              </div>
-            </div>
-
-            { }
-            {compareResult && (
-              <>
-                <hr className="border-slate-200" />
-                <DeviationSummaryCard
-                  indicatorName={compareResult.math.indicatorName}
-                  sector={compareResult.math.sector}
-                  targetText={compareResult.math.targetText}
-                  realizationText={compareResult.math.realizationText}
-                  deviationPercentage={compareResult.math.deviationPercentage}
-                  urgencyStatus={compareResult.math.urgencyStatus}
-                />
-              </>
-            )}
-
-            { }
-            {isComparing ? (
-              <div className="bg-white border border-slate-300 p-12 text-center text-slate-600 space-y-2">
-                <Loader2 size={28} className="animate-spin text-teal-700 mx-auto" />
-                <p className="font-bold text-sm text-slate-800">
-                  Menganalisis Causal Inference AI dari {selectedDocIds.length} dokumen sumber terpilih...
-                </p>
-              </div>
-            ) : compareResult ? (
-              <>
-                <hr className="border-slate-200" />
-                <CausalFactorChart
-                  summaryText={compareResult.causal.summary}
-                  causalFactors={compareResult.causal.causalFactors}
-                />
-              </>
-            ) : null}
-
-            { }
-            {compareResult && (
-              <>
-                <hr className="border-slate-200" />
-                <RecommendationList
-                  recommendations={compareResult.causal.recommendations}
-                />
-              </>
-            )}
-          </div>
         </div>
       )}
 
@@ -6696,45 +6924,93 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
 };
 
 --- FILE: src\modules\auth\views\login.view.tsx ---
+
 import React, { useState } from 'react';
-import { Shield, Lock, ArrowRight, CheckCircle2 } from 'lucide-react';
+import {
+  FileText,
+  Lock,
+  ArrowRight,
+  AlertCircle,
+  Loader2,
+  LogOut
+} from 'lucide-react';
+import { AuthService } from '../../../services/auth.service';
 
 interface LoginViewProps {
   onLoginSuccess: () => void;
+  onClose?: () => void;
 }
 
-export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
-  const [nip, setNip] = useState('19780412 200312 1 002');
-  const [password, setPassword] = useState('••••••••••••');
+export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onClose }) => {
+  const [nip, setNip] = useState('197804122003121002');
+  const [password, setPassword] = useState('password123');
   const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setErrorMessage(null);
     setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
+
+    try {
+      const response = await AuthService.login(nip, password);
+
+      sessionStorage.setItem('brida_auth_token', response.data.accessToken);
+      sessionStorage.setItem('brida_executive_name', response.data.executive.fullName);
+
       onLoginSuccess();
-    }, 600);
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Terjadi kesalahan saat menghubungi server autentikasi.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
-    <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4 font-roboto">
-      <div className="w-full max-w-md bg-white border-2 border-slate-700 shadow-2xl rounded-none overflow-hidden">
-        {}
-        <div className="bg-slate-950 p-6 border-b border-slate-800 text-center relative">
-          <div className="w-12 h-12 bg-teal-600 border border-teal-400 mx-auto flex items-center justify-center text-white mb-3 rounded-none shadow-md">
-            <Shield size={24} />
-          </div>
-          <h1 className="text-xl font-bold text-white tracking-wide uppercase">
-            Geo Analisis
-          </h1>
-          <p className="text-xs text-teal-400 font-medium mt-1">
-            Portal Eksekutif
-          </p>
-        </div>
+    <div
+      className="min-h-screen flex items-center justify-center p-4 font-roboto relative bg-cover bg-center bg-no-repeat"
+      style={{ backgroundImage: `url('/login-bg.png')` }}
+    >
+      { }
+      <div className="absolute inset-0 bg-slate-950/20" />
+
+      { }
+      <div className="w-full max-w-md bg-white border border-slate-300 shadow-2xl rounded-none overflow-hidden relative z-10">
 
         {}
+        {onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            className="absolute top-5 right-5 text-slate-400 hover:text-red-500 p-1.5 transition-colors cursor-pointer z-25 bg-white/80 hover:bg-slate-100"
+            title="Tutup"
+          >
+            <LogOut size={16} />
+          </button>
+        )}
+
+        <div className="bg-white p-6 border-b border-slate-200 flex items-left justify-left gap-3 relative select-none">
+          <FileText size={28} className="text-blue-600 shrink-0" />
+          <div className="w-px h-8 bg-slate-300 mx-1" />
+          <div className="flex flex-col text-left">
+            <h1 className="text-base font-black tracking-tight leading-none text-slate-900 m-0 p-0 flex items-center">
+              <span>AKLS</span>
+              <span className="text-blue-600 ml-1">Platform</span>
+            </h1>
+            <span className="text-[11px] text-slate-500 font-bold uppercase tracking-wider mt-1">
+              Portal Eksekutif
+            </span>
+          </div>
+        </div>
+
         <div className="p-8 bg-slate-50">
+          {errorMessage && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-800 text-xs font-semibold flex items-center gap-2 rounded-none">
+              <AlertCircle size={16} className="text-red-600 shrink-0" />
+              <span>{errorMessage}</span>
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
               <label className="block text-xs font-bold uppercase text-slate-700 mb-1.5 tracking-wider">
@@ -6745,7 +7021,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                 value={nip}
                 onChange={(e) => setNip(e.target.value)}
                 required
-                className="w-full bg-white border border-slate-400 px-4 py-2.5 text-sm text-slate-900 font-semibold focus:outline-none focus:border-teal-600 rounded-none shadow-xs"
+                className="w-full bg-white border border-slate-400 px-4 py-2.5 text-sm text-slate-900 font-semibold focus:outline-none focus:border-teal-600 rounded-none shadow-xs font-mono"
               />
             </div>
 
@@ -6762,24 +7038,27 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
               />
             </div>
 
-            <div className="p-3 bg-teal-50 border border-teal-200 text-teal-800 text-xs flex items-center gap-2 rounded-none">
-              <CheckCircle2 size={16} className="text-teal-600 shrink-0" />
-              <span>Akses Khusus Terotentikasi Executive</span>
-            </div>
-
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full py-3 bg-teal-600 hover:bg-teal-700 text-white font-bold text-sm uppercase tracking-wider rounded-none flex items-center justify-center gap-2 transition-colors border border-teal-700 shadow-md"
+              className="w-full py-3 bg-[#0070c0] hover:bg-blue-700 disabled:bg-slate-300 text-white font-bold text-sm uppercase tracking-wider rounded-none flex items-center justify-center gap-2 transition-colors border border-blue-800 shadow-md cursor-pointer disabled:cursor-not-allowed"
             >
-              <Lock size={16} />
-              <span>{isLoading ? 'Memverifikasi Sesi...' : 'Masuk Portal Eksekutif'}</span>
-              <ArrowRight size={16} />
+              {isLoading ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  <span>Memverifikasi Sesi...</span>
+                </>
+              ) : (
+                <>
+                  <Lock size={16} />
+                  <span>Masuk Portal Eksekutif</span>
+                  <ArrowRight size={16} />
+                </>
+              )}
             </button>
           </form>
         </div>
 
-        {}
         <div className="px-6 py-3 bg-slate-100 border-t border-slate-300 text-center">
           <span className="text-[11px] text-slate-500 font-medium">
             Zero-Knowledge Public Policy Engine
@@ -6848,7 +7127,7 @@ export default function AssetMarkers() {
                     type: "Rumah Sakit",
                     lat: -4.5448,
                     lng: 136.8870,
-                    image_url: "https://picsum.photos/seed/rsud-mimika/320/180",
+                    image_url: "/img/mimika%20baru/images.jpg",
                     config: { color: "#EF4444", iconUrl: "/icons/markers/hospital.svg" },
                     details: { "Kapasitas Tempat Tidur": "350 Bed", "Kelas Akreditasi": "Paripurna", "Status Operasional": "Aktif 24 Jam" }
                 },
@@ -6858,7 +7137,7 @@ export default function AssetMarkers() {
                     type: "Puskesmas",
                     lat: -4.1200,
                     lng: 137.4500,
-                    image_url: "https://picsum.photos/seed/pusk-hoya/320/180",
+                    image_url: "/img/hoya/images.jpg",
                     config: { color: "#F97316", iconUrl: "/icons/markers/clinic.svg" },
                     details: { "Tenaga Medis": "1 Dokter, 3 Perawat", "Fasilitas": "Rawat Jalan", "Kendala": "Hanya dijangkau Helikopter" }
                 }
@@ -6870,7 +7149,7 @@ export default function AssetMarkers() {
                     type: "Gedung Sekolah",
                     lat: -4.5710,
                     lng: 136.8920,
-                    image_url: "https://picsum.photos/seed/sd-nawaripi/320/180",
+                    image_url: "/img/mimika%20baru/Indahhnya-Wisata-Timika.jpg",
                     config: { color: "#10B981", iconUrl: "/icons/markers/school.svg" },
                     details: { "Jumlah Murid": "180 Siswa", "Jumlah Guru": "6 Pengajar", "Status Akreditasi": "B" }
                 }
@@ -6882,7 +7161,7 @@ export default function AssetMarkers() {
                     type: "Infrastruktur",
                     lat: -4.1350,
                     lng: 137.4650,
-                    image_url: "https://picsum.photos/seed/jemb-hoya/320/180",
+                    image_url: "/img/hoya/JembatanHoya%20(2).jpg",
                     config: { color: "#64748B", iconUrl: "/icons/markers/bridge.svg" },
                     details: { "Panjang Bentang": "120 Meter", "Target Anggaran": "Rp 16,12 Miliar", "Status Fisik": "Pengurangan Volume Kontrak" }
                 },
@@ -6892,7 +7171,7 @@ export default function AssetMarkers() {
                     type: "Infrastruktur",
                     lat: -4.7800,
                     lng: 137.3500,
-                    image_url: "https://picsum.photos/seed/jalan-agimuga/320/180",
+                    image_url: "/img/agimuga/209.jpg",
                     config: { color: "#64748B", iconUrl: "/icons/markers/bridge.svg" },
                     details: { "Target Pemadatan": "120 Km", "Pekerjaan Aktual": "98 Km", "Status": "Penyesuaian Biaya BBM" }
                 }
@@ -7468,126 +7747,126 @@ const MOCK_DISTRICT_PROFILES: Record<number, {
         jumlah_penduduk: 142000,
         deskripsi: "Distrik Mimika Baru merupakan pusat pemerintahan dan ekonomi daerah (Kota Timika). Memiliki kepadatan penduduk tertinggi dengan aktivitas perdagangan dan jasa yang sangat dinamis.",
         batas_wilayah: "Utara: Kuala Kencana, Selatan: Wania, Barat: Iwaka, Timur: Mimika Timur",
-        images: ["https://picsum.photos/seed/mimika-baru/320/180"]
+        images: ["/img/mimika%20baru/aerial%20view.jpg"]
     },
     2: {
         luas_wilayah: 840,
         jumlah_penduduk: 28000,
         deskripsi: "Distrik Kuala Kencana merupakan kawasan pemukiman modern dan pusat administratif operasional PT Freeport Indonesia di dataran rendah. Dirancang dengan konsep kota berwawasan lingkungan.",
         batas_wilayah: "Utara: Tembagapura, Selatan: Mimika Baru, Barat: Iwaka, Timur: Kwamki Narama",
-        images: ["https://picsum.photos/seed/kuala-kencana/320/180"]
+        images: ["/img/kualakencana/images%20(1).jpg"]
     },
     3: {
         luas_wilayah: 1452,
         jumlah_penduduk: 23000,
         deskripsi: "Distrik Tembagapura terletak di kawasan pegunungan tinggi Mimika. Wilayah ini merupakan pusat eksplorasi pertambangan mineral tembaga dan emas utama PT Freeport Indonesia.",
         batas_wilayah: "Utara: Kabupaten Puncak, Selatan: Kuala Kencana, Barat: Alama, Timur: Hoya",
-        images: ["https://picsum.photos/seed/tembagapura/320/180"]
+        images: ["/img/tembagapura/Grasberg_pano_(3200491589)_(cropped).jpg"]
     },
     4: {
         luas_wilayah: 195,
         jumlah_penduduk: 61000,
         deskripsi: "Distrik Wania merupakan distrik pemekaran dari Mimika Baru yang berkembang pesat sebagai kawasan penyangga pemukiman perkotaan dan pusat sentra industri UMKM masyarakat.",
         batas_wilayah: "Utara: Mimika Baru, Selatan: Mimika Timur, Barat: Iwaka, Timur: Mimika Tengah",
-        images: ["https://picsum.photos/seed/wania/320/180"]
+        images: ["/img/wania/Pasar-Sentral-1-scaled.jpg"]
     },
     5: {
         luas_wilayah: 742,
         jumlah_penduduk: 12000,
-        deskripsi: "Distrik Iwaka didominasi oleh wilayah dataran rendah transisi, perkebunan rakyat, dan area jalur logistik penghubung pelabuhan ke wilayah pertambangan.",
+        deskripsi: "Distrik Iwaka didominasi oleh wilayah dataran rendah transisi, perkebunan rakyat, and area jalur logistik penghubung pelabuhan ke wilayah pertambangan.",
         batas_wilayah: "Utara: Kuala Kencana, Selatan: Amar, Barat: Mimika Barat Tengah, Timur: Mimika Baru",
-        images: ["https://picsum.photos/seed/iwaka/320/180"]
+        images: ["/img/iwaka/sagu-1-635c8e4408a8b57f2152e722.jpg"]
     },
     6: {
         luas_wilayah: 45,
         jumlah_penduduk: 15000,
         deskripsi: "Distrik Kwamki Narama merupakan wilayah administratif dengan luas terkecil namun memiliki kepadatan pemukiman adat yang tinggi serta sentra pertanian lokal.",
         batas_wilayah: "Utara: Kuala Kencana, Selatan: Mimika Baru, Barat: Kuala Kencana, Timur: Mimika Tengah",
-        images: ["https://picsum.photos/seed/kwamki-narama/320/180"]
+        images: ["/img/kwamki%20narama/prosesi-kremasi-jenazah-junius-m-janempa-di-kwamki-narama-rabu-142026-foto-cenderawasih-posmoh-wahyu-welerubun-xmAu6.webp"]
     },
     7: {
         luas_wilayah: 211,
         jumlah_penduduk: 11000,
         deskripsi: "Distrik Mimika Timur berpusat di Mapurujaya, merupakan kawasan sejarah pemukiman awal dan penyangga transportasi laut menuju pelabuhan nasional Pomako.",
         batas_wilayah: "Utara: Mimika Baru, Selatan: Laut Arafura, Barat: Wania, Timur: Mimika Timur Jauh",
-        images: ["https://picsum.photos/seed/mimika-timur/320/180"]
+        images: ["/img/mimika%20timur/624e6c8c105e5.jpg"]
     },
     8: {
         luas_wilayah: 341,
         jumlah_penduduk: 5500,
         deskripsi: "Distrik Mimika Tengah didominasi wilayah rawa-rawa pesisir pantai dan perkampungan nelayan lokal dengan komoditas perikanan laut yang melimpah.",
         batas_wilayah: "Utara: Kwamki Narama, Selatan: Laut Arafura, Barat: Wania, Timur: Jita",
-        images: ["https://picsum.photos/seed/mimika-tengah/320/180"]
+        images: ["/img/jita/Panoramic_view_of_dock_at_Kampung_Rawa,_2014-06-21.jpg"]
     },
     9: {
         luas_wilayah: 1021,
         jumlah_penduduk: 4200,
         deskripsi: "Distrik Mimika Barat berpusat di Kokonao, merupakan salah satu pusat peradaban pendidikan dan misi keagamaan tertua di wilayah pesisir selatan Papua.",
         batas_wilayah: "Utara: Mimika Barat Tengah, Selatan: Laut Arafura, Barat: Mimika Barat Jauh, Timur: Amar",
-        images: ["https://picsum.photos/seed/mimika-barat/320/180"]
+        images: ["/img/mimika%20barat/061348_64937_INDAH_mimika_dalam.jpg"]
     },
     10: {
         luas_wilayah: 4124,
         jumlah_penduduk: 3800,
         deskripsi: "Distrik Agimuga merupakan kawasan dataran rendah pesisir luas yang dilalui banyak sungai besar. Fokus pada pembangunan jalan strategis penghubung wilayah timur Mimika.",
         batas_wilayah: "Utara: Jila, Selatan: Laut Arafura, Barat: Jita, Timur: Mimika Timur Jauh",
-        images: ["https://picsum.photos/seed/agimuga/320/180"]
+        images: ["/img/agimuga/209.jpg"]
     },
     11: {
         luas_wilayah: 6011,
         jumlah_penduduk: 4500,
         deskripsi: "Distrik Jila merupakan wilayah pegunungan dalam yang memiliki bentang geografi sangat menantang dan berbatasan langsung dengan pegunungan tengah Papua.",
         batas_wilayah: "Utara: Kabupaten Puncak, Selatan: Agimuga, Barat: Hoya, Timur: Jita",
-        images: ["https://picsum.photos/seed/jila/320/180"]
+        images: ["/img/jila/615d4d4e6ff0c.jpg"]
     },
     12: {
         luas_wilayah: 4121,
         jumlah_penduduk: 2800,
         deskripsi: "Distrik Jita merupakan kawasan pedalaman berawa di timur Mimika yang sangat bergantung pada akses transportasi sungai dan perahu motor sebagai urat nadi logistik.",
         batas_wilayah: "Utara: Jila, Selatan: Laut Arafura, Barat: Mimika Tengah, Timur: Agimuga",
-        images: ["https://picsum.photos/seed/jita/320/180"]
+        images: ["/img/jita/images.jpg"]
     },
     13: {
         luas_wilayah: 2112,
         jumlah_penduduk: 3200,
         deskripsi: "Distrik Mimika Timur Jauh merupakan wilayah pesisir ujung timur Mimika yang berbatasan dengan wilayah Kabupaten Asmat. Mayoritas mata pencaharian penduduk adalah nelayan tradisional.",
         batas_wilayah: "Utara: Agimuga, Selatan: Laut Arafura, Barat: Mimika Timur, Timur: Kabupaten Asmat",
-        images: ["https://picsum.photos/seed/mimika-timur-jauh/320/180"]
+        images: ["/img/agimuga/7311.jpg"]
     },
     14: {
         luas_wilayah: 2122,
         jumlah_penduduk: 2100,
         deskripsi: "Distrik Mimika Barat Jauh berpusat di Ipaya (Kampung Yaraya), memiliki potensi wisata bahari pantai pasir putih dan sentra pengembangan komoditas kelapa rakyat.",
         batas_wilayah: "Utara: Mimika Barat Tengah, Selatan: Laut Arafura, Barat: Kabupaten Kaimana, Timur: Mimika Barat",
-        images: ["https://picsum.photos/seed/mimika-barat-jauh/320/180"]
+        images: ["/img/mimika%20barat%20jauh/pantai-minajaya-sukabumi-1747457877972_169.jpeg"]
     },
     15: {
         luas_wilayah: 1842,
         jumlah_penduduk: 2400,
         deskripsi: "Distrik Mimika Barat Tengah merupakan distrik pesisir barat penyangga yang menghubungkan sirkulasi logistik perairan antara pelabuhan rakyat Mimika Barat dan Kokonao.",
         batas_wilayah: "Utara: Kabupaten Deiyai, Selatan: Mimika Barat, Barat: Mimika Barat Jauh, Timur: Iwaka",
-        images: ["https://picsum.photos/seed/mimika-barat-tengah/320/180"]
+        images: ["/img/AMANNSAGOAOWA.jpg"]
     },
     16: {
         luas_wilayah: 1221,
         jumlah_penduduk: 1800,
         deskripsi: "Distrik Amar merupakan wilayah pemekaran pesisir barat yang memfokuskan perekonomian masyarakat pada budidaya perikanan air payau dan pencarian kepiting bakau.",
         batas_wilayah: "Utara: Iwaka, Selatan: Laut Arafura, Barat: Mimika Barat, Timur: Mimika Barat Tengah",
-        images: ["https://picsum.photos/seed/amar/320/180"]
+        images: ["/img/jita/Panoramic_view_of_dock_at_Kampung_Rawa,_2014-06-21.jpg"]
     },
     17: {
         luas_wilayah: 2450,
         jumlah_penduduk: 1200,
         deskripsi: "Distrik Hoya terletak di lembah terisolasi pegunungan tengah Mimika. Keterbatasan akses darat membuat distrik ini sangat bergantung pada jembatan gantung perintis dan helikopter logistik.",
         batas_wilayah: "Utara: Kabupaten Intan Jaya, Selatan: Jila, Barat: Tembagapura, Timur: Alama",
-        images: ["https://picsum.photos/seed/hoya/320/180"]
+        images: ["/img/hoya/images.jpg"]
     },
     18: {
         luas_wilayah: 4110,
         jumlah_penduduk: 1600,
         deskripsi: "Distrik Alama merupakan distrik paling timur laut di kawasan pegunungan Mimika yang berbatasan dengan wilayah rujukan adat pegunungan tengah.",
         batas_wilayah: "Utara: Kabupaten Lanny Jaya, Selatan: Jita, Barat: Hoya, Timur: Kabupaten Nduga",
-        images: ["https://picsum.photos/seed/alama/320/180"]
+        images: ["/img/alama/97295c5df6d1.jpg"]
     }
 };
 
@@ -8451,7 +8730,7 @@ export const RecentWorkspaceCards: React.FC<RecentWorkspaceCardsProps> = ({
                             >
                                 <div className="space-y-2">
                                     <div className="flex items-center justify-between select-none">
-                                        <span className="text-[9px] font-black text-teal-800 bg-teal-50 px-2 py-0.5 border border-teal-150 uppercase tracking-widest">
+                                        <span className="text-[9px] font-black text-teal-800 uppercase tracking-widest">
                                             {article.tone || 'Solutif'}
                                         </span>
                                         <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
@@ -8498,7 +8777,7 @@ export const RecentWorkspaceCards: React.FC<RecentWorkspaceCardsProps> = ({
                                 className="flex-1 p-5 flex flex-col justify-between h-48 hover:bg-slate-50/50 cursor-pointer transition-all duration-300 rounded-none relative text-left group"
                             >
                                 <div className="space-y-2">
-                                    <span className="text-[9px] font-black text-teal-800 bg-teal-50 px-2 py-0.5 border border-teal-150 uppercase tracking-widest select-none inline-block">
+                                    <span className="text-[9px] font-black text-teal-800 uppercase tracking-widest select-none inline-block">
                                         Diskusi Faktual RAG
                                     </span>
                                     <h3 className="text-xs font-bold text-slate-800 group-hover:text-teal-800 line-clamp-2 leading-snug transition-colors">
@@ -8686,9 +8965,9 @@ export const SpatialMap: React.FC<SpatialMapProps> = () => {
 export default SpatialMap;
 
 --- FILE: src\modules\dashboard\components\spatial-preview-wrapper.component.tsx ---
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useId } from 'react';
 import { Maximize2, Map, Shield, Radio, Activity } from 'lucide-react';
-import { SpatialMap, type MapLocationPoint } from '../components/spatial-map.component';
+import { SpatialMap, type MapLocationPoint } from './spatial-map.component';
 
 interface SpatialPreviewWrapperProps {
     locations: MapLocationPoint[];
@@ -8701,6 +8980,8 @@ export const SpatialPreviewWrapper: React.FC<SpatialPreviewWrapperProps> = ({
 }) => {
     const [isActivated, setIsActivated] = useState(false);
     const [isTouchDevice, setIsTouchDevice] = useState(false);
+
+    const containerId = useId();
 
     useEffect(() => {
         const checkTouch = () => {
@@ -8730,7 +9011,7 @@ export const SpatialPreviewWrapper: React.FC<SpatialPreviewWrapperProps> = ({
     };
 
     return (
-        <div className="w-full py-1 flex flex-col rounded-none font-roboto select-none">
+        <div key={containerId} className="w-full py-1 flex flex-col rounded-none font-roboto select-none">
 
             {}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-200 pb-4 mb-4">
@@ -8746,7 +9027,7 @@ export const SpatialPreviewWrapper: React.FC<SpatialPreviewWrapperProps> = ({
                         Sistem PostGIS Spatial Engine pemantauan logistik fisik dan indikator pembangunan daerah.
                     </p>
                 </div>
-                <span className="text-[10px] font-black uppercase tracking-widest px-2.5 py-1 bg-teal-50 border border-teal-200 text-teal-800 shrink-0 self-start sm:self-auto flex items-center gap-1.5">
+                <span className="text-[10px] font-black uppercase tracking-widest text-teal-800 shrink-0 self-start sm:self-auto flex items-center gap-1.5">
                     <Activity size={12} className="text-teal-700" />
                     <span>PostGIS Active</span>
                 </span>
@@ -8757,7 +9038,7 @@ export const SpatialPreviewWrapper: React.FC<SpatialPreviewWrapperProps> = ({
                 onClick={handleInteractiveClick}
                 onMouseEnter={() => !isTouchDevice && setIsActivated(true)}
                 onMouseLeave={handleMouseLeave}
-                className="w-full relative overflow-hidden group cursor-pointer border border-slate-300 bg-slate-100"
+                className="w-full relative overflow-hidden group cursor-pointer border border-slate-300 bg-slate-100 animate-in fade-in duration-200"
                 style={{ height: '540px' }}
             >
                 {}
@@ -8818,7 +9099,7 @@ export const SpatialPreviewWrapper: React.FC<SpatialPreviewWrapperProps> = ({
                             Pusat Pengendali
                         </h3>
 
-                        <p className="text-[10px] text-slate-600 font-semibold leading-relaxed mb-4 max-w-[280px]">
+                        <p className="text-[10px] text-slate-600 font-semibold leading-relaxed mb-4 max-w-70">
                             {isTouchDevice
                                 ? "Ketuk sekali lagi pada layar atau lencana di bawah untuk masuk Pusat Pengendali Spasial penuh."
                                 : "Klik di mana saja untuk mengaktifkan sistem navigasi spasial interaktif penuh (GFW Command Center)."}
@@ -8904,7 +9185,9 @@ import { Coins, Database, Loader2 } from 'lucide-react';
 
 export interface TokenBudget {
     totalTokens: number;
+    remainingTokens: number;
     estimatedCostIdr: number;
+    remainingCostIdr: number;
     maxMonthlyPaguIdr: number;
     quotaPercentage: number;
     paguStatus: 'SAFE' | 'ALERT' | 'WARNING';
@@ -8929,25 +9212,25 @@ export const TokenBudgetGuard: React.FC<TokenBudgetGuardProps> = ({ budget, isLo
 
   if (!budget) return null;
 
-  const { totalTokens, estimatedCostIdr, maxMonthlyPaguIdr, quotaPercentage, paguStatus } = budget;
+  const { totalTokens, remainingTokens, estimatedCostIdr, remainingCostIdr, maxMonthlyPaguIdr, quotaPercentage, paguStatus } = budget;
 
   const statusConfigs = {
     SAFE: {
-      badge: 'bg-emerald-100 text-emerald-800 border-emerald-300',
+      badge: 'text-emerald-800',
       bar: 'bg-emerald-600 shadow-[0_0_8px_rgba(16,185,129,0.3)]',
       label: 'Aman',
       pulse: 'bg-emerald-500',
       description: 'Penggunaan AI masih sangat aman. Sisa kuota bulanan Anda masih melimpah.',
     },
     ALERT: {
-      badge: 'bg-amber-100 text-amber-800 border-amber-300',
+      badge: 'text-amber-800',
       bar: 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.3)]',
       label: 'Waspada',
       pulse: 'bg-amber-500',
       description: 'Penggunaan AI sudah setengah jalan dari limit bulanan. Batasi aktivitas yang tidak terlalu penting.',
     },
     WARNING: {
-      badge: 'bg-rose-100 text-rose-800 border-rose-300',
+      badge: 'text-rose-800',
       bar: 'bg-rose-600 shadow-[0_0_8px_rgba(225,29,72,0.3)]',
       label: 'Hampir Habis / Kritis',
       pulse: 'bg-rose-500',
@@ -8969,7 +9252,7 @@ export const TokenBudgetGuard: React.FC<TokenBudgetGuardProps> = ({ budget, isLo
           <span className="text-[10px] font-black tracking-widest text-slate-400 uppercase">
             PEMANTAUAN KUOTA AI BULANAN
           </span>
-          <span className={`px-2 py-0.5 text-[9px] font-black uppercase border tracking-wider rounded-none ${currentConfig.badge}`}>
+          <span className={`text-[9px] font-black uppercase tracking-wider ${currentConfig.badge}`}>
             Status Kuota: {currentConfig.label}
           </span>
         </div>
@@ -8998,13 +9281,13 @@ export const TokenBudgetGuard: React.FC<TokenBudgetGuardProps> = ({ budget, isLo
         <div className="flex flex-col justify-center pr-6">
           <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5 mb-1.5 select-none">
             <Coins size={11} className="text-teal-700 shrink-0" />
-            <span>Biaya Terpakai</span>
+            <span>Sisa Saldo</span>
           </span>
           <span className="text-lg font-black text-slate-900 tracking-tight font-mono">
-            Rp {estimatedCostIdr.toLocaleString('id-ID')}
+            Rp {remainingCostIdr.toLocaleString('id-ID')}
           </span>
           <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-1 select-none">
-            Limit: Rp {maxMonthlyPaguIdr.toLocaleString('id-ID')}
+            Kredit: Rp {maxMonthlyPaguIdr.toLocaleString('id-ID')}
           </span>
         </div>
 
@@ -9012,13 +9295,13 @@ export const TokenBudgetGuard: React.FC<TokenBudgetGuardProps> = ({ budget, isLo
         <div className="pl-6 flex flex-col justify-center">
           <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5 mb-1.5 select-none">
             <Database size={11} className="text-teal-700 shrink-0" />
-            <span>Total Token</span>
+            <span>Sisa Token</span>
           </span>
           <span className="text-lg font-black text-slate-900 tracking-tight font-mono">
-            {totalTokens.toLocaleString('id-ID')}
+            {remainingTokens.toLocaleString('id-ID')}
           </span>
           <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-1 select-none">
-            Sesi Input + Output
+            Tersedia dari Pagu
           </span>
         </div>
       </div>
@@ -9644,7 +9927,7 @@ const MOCK_DRILLDOWN_DETAILS: Record<number, {
             jumlah_penduduk: 142000,
             deskripsi: "Distrik Mimika Baru berpusat di kota Timika, berfungsi sebagai episentrum aktivitas perekonomian, perbankan, industri kreatif, serta pusat pemerintahan. Kepadatan infrastruktur dasar di distrik ini merupakan yang paling maju di seluruh kabupaten.",
             batas_wilayah: "Utara: Kuala Kencana, Selatan: Wania, Barat: Iwaka, Timur: Mimika Timur",
-            images: ["https://picsum.photos/seed/m-baru-d1/320/180", "https://picsum.photos/seed/m-baru-d2/320/180"]
+            images: ["/img/mimika%20baru/aerial%20view.jpg", "/img/mimika%20baru/Pasar-Sentral-Timika.jpg"]
         },
         categories: [
             { category_id: 1, name: "Kesehatan & Pendidikan", total: 45 },
@@ -9661,7 +9944,7 @@ const MOCK_DRILLDOWN_DETAILS: Record<number, {
             jumlah_penduduk: 28000,
             deskripsi: "Distrik Kuala Kencana merupakan kota modern terencana yang dikelola secara eksklusif berkolaborasi dengan pihak swasta pertambangan. Memiliki tata kota ramah lingkungan, jaringan kabel bawah tanah, dan kualitas sanitasi berstandar internasional.",
             batas_wilayah: "Utara: Tembagapura, Selatan: Mimika Baru, Barat: Iwaka, Timur: Kwamki Narama",
-            images: ["https://picsum.photos/seed/kuala-k-d1/320/180", "https://picsum.photos/seed/kuala-k-d2/320/180"]
+            images: ["/img/kualakencana/images%20(1).jpg", "/img/kualakencana/images.jpg"]
         },
         categories: [
             { category_id: 1, name: "Kesehatan & Pendidikan", total: 22 },
@@ -9678,7 +9961,7 @@ const MOCK_DRILLDOWN_DETAILS: Record<number, {
             jumlah_penduduk: 23000,
             deskripsi: "Distrik Tembagapura terletak di wilayah pegunungan tinggi bersuhu dingin. Merupakan pusat operasi penambangan emas dan tembaga utama. Distrik ini memiliki tantangan geografis berupa lereng terjal dan risiko tanah longsor tinggi.",
             batas_wilayah: "Utara: Kabupaten Puncak, Selatan: Kuala Kencana, Barat: Alama, Timur: Hoya",
-            images: ["https://picsum.photos/seed/temb-d1/320/180", "https://picsum.photos/seed/temb-d2/320/180"]
+            images: ["/img/tembagapura/Grasberg_pano_(3200491589)_(cropped).jpg", "/img/tembagapura/Tembagapura_4.jpg"]
         },
         categories: [
             { category_id: 1, name: "Kesehatan & Pendidikan", total: 14 },
@@ -9695,7 +9978,7 @@ const MOCK_DRILLDOWN_DETAILS: Record<number, {
             jumlah_penduduk: 61000,
             deskripsi: "Distrik Wania dikembangkan sebagai kawasan penyangga pemukiman perkotaan Timika. Memiliki konsentrasi pemukiman transmigrasi yang padat, pasar sentral regional, dan perkembangan ruko komersial menengah yang sangat pesat.",
             batas_wilayah: "Utara: Mimika Baru, Selatan: Mimika Timur, Barat: Iwaka, Timur: Mimika Tengah",
-            images: ["https://picsum.photos/seed/wania-d1/320/180"]
+            images: ["/img/wania/Pasar-Sentral-1-scaled.jpg", "/img/mimika%20baru/Indahhnya-Wisata-Timika.jpg"]
         },
         categories: [
             { category_id: 1, name: "Kesehatan & Pendidikan", total: 31 },
@@ -9712,7 +9995,7 @@ const MOCK_DRILLDOWN_DETAILS: Record<number, {
             jumlah_penduduk: 12000,
             deskripsi: "Distrik Iwaka didominasi dataran rendah subur yang dimanfaatkan sebagai kawasan perkebunan buah, penangkaran sagu lokal, serta menjadi area perlintasan utama koridor logistik berat menuju pelabuhan dan tambang.",
             batas_wilayah: "Utara: Kuala Kencana, Selatan: Amar, Barat: Mimika Barat Tengah, Timur: Mimika Baru",
-            images: ["https://picsum.photos/seed/iwaka-d1/320/180"]
+            images: ["/img/iwaka/sagu-1-635c8e4408a8b57f2152e722.jpg", "/img/iwaka/WhatsApp-Image-2026-07-13-at-10.24.32.jpg"]
         },
         categories: [
             { category_id: 1, name: "Kesehatan & Pendidikan", total: 15 },
@@ -9729,7 +10012,7 @@ const MOCK_DRILLDOWN_DETAILS: Record<number, {
             jumlah_penduduk: 15000,
             deskripsi: "Distrik Kwamki Narama merupakan kawasan pemukiman adat yang padat. Pemerintah daerah memprioritaskan distrik ini untuk program asimilasi sosial, peningkatan literasi pendidikan dasar, dan pemberdayaan perkebunan rakyat.",
             batas_wilayah: "Utara: Kuala Kencana, Selatan: Mimika Baru, Barat: Kuala Kencana, Timur: Mimika Tengah",
-            images: ["https://picsum.photos/seed/kwamki-d1/320/180"]
+            images: ["/img/kwamki%20narama/prosesi-kremasi-jenazah-junius-m-janempa-di-kwamki-narama-rabu-142026-foto-cenderawasih-posmoh-wahyu-welerubun-xmAu6.webp", "/img/iwaka/traditional-honai-house-dani-tribe-260nw-2635906639.jpg"]
         },
         categories: [
             { category_id: 1, name: "Kesehatan & Pendidikan", total: 24 },
@@ -9746,7 +10029,7 @@ const MOCK_DRILLDOWN_DETAILS: Record<number, {
             jumlah_penduduk: 11000,
             deskripsi: "Distrik Mimika Timur merupakan pintu gerbang jalur logistik kelautan utama Mimika. Berpusat di Mapurujaya, distrik ini melayani operasional pelabuhan nasional Pomako dan industri pengolahan hasil laut laut.",
             batas_wilayah: "Utara: Mimika Baru, Selatan: Laut Arafura, Barat: Wania, Timur: Mimika Timur Jauh",
-            images: ["https://picsum.photos/seed/m-tim-d1/320/180"]
+            images: ["/img/mimika%20timur/624e6c8c105e5.jpg", "/img/mimika%20timur/images.jpg"]
         },
         categories: [
             { category_id: 1, name: "Kesehatan & Pendidikan", total: 19 },
@@ -9763,7 +10046,7 @@ const MOCK_DRILLDOWN_DETAILS: Record<number, {
             jumlah_penduduk: 5500,
             deskripsi: "Distrik Mimika Tengah didominasi oleh bentang alam perairan payau dan muara sungai pesisir selatan. Mata pencaharian utama penduduknya adalah nelayan kepiting bakau dan budidaya tambak ikan tradisional.",
             batas_wilayah: "Utara: Kwamki Narama, Selatan: Laut Arafura, Barat: Wania, Timur: Jita",
-            images: ["https://picsum.photos/seed/m-teng-d1/320/180"]
+            images: ["/img/jita/Panoramic_view_of_dock_at_Kampung_Rawa,_2014-06-21.jpg", "/img/mimika%20barat/061348_64937_INDAH_mimika_dalam.jpg"]
         },
         categories: [
             { category_id: 1, name: "Kesehatan & Pendidikan", total: 8 },
@@ -9780,7 +10063,7 @@ const MOCK_DRILLDOWN_DETAILS: Record<number, {
             jumlah_penduduk: 4200,
             deskripsi: "Distrik Mimika Barat berpusat di Kokonao. Merupakan kawasan administratif bersejarah yang menyimpan rekam jejak misionaris pendidikan awal di pesisir Papua. Fokus pada pelestarian peninggalan budaya lokal.",
             batas_wilayah: "Utara: Mimika Barat Tengah, Selatan: Laut Arafura, Barat: Mimika Barat Jauh, Timur: Amar",
-            images: ["https://picsum.photos/seed/m-barat-d1/320/180"]
+            images: ["/img/mimika%20barat/061348_64937_INDAH_mimika_dalam.jpg", "/img/mimika%20barat/IMG-20250929-WA0041-scaled.webp"]
         },
         categories: [
             { category_id: 1, name: "Kesehatan & Pendidikan", total: 13 },
@@ -9797,7 +10080,7 @@ const MOCK_DRILLDOWN_DETAILS: Record<number, {
             jumlah_penduduk: 3800,
             deskripsi: "Distrik Agimuga merupakan kawasan dataran rendah timur Mimika yang dilalui banyak aliran sungai besar. Pembangunan infrastruktur jalan darat penghubung terus diupayakan untuk mengikis isolasi logistik antar wilayah.",
             batas_wilayah: "Utara: Jila, Selatan: Laut Arafura, Barat: Jita, Timur: Mimika Timur Jauh",
-            images: ["https://picsum.photos/seed/agimuga-d1/320/180", "https://picsum.photos/seed/agimuga-d2/320/180"]
+            images: ["/img/agimuga/209.jpg", "/img/agimuga/7311.jpg"]
         },
         categories: [
             { category_id: 1, name: "Kesehatan & Pendidikan", total: 11 },
@@ -9814,7 +10097,7 @@ const MOCK_DRILLDOWN_DETAILS: Record<number, {
             jumlah_penduduk: 4500,
             deskripsi: "Distrik Jila membentang luas di kaki jajaran pegunungan tengah Mimika. Topografi berbukit curam dan lereng batu mempersulit jaringan telekomunikasi dan pembangunan jalan trans-kabupaten.",
             batas_wilayah: "Utara: Kabupaten Puncak, Selatan: Agimuga, Barat: Hoya, Timur: Jita",
-            images: ["https://picsum.photos/seed/jila-d1/320/180"]
+            images: ["/img/jila/615d4d4e6ff0c.jpg", "/img/jila/shutterstock_2362513197.jpg"]
         },
         categories: [
             { category_id: 1, name: "Kesehatan & Pendidikan", total: 9 },
@@ -9831,7 +10114,7 @@ const MOCK_DRILLDOWN_DETAILS: Record<number, {
             jumlah_penduduk: 2800,
             deskripsi: "Distrik Jita merupakan kawasan pedalaman berawa di timur Mimika. Sirkulasi mobilitas masyarakat sangat bergantung pada transportasi sungai, perahu kayu tradisional (*perahu jonson*), dan pasang surut air laut.",
             batas_wilayah: "Utara: Jila, Selatan: Laut Arafura, Barat: Mimika Tengah, Timur: Agimuga",
-            images: ["https://picsum.photos/seed/jita-d1/320/180"]
+            images: ["/img/jita/images.jpg", "/img/jita/Panoramic_view_of_dock_at_Kampung_Rawa,_2014-06-21.jpg"]
         },
         categories: [
             { category_id: 1, name: "Kesehatan & Pendidikan", total: 7 },
@@ -9848,7 +10131,7 @@ const MOCK_DRILLDOWN_DETAILS: Record<number, {
             jumlah_penduduk: 3200,
             deskripsi: "Distrik Mimika Timur Jauh terletak di pesisir muara sungai ujung timur Mimika yang berbatasan langsung dengan Kabupaten Asmat. Mayoritas penduduk bekerja mencari ikan dan mengolah sagu hutan alami.",
             batas_wilayah: "Utara: Agimuga, Selatan: Laut Arafura, Barat: Mimika Timur, Timur: Kabupaten Asmat",
-            images: ["https://picsum.photos/seed/mtimj-d1/320/180"]
+            images: ["/img/agimuga/7311.jpg", "/img/20170903_Papouasie_Baliem_valley_15.jpg"]
         },
         categories: [
             { category_id: 1, name: "Kesehatan & Pendidikan", total: 12 },
@@ -9865,7 +10148,7 @@ const MOCK_DRILLDOWN_DETAILS: Record<number, {
             jumlah_penduduk: 2100,
             deskripsi: "Distrik Mimika Barat Jauh berpusat di rumpun pesisir pantai Yaraya-Ipaya. Terkenal dengan potensi pasir pantai putih kelapa rakyat, dan pemanfaatan kincir angin skala mikro untuk listrik kampung pesisir.",
             batas_wilayah: "Utara: Mimika Barat Tengah, Selatan: Laut Arafura, Barat: Kabupaten Kaimana, Timur: Mimika Barat",
-            images: ["https://picsum.photos/seed/mbarj-d1/320/180"]
+            images: ["/img/mimika%20barat%20jauh/pantai-minajaya-sukabumi-1747457877972_169.jpeg", "/img/mimika%20barat/IMG-20250929-WA0041-scaled.webp"]
         },
         categories: [
             { category_id: 1, name: "Kesehatan & Pendidikan", total: 10 },
@@ -9882,7 +10165,7 @@ const MOCK_DRILLDOWN_DETAILS: Record<number, {
             jumlah_penduduk: 2400,
             deskripsi: "Distrik Mimika Barat Tengah melayani rute penghubung transportasi laut logistik ringan antar pesisir barat. Memiliki bentang muara yang luas dan dilindungi ekosistem hutan bakau (*mangrove*) tebal alami.",
             batas_wilayah: "Utara: Kabupaten Deiyai, Selatan: Mimika Barat, Barat: Mimika Barat Jauh, Timur: Iwaka",
-            images: ["https://picsum.photos/seed/mbar-t-d1/320/180"]
+            images: ["/img/AMANNSAGOAOWA.jpg", "/img/mimika%20barat/061348_64937_INDAH_mimika_dalam.jpg"]
         },
         categories: [
             { category_id: 1, name: "Kesehatan & Pendidikan", total: 11 },
@@ -9899,7 +10182,7 @@ const MOCK_DRILLDOWN_DETAILS: Record<number, {
             jumlah_penduduk: 1800,
             deskripsi: "Distrik Amar merupakan kawasan pesisir rawa dengan mayoritas vegetasi nipa dan hutan payau. Sentra andalan daerah untuk penangkapan kepiting bakau (*Scylla serrata*) berkualitas ekspor.",
             batas_wilayah: "Utara: Iwaka, Selatan: Laut Arafura, Barat: Mimika Barat, Timur: Mimika Barat Tengah",
-            images: ["https://picsum.photos/seed/amar-d1/320/180"]
+            images: ["/img/jita/Panoramic_view_of_dock_at_Kampung_Rawa,_2014-06-21.jpg", "/img/Mimika-300x200.jpg"]
         },
         categories: [
             { category_id: 1, name: "Kesehatan & Pendidikan", total: 6 },
@@ -9916,7 +10199,7 @@ const MOCK_DRILLDOWN_DETAILS: Record<number, {
             jumlah_penduduk: 1200,
             deskripsi: "Distrik Hoya terletak jauh di lembah sempit terdalam pegunungan Mimika. Akses jalan darat sama sekali tidak tersedia, membuat wilayah ini memiliki tantangan keterisolasian yang tinggi dalam pemenuhan kesehatan, logistik dasar, dan guru ajar.",
             batas_wilayah: "Utara: Kabupaten Intan Jaya, Selatan: Jila, Barat: Tembagapura, Timur: Alama",
-            images: ["https://picsum.photos/seed/hoya-d1/320/180", "https://picsum.photos/seed/hoya-d2/320/180"]
+            images: ["/img/hoya/images.jpg", "/img/hoya/JembatanHoya%20(2).jpg"]
         },
         categories: [
             { category_id: 1, name: "Kesehatan & Pendidikan", total: 14 },
@@ -9933,7 +10216,7 @@ const MOCK_DRILLDOWN_DETAILS: Record<number, {
             jumlah_penduduk: 1600,
             deskripsi: "Distrik Alama terletak di ujung timur laut pegunungan terjal Mimika. Memiliki kepadatan penduduk paling kecil dengan sebaran perkampungan adat tradisional di lembah-lembah perbukitan terpencil.",
             batas_wilayah: "Utara: Kabupaten Lanny Jaya, Selatan: Jita, Barat: Hoya, Timur: Kabupaten Nduga",
-            images: ["https://picsum.photos/seed/alama-d1/320/180"]
+            images: ["/img/alama/97295c5df6d1.jpg", "/img/alama/Taman-Nasional-Lorentz-1024x679.jpg"]
         },
         categories: [
             { category_id: 1, name: "Kesehatan & Pendidikan", total: 8 },
@@ -10512,7 +10795,28 @@ export default function DistrictListPanel() {
                     <div className="flex flex-col bg-white">
                         {filteredDistricts.map((district) => {
                             const isActive = focusedDistrict === district.name;
-                            const mockThumbnail = `https://picsum.photos/seed/mimika-dist-${district.id}/100/100`;
+
+                            const thumbnailMap: Record<number, string> = {
+                                1: "/img/mimika%20baru/aerial%20view.jpg",
+                                2: "/img/kualakencana/images%20(1).jpg",
+                                3: "/img/tembagapura/Grasberg_pano_(3200491589)_(cropped).jpg",
+                                4: "/img/wania/Pasar-Sentral-1-scaled.jpg",
+                                5: "/img/iwaka/sagu-1-635c8e4408a8b57f2152e722.jpg",
+                                6: "/img/kwamki%20narama/prosesi-kremasi-jenazah-junius-m-janempa-di-kwamki-narama-rabu-142026-foto-cenderawasih-posmoh-wahyu-welerubun-xmAu6.webp",
+                                7: "/img/mimika%20timur/624e6c8c105e5.jpg",
+                                8: "/img/jita/Panoramic_view_of_dock_at_Kampung_Rawa,_2014-06-21.jpg",
+                                9: "/img/mimika%20barat/061348_64937_INDAH_mimika_dalam.jpg",
+                                10: "/img/agimuga/209.jpg",
+                                11: "/img/jila/615d4d4e6ff0c.jpg",
+                                12: "/img/jita/images.jpg",
+                                13: "/img/agimuga/7311.jpg",
+                                14: "/img/mimika%20barat%20jauh/pantai-minajaya-sukabumi-1747457877972_169.jpeg",
+                                15: "/img/AMANNSAGOAOWA.jpg",
+                                16: "/img/jita/Panoramic_view_of_dock_at_Kampung_Rawa,_2014-06-21.jpg",
+                                17: "/img/hoya/images.jpg",
+                                18: "/img/alama/97295c5df6d1.jpg"
+                            };
+                            const mockThumbnail = thumbnailMap[district.id] || "/img/Mimika-300x200.jpg";
 
                             return (
                                 <button
@@ -11628,10 +11932,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         if (isMounted) {
           setDashboardMeta({
             tokenBudget: {
-              totalTokens: 412500,
-              estimatedCostIdr: 107250,
-              maxMonthlyPaguIdr: 500000,
-              quotaPercentage: 21.5,
+              totalTokens: 15000,
+              remainingTokens: 20818333,
+              estimatedCostIdr: 65,
+              remainingCostIdr: 90315,
+              maxMonthlyPaguIdr: 90380,
+              quotaPercentage: 0.1,
               paguStatus: 'SAFE'
             },
             recentChats: [
@@ -11900,50 +12206,29 @@ import {
   MessageSquareCode,
   BarChart3,
   FileText,
-  LayoutDashboard,
-  FolderOpen,
-  Clock,
-  Sparkles,
   ChevronRight,
   Database,
   Globe,
-  Cpu,
-  Activity,
-  Atom
+  Search,
+  ChevronDown
 } from 'lucide-react';
+import { SpatialPreviewWrapper } from '../components/spatial-preview-wrapper.component';
+import { MOCK_DATA } from '../../../services/mock-data.service';
 
 interface LandingViewProps {
   onNavigate: (route: string) => void;
 }
 
 export const LandingView: React.FC<LandingViewProps> = ({ onNavigate }) => {
-  const [currentTime, setCurrentTime] = useState<string>('');
-  const [currentDate, setCurrentDate] = useState<string>('');
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
 
   useEffect(() => {
-    const updateDateTime = () => {
-      const now = new Date();
-      setCurrentTime(
-        now.toLocaleTimeString('id-ID', {
-          hour: '2-digit',
-          minute: '2-digit',
-          second: '2-digit',
-          hour12: false,
-        })
-      );
-      setCurrentDate(
-        now.toLocaleDateString('id-ID', {
-          weekday: 'long',
-          day: 'numeric',
-          month: 'long',
-          year: 'numeric',
-        })
-      );
+    const handleMouseMove = (e: MouseEvent) => {
+      setMousePos({ x: e.clientX, y: e.clientY });
     };
 
-    updateDateTime();
-    const intervalId = setInterval(updateDateTime, 1000);
-    return () => clearInterval(intervalId);
+    window.addEventListener('mousemove', handleMouseMove);
+    return () => window.removeEventListener('mousemove', handleMouseMove);
   }, []);
 
   const mainModules = [
@@ -11956,10 +12241,10 @@ export const LandingView: React.FC<LandingViewProps> = ({ onNavigate }) => {
       accentBg: 'bg-teal-500',
       accentLight: 'bg-teal-50',
       accentText: 'text-teal-700',
-      accentBorder: 'border-teal-200 hover:border-teal-400',
+      accentBorder: 'border-slate-200 hover:border-teal-400',
       iconBg: 'bg-teal-100 text-teal-600',
       badgeBg: 'bg-teal-50 text-teal-600 border-teal-200',
-      hoverAccent: 'hover:shadow-teal-100',
+      hoverAccent: 'hover:shadow-teal-100/60',
     },
     {
       id: 'ai-request',
@@ -11970,24 +12255,24 @@ export const LandingView: React.FC<LandingViewProps> = ({ onNavigate }) => {
       accentBg: 'bg-blue-500',
       accentLight: 'bg-blue-50',
       accentText: 'text-blue-700',
-      accentBorder: 'border-blue-200 hover:border-blue-400',
+      accentBorder: 'border-slate-200 hover:border-blue-400',
       iconBg: 'bg-blue-100 text-blue-600',
       badgeBg: 'bg-blue-50 text-blue-600 border-blue-200',
-      hoverAccent: 'hover:shadow-blue-100',
+      hoverAccent: 'hover:shadow-blue-100/60',
     },
     {
       id: 'analytics',
-      title: 'Lembar Diagnostik & Analisisa Kebijakan',
+      title: 'Lembar Diagnostik & Analisa',
       badge: 'Causal Inference',
       desc: 'Sistem analisis deviasi capaian kinerja antara baseline target pembangunan vs realisasi lapangan dengan pemodelan faktor penyebab (AI).',
       icon: BarChart3,
       accentBg: 'bg-indigo-500',
       accentLight: 'bg-indigo-50',
       accentText: 'text-indigo-700',
-      accentBorder: 'border-indigo-200 hover:border-indigo-400',
+      accentBorder: 'border-slate-200 hover:border-indigo-400',
       iconBg: 'bg-indigo-100 text-indigo-600',
       badgeBg: 'bg-indigo-50 text-indigo-600 border-indigo-200',
-      hoverAccent: 'hover:shadow-indigo-100',
+      hoverAccent: 'hover:shadow-indigo-100/60',
     },
     {
       id: 'reports',
@@ -11998,218 +12283,236 @@ export const LandingView: React.FC<LandingViewProps> = ({ onNavigate }) => {
       accentBg: 'bg-amber-500',
       accentLight: 'bg-amber-50',
       accentText: 'text-amber-700',
-      accentBorder: 'border-amber-200 hover:border-amber-400',
+      accentBorder: 'border-slate-200 hover:border-amber-400',
       iconBg: 'bg-amber-100 text-amber-600',
       badgeBg: 'bg-amber-50 text-amber-600 border-amber-200',
-      hoverAccent: 'hover:shadow-amber-100',
+      hoverAccent: 'hover:shadow-amber-100/60',
     }
   ];
 
-  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
-
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      setMousePos({ x: e.clientX, y: e.clientY });
-    };
-
-    window.addEventListener('mousemove', handleMouseMove);
-    return () => window.removeEventListener('mousemove', handleMouseMove);
-  }, []);
-
   return (
-    <div className="min-h-screen w-full bg-slate-50 text-slate-800 flex flex-col justify-between relative overflow-hidden font-roboto">
+    <div className="min-h-screen w-full bg-slate-50 text-slate-800 flex flex-col justify-between relative overflow-x-hidden font-roboto">
 
       {}
       <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
-
-        {}
         <div
           className="absolute inset-0 opacity-[0.25] transition-transform duration-1000 ease-out"
           style={{
             backgroundImage: `radial-gradient(circle at 1px 1px, #94a3b8 1px, transparent 0)`,
             backgroundSize: '32px 32px',
-
             transform: `translate(${mousePos.x * 0.01}px, ${mousePos.y * 0.01}px)`,
           }}
         />
-
-        {}
         <div
-          className="absolute inset-0 opacity-[0.12] transition-transform duration-700 ease-out"
-          style={{
-            backgroundImage: `
-              linear-gradient(to right, #cbd5e1 1px, transparent 1px),
-              linear-gradient(to bottom, #cbd5e1 1px, transparent 1px)
-            `,
-            backgroundSize: '128px 128px',
-
-            transform: `translate(${mousePos.x * -0.015}px, ${mousePos.y * -0.015}px)`,
-          }}
-        />
-
-        {}
-        <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-teal-500/20 to-transparent animate-[scan_8s_linear_infinite]" />
-      </div>
-
-      {}
-      <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
-        {}
-        <div
-          className="absolute w-[600px] h-[600px] bg-teal-400/10 rounded-full blur-[120px] transition-transform duration-700 ease-out"
-          style={{
-
-            transform: `translate(${mousePos.x - 300}px, ${mousePos.y - 300}px)`,
-          }}
-        />
-
-        {}
-        <div
-          className="absolute w-[800px] h-[800px] bg-indigo-500/10 rounded-full blur-[140px] transition-transform duration-[1500ms] ease-out"
+          className="absolute w-200 h-200 bg-blue-500/5 rounded-full blur-[140px] transition-transform duration-1500 ease-out"
           style={{
             right: '10%',
             bottom: '10%',
-
             transform: `translate(${(mousePos.x * -0.03)}px, ${(mousePos.y * -0.03)}px)`,
           }}
         />
       </div>
 
       {}
-      <header className="w-full bg-white/90 backdrop-blur-sm border-b border-slate-200 px-6 py-4 flex flex-col md:flex-row items-center justify-between gap-4 z-10 shadow-xs">
-        <div className="flex items-center gap-3">
-          <FileText size={24} className="text-teal-600 shrink-0" />
+      <header className="w-full bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between gap-4 z-45 shadow-xs shrink-0 select-none">
+        <div
+          onClick={() => onNavigate('landing')}
+          className="flex items-center gap-3 cursor-pointer hover:opacity-90 transition-opacity"
+        >
+          <FileText size={24} className="text-blue-600 shrink-0" />
+          <div className="w-px h-6 bg-slate-300 mx-2" />
           <div className="flex flex-col text-left">
-            <span className="font-extrabold text-sm uppercase tracking-widest text-teal-700">
-              AKLS
-            </span>
-            <span className="text-[10px] text-slate-500 font-medium">
+            <h1 className="text-base font-black tracking-tight leading-none text-slate-900 m-0 p-0 flex items-center">
+              <span>AKLS</span>
+              <span className="text-blue-600 ml-1">Platform</span>
+            </h1>
+            <span className="text-[12px] text-slate-500 font-semibold mt-1">
               Aplikasi Analisa Kebijakan &amp; Laporan Strategis
             </span>
           </div>
         </div>
 
         {}
-        <div className="flex items-center gap-5 text-xs text-slate-500">
-          <div className="flex items-center gap-2 border-r border-slate-200 pr-5">
-            <Clock size={13} className="text-teal-500" />
-            <div className="text-left font-mono">
-              <span className="text-slate-800 font-bold block leading-none text-sm">{currentTime}</span>
-              <span className="text-[9px] text-slate-400 block mt-0.5">{currentDate}</span>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Activity size={13} className="text-emerald-500" />
-            <div>
-              <span className="font-bold text-slate-700 block leading-none text-xs">SISTEM AKTIF</span>
-              <span className="text-[9px] text-slate-400 block mt-0.5">Secure AI Connection</span>
-            </div>
-          </div>
+        <div className="flex items-center gap-8">
+          <button
+            onClick={() => onNavigate('generator')}
+            className="bg-[#0070c0] hover:bg-blue-700 text-white font-extrabold text-xs uppercase tracking-widest px-6 py-2.5 border-none cursor-pointer transition-colors rounded-none"
+          >
+            MASUK
+          </button>
         </div>
       </header>
 
       {}
-      <main className="flex-1 w-full max-w-6xl mx-auto px-6 py-12 flex flex-col justify-center gap-10 z-10">
+      <main className="flex-1 w-full flex flex-col gap-6 z-10 pb-10">
 
         {}
-        <div className="text-center flex flex-col items-center">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-teal-50 border border-teal-200 text-[10px] font-bold text-teal-700 uppercase tracking-widest mb-4">
-            <Sparkles size={11} className="text-teal-500" />
-            PORTAL UTAMA EKSEKUTIF
-          </div>
-          <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-slate-900 uppercase">
-            Aplikasi Analisa Kebijakan &amp; Laporan Strategis
-          </h1>
-          <div className="w-16 h-1 bg-teal-500 mt-3 mb-3" />
-          <p className="text-sm text-slate-500 max-w-2xl font-normal leading-relaxed text-center">
-            Pusat pengendali analitik terintegrasi. Silakan pilih instrumen cerdas di bawah untuk merancang kebijakan, menguji analisis deviasi, atau memantau metrik spasial.
-          </p>
-        </div>
-
-        {}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 w-full max-w-5xl mx-auto">
-          {mainModules.map((mod) => {
-            const Icon = mod.icon;
-            return (
-              <button
-                key={mod.id}
-                onClick={() => onNavigate(mod.id)}
-                className={`group relative text-left bg-white border-2 ${mod.accentBorder} p-6 flex gap-5 transition-all duration-300 hover:-translate-y-1.5 cursor-pointer ${mod.hoverAccent} hover:shadow-xl shadow-sm`}
-              >
-                {}
-                <div className={`absolute top-0 left-0 right-0 h-[3px] ${mod.accentBg} opacity-0 group-hover:opacity-100 transition-opacity duration-300`} />
-
-                {}
-                <div className={`w-13 h-13 w-12 h-12 flex items-center justify-center shrink-0 ${mod.iconBg} transition-transform duration-300 group-hover:scale-105`}>
-                  <Icon size={22} />
-                </div>
-
-                {}
-                <div className="flex flex-col flex-1 justify-between gap-2 text-left">
-                  <div>
-                    <div className="flex items-center justify-between gap-2 mb-2">
-                      <h2 className={`text-sm font-bold text-slate-800 uppercase tracking-wide group-hover:${mod.accentText} transition-colors`}>
-                        {mod.title}
-                      </h2>
-                      <span className={`text-[9px] font-black tracking-widest uppercase border px-2 py-0.5 shrink-0 ${mod.badgeBg}`}>
-                        {mod.badge}
-                      </span>
-                    </div>
-                    <p className="text-[11.5px] text-slate-500 leading-relaxed font-normal">
-                      {mod.desc}
-                    </p>
-                  </div>
-
-                  <div className={`inline-flex items-center gap-1 text-[10px] font-bold ${mod.accentText} opacity-0 group-hover:opacity-100 uppercase tracking-widest transition-all group-hover:translate-x-1 mt-1`}>
-                    <span>Mulai Akses Modul</span>
-                    <ChevronRight size={12} />
-                  </div>
-                </div>
-              </button>
-            );
-          })}
-        </div>
-
-        {}
-        <div className="w-full max-w-5xl mx-auto border-t border-slate-200 pt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2 text-slate-400 text-xs">
-            <Cpu size={13} className="text-teal-500" />
-            <span>Akses Cepat Pengendali Data Daerah</span>
-          </div>
-
-          <div className="flex flex-wrap justify-center gap-3">
-            <button
-              onClick={() => onNavigate('dashboard')}
-              className="px-4 py-2 bg-white border border-slate-300 hover:border-teal-400 hover:bg-teal-50 text-slate-600 hover:text-teal-700 text-xs font-bold uppercase tracking-wider transition-all cursor-pointer flex items-center gap-2 shadow-xs active:scale-95"
+        <section
+          className="w-full bg-[#f8fafc] bg-cover bg-center bg-no-repeat py-12 relative overflow-hidden shrink-0 select-none border-b border-slate-200"
+          style={{
+            backgroundImage: `url('/bg/landingpage.png')`
+          }}
+        >
+          <div className="w-full px-4 md:px-8 relative z-10 text-left">
+            <h1
+              className="text-4xl md:text-5xl font-black tracking-tight text-white! uppercase leading-none mb-4 font-roboto"
+              style={{ textShadow: '0 2px 10px rgba(0, 0, 0, 0.8)' }}
             >
-              <LayoutDashboard size={13} className="text-teal-500" />
-              <span>Dashboard Metrik</span>
-            </button>
-            <button
-              onClick={() => onNavigate('gis-explorer')}
-              className="px-4 py-2 bg-white border border-slate-300 hover:border-indigo-400 hover:bg-indigo-50 text-slate-600 hover:text-indigo-700 text-xs font-bold uppercase tracking-wider transition-all cursor-pointer flex items-center gap-2 shadow-xs active:scale-95"
+              Aplikasi Analisa Kebijakan <br className="hidden md:inline" /> &amp; Laporan Strategis
+            </h1>
+            <p
+              className="text-sm md:text-base text-slate-100! max-w-4xl font-medium leading-relaxed mb-4"
+              style={{ textShadow: '0 1px 6px rgba(0, 0, 0, 0.8)' }}
             >
-              <Globe size={13} className="text-indigo-500" />
-              <span>Pusat Spasial (GIS)</span>
-            </button>
-            <button
+              Akses cepat dan terpadu untuk data pembangunan kognitif Mimika. Silakan pilih instrumen cerdas di bawah untuk merancang naskah kebijakan, menguji analisis deviasi kinerja daerah, atau mengakses pusat monitoring geospasial secara langsung melalui data rujukan terpercaya.
+            </p>
+          </div>
+        </section>
+
+        {}
+        <section className="w-full bg-white border-y border-slate-200 z-20 -mt-6 relative">
+          <div className="w-full grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-slate-200 py-4 px-4 md:px-8">
+            <div
               onClick={() => onNavigate('knowledge-hub')}
-              className="px-4 py-2 bg-white border border-slate-300 hover:border-amber-400 hover:bg-amber-50 text-slate-600 hover:text-amber-700 text-xs font-bold uppercase tracking-wider transition-all cursor-pointer flex items-center gap-2 shadow-xs active:scale-95"
+              className="px-4 py-3 md:py-2 flex items-start gap-4 group cursor-pointer transition-colors hover:bg-slate-50/40"
             >
-              <FolderOpen size={13} className="text-amber-500" />
-              <span>Repositori Dokumen</span>
-            </button>
+              <div className="w-12 h-12 flex items-center justify-center text-blue-600 shrink-0 shadow-xs group-hover:scale-105 transition-transform duration-300 rounded-none">
+                <Database size={20} className="text-blue-600" />
+              </div>
+              <div className="flex flex-col gap-1 text-left">
+                <h3 className="text-xs font-black uppercase tracking-wider text-slate-800 group-hover:text-blue-700 transition-colors">
+                  Repositori Dokumen
+                </h3>
+                <p className="text-[11px] text-slate-500 font-medium leading-relaxed text-justify line-clamp-3">
+                  Pencarian dokumen kajian akademis, rencana strategis, regulasi, dan arsip data sektoral daerah.
+                </p>
+                <div className="text-[10px] font-black text-blue-600 uppercase tracking-wider inline-flex items-center gap-1 mt-2.5">
+                  <span>LIHAT REPOSITORI</span>
+                  <span className="text-[8px] font-normal ml-0.5">&gt;</span>
+                </div>
+              </div>
+            </div>
+            <div
+              onClick={() => onNavigate('dashboard')}
+              className="px-4 py-3 md:py-2 flex items-start gap-4 group cursor-pointer transition-colors hover:bg-slate-50/40"
+            >
+              <div className="w-12 h-12 flex items-center justify-center text-blue-600 shrink-0 shadow-xs group-hover:scale-105 transition-transform duration-300 rounded-none">
+                <BarChart3 size={20} className="text-blue-600" />
+              </div>
+              <div className="flex flex-col gap-1 text-left">
+                <h3 className="text-xs font-black uppercase tracking-wider text-slate-800 group-hover:text-blue-700 transition-colors">
+                  Dashboard
+                </h3>
+                <p className="text-[11px] text-slate-500 font-medium leading-relaxed text-justify line-clamp-3">
+                  Monitoring status sesi kerja aktif, pemakaian token kuota AI, serta pratinjau ringkas peta spasial daerah.
+                </p>
+                <div className="text-[10px] font-black text-blue-600 uppercase tracking-wider inline-flex items-center gap-1 mt-2.5">
+                  <span>LIHAT DASHBOARD</span>
+                  <span className="text-[8px] font-normal ml-0.5">&gt;</span>
+                </div>
+              </div>
+            </div>
+            <div
+              onClick={() => onNavigate('gis-explorer')}
+              className="px-4 py-3 md:py-2 flex items-start gap-4 group cursor-pointer transition-colors hover:bg-slate-50/40"
+            >
+              <div className="w-12 h-12 flex items-center justify-center text-blue-600 shrink-0 shadow-xs group-hover:scale-105 transition-transform duration-300 rounded-none">
+                <Globe size={20} className="text-blue-600" />
+              </div>
+              <div className="flex flex-col gap-1 text-left">
+                <h3 className="text-xs font-black uppercase tracking-wider text-slate-800 group-hover:text-blue-700 transition-colors">
+                  Pusat Spasial
+                </h3>
+                <p className="text-[11px] text-slate-500 font-medium leading-relaxed text-justify line-clamp-3">
+                  Analisis geospasial dan pemetaan wilayah terintegrasi untuk pemantauan sebaran pembangunan secara spasial analitik.
+                </p>
+                <div className="text-[10px] font-black text-blue-600 uppercase tracking-wider inline-flex items-center gap-1 mt-2.5">
+                  <span>BUKA PUSAT SPASIAL</span>
+                  <span className="text-[8px] font-normal ml-0.5">&gt;</span>
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
+        </section>
+
+        {}
+        <section className="w-full px-4 md:px-8 space-y-4">
+          <div className="text-left space-y-1 select-none">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">INSTRUMEN KOGNITIF AKTIF</span>
+            <h2 className="text-sm font-black text-slate-900 uppercase tracking-wider">Ruang Kerja &amp; Analisis AI</h2>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 border border-slate-200 bg-white shadow-xs rounded-none">
+            {mainModules.map((mod, index) => {
+              const Icon = mod.icon;
+
+              let borderClasses = "border-slate-200";
+              if (index === 0) {
+                borderClasses += " border-b md:border-r";
+              } else if (index === 1) {
+                borderClasses += " border-b";
+              } else if (index === 2) {
+                borderClasses += " border-b md:border-b-0 md:border-r";
+              } else if (index === 3) {
+                borderClasses += " border-b-0";
+              }
+
+              return (
+                <button
+                  key={mod.id}
+                  onClick={() => onNavigate(mod.id)}
+                  className={`group text-left bg-white p-6 flex gap-5 transition-colors duration-200 hover:bg-slate-50/50 cursor-pointer rounded-none ${borderClasses}`}
+                >
+                  {}
+                  <div className={`w-8 h-8 flex items-center justify-center shrink-0 ${mod.accentText} mt-0.5`}>
+                    <Icon size={24} />
+                  </div>
+
+                  {}
+                  <div className="flex flex-col flex-1 justify-between gap-2 text-left">
+                    <div>
+                      <div className="flex items-center justify-between gap-2 mb-2 select-none">
+                        <h3 className={`text-xs font-extrabold text-slate-800 uppercase tracking-wide group-hover:${mod.accentText} transition-colors line-clamp-1`}>
+                          {mod.title}
+                        </h3>
+                        <span className={`text-[9px] font-black tracking-widest uppercase shrink-0 ${mod.accentText}`}>
+                          {mod.badge}
+                        </span>
+                      </div>
+                      <p className="text-[11.5px] text-slate-500 leading-relaxed font-normal text-justify">
+                        {mod.desc}
+                      </p>
+                    </div>
+
+                    {}
+                    <div className={`inline-flex items-center gap-1 text-[10px] font-bold ${mod.accentText} opacity-0 group-hover:opacity-100 uppercase tracking-widest transition-all group-hover:translate-x-1 mt-2 border-t border-slate-100 pt-2.5 w-full justify-between select-none`}>
+                      <span>Mulai Akses Modul</span>
+                      <ChevronRight size={12} />
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
+        {}
+        <section className="w-full px-4 md:px-8 pt-0">
+          <SpatialPreviewWrapper
+            locations={MOCK_DATA.spatialLocations}
+            onNavigate={onNavigate}
+          />
+        </section>
 
       </main>
 
       {}
-      <footer className="w-full bg-white/80 border-t border-slate-200 py-4 px-6 flex flex-col sm:flex-row items-center justify-between gap-2 text-[10px] text-slate-400 z-10">
+      <footer className="w-full bg-white/80 border-t border-slate-200 py-4 px-6 flex flex-col sm:flex-row items-center justify-between gap-2 text-[10px] text-slate-400 z-10 select-none">
         <div className="flex items-center gap-2">
           <Database size={11} className="text-teal-500" />
-          <span className="font-medium"> AKLS Platform v1.1.0</span>
+          <span className="font-semibold text-slate-650"> AKLS Platform v1.1.0</span>
         </div>
-        <span>Hak Cipta © 2026 AKLS</span>
+        <span className="font-semibold text-slate-500">Hak Cipta © 2026 AKLS</span>
       </footer>
 
     </div>
@@ -13470,6 +13773,27 @@ const stripCitationTokens = (content?: string | null): string => {
 
 const sanitizeReportText = (content?: string | null): string => stripCitationTokens(content);
 
+const formatReportPreviewText = (content?: string | null): string => {
+  if (!content) return '';
+  let text = content;
+  try {
+    const parsed = JSON.parse(content);
+    if (parsed && typeof parsed === 'object') {
+      text = parsed.executiveSummary || parsed.answer || content;
+    }
+  } catch {
+
+  }
+  return text
+    .replace(/\[(?:[a-f0-9-]{8,}|doc(?:[-_a-z0-9]+)?):\d+\]/gi, '')
+    .replace(/#{1,6}\s*/g, '')
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/\*(.*?)\*/g, '$1')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+};
+
 const MarkdownContent: React.FC<{ content?: string | null; className?: string }> = ({ content, className = '' }) => {
   const html = React.useMemo(() => {
     const safeContent = sanitizeReportText(content);
@@ -13487,20 +13811,23 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
   initialSelectedDocIds,
   onClearSharedDocIds,
 }) => {
-
+  // State for available source documents
   const [documents, setDocuments] = useState<DocumentRecord[]>([]);
   const [selectedDocIds, setSelectedDocIds] = useState<string[]>([]);
   const [isLoadingDocs, setIsLoadingDocs] = useState<boolean>(true);
 
+  // Direct Upload Modal State
   const [isUploadModalOpen, setIsUploadModalOpen] = useState<boolean>(false);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadTitle, setUploadTitle] = useState<string>('');
   const [uploadCategory, setUploadCategory] = useState<string>('Laporan Strategis');
   const [isUploading, setIsUploading] = useState<boolean>(false);
 
+  // Generation State
   const [forceRegenerate, setForceRegenerate] = useState<boolean>(false);
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
 
+  // Active Report & History (Strictly 100% Real Live DB Data)
   const [currentReport, setCurrentReport] = useState<any | null>(null);
   const [reportMetadata, setReportMetadata] = useState<{
     id?: string;
@@ -13514,11 +13841,12 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
   const [savedReports, setSavedReports] = useState<GeneratedReportDetail[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState<boolean>(false);
 
+  // Live filter states for saved reports history (Calendar Datepicker & Text Search)
   const [historySearchQuery, setHistorySearchQuery] = useState('');
   const [historyCalendarDate, setHistoryCalendarDate] = useState('');
 
   const filteredSavedReports = savedReports.filter((report) => {
-
+    // 1. Text Search Filter
     const q = historySearchQuery.toLowerCase();
     const matchesText =
       report.title.toLowerCase().includes(q) ||
@@ -13526,6 +13854,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
 
     if (!matchesText) return false;
 
+    // 2. Calendar Date Filter (YYYY-MM-DD)
     if (historyCalendarDate) {
       const reportDate = new Date(report.createdAt);
       if (!isNaN(reportDate.getTime())) {
@@ -13537,6 +13866,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
     return true;
   });
 
+  // Toast & Export
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
 
@@ -13545,20 +13875,25 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
     setTimeout(() => setToastMessage(null), 4000);
   };
 
+  // Initial Load: Fetch ingested documents & saved reports history
   useEffect(() => {
     loadDocuments();
     loadHistory();
   }, []);
 
+  /**
+   * Memuat dokumen acuan dari basis data
+   */
   const loadDocuments = async () => {
     setIsLoadingDocs(true);
     try {
       const fetchedDocs = await DocumentService.listDocuments();
       setDocuments(fetchedDocs || []);
 
+      // HANYA jalankan seleksi default jika TIDAK ada dokumen hasil penerusan
       if (!initialSelectedDocIds || initialSelectedDocIds.length === 0) {
         if (fetchedDocs && fetchedDocs.length > 0 && selectedDocIds.length === 0) {
-
+          // Select first document by default
           setSelectedDocIds([fetchedDocs[0].id]);
         }
       }
@@ -13571,10 +13906,13 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
     }
   };
 
+  /**
+   * Menyelaraskan dokumen hasil penerusan secara aman (Forwarding State sync)
+   */
   useEffect(() => {
     if (documents.length > 0) {
       if (initialSelectedDocIds && initialSelectedDocIds.length > 0) {
-
+        // Penyaringan defensif: Pastikan ID dokumen yang diteruskan benar-benar ada di database
         const validIds = initialSelectedDocIds.filter((id) =>
           documents.some((doc) => doc.id === id)
         );
@@ -13583,6 +13921,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
           setSelectedDocIds(validIds);
         }
 
+        // Segera bersihkan state transien global untuk menghindari masalah sticky selection
         onClearSharedDocIds?.();
       }
     }
@@ -13594,6 +13933,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
       const history = await ReportService.listSavedReports();
       setSavedReports(history || []);
 
+      // If no active report loaded yet and history exists, auto-load latest saved report
       if (!currentReport && history && history.length > 0) {
         loadReportToView(history[0]);
       }
@@ -13623,12 +13963,13 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
     setSelectedDocIds([]);
   };
 
+  // Direct Document Upload Handler (.pdf, .txt, .docx)
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       setUploadFile(file);
       if (!uploadTitle) {
-
+        // Remove file extension for default title
         const titleWithoutExt = file.name.replace(/\.[^/.]+$/, '');
         setUploadTitle(titleWithoutExt);
       }
@@ -13652,9 +13993,11 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
 
       showToast(`Dokumen '${newDoc.title}' berhasil diunggah & diproses oleh AI Engine!`);
 
+      // Refresh documents list & auto-select newly uploaded doc
       await loadDocuments();
       setSelectedDocIds((prev) => [...prev, newDoc.id]);
 
+      // Reset & close modal
       setUploadFile(null);
       setUploadTitle('');
       setIsUploadModalOpen(false);
@@ -13790,7 +14133,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
 
   return (
     <div className="flex flex-col w-full bg-slate-100/70 p-6 space-y-6 font-roboto">
-      {}
+      {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-5 py-3 border border-slate-700 shadow-xl flex items-center gap-3 rounded-none no-print">
           <CheckCircle2 size={18} className="text-emerald-400 shrink-0" />
@@ -13798,7 +14141,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
         </div>
       )}
 
-      {}
+      {/* SECTION 1. HERO COMMAND STRIP HEADER */}
       <div className="w-full bg-white border border-slate-300 px-6 py-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4 rounded-none shadow-2xs no-print">
         <div className="flex flex-col">
           <h1 className="text-xl font-bold uppercase text-slate-900 tracking-tight">
@@ -13830,7 +14173,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
         </div>
       </div>
 
-      {}
+      {/* SECTION 1: Categorized Multi-Document Selector Hub (Flat, Categorized, Compact Scroll) */}
       <div className="no-print space-y-4">
         <CategorizedDocumentSelector
           documents={documents}
@@ -13843,7 +14186,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
           title="Pilihan Dokumen Acuan Laporan"
         />
 
-        {}
+        {/* Generation Action Toolbar */}
         <div className="bg-white border border-slate-300 p-4 rounded-none shadow-2xs flex flex-wrap items-center justify-between gap-4 font-roboto">
           <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer">
             <input
@@ -13878,7 +14221,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
         </div>
       </div>
 
-      {}
+      {/* SECTION 2: Tab Navigation (Laporan Aktif vs Riwayat Database) */}
       <div className="flex items-center border-b border-slate-300 no-print">
         <button
           onClick={() => setActiveTab('active')}
@@ -13906,7 +14249,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
         </button>
       </div>
 
-      {}
+      {/* TAB CONTENT 1: Active Report Viewer */}
       {activeTab === 'active' && (
         !currentReport ? (
           <div className="bg-white border border-slate-300 p-12 text-center rounded-none shadow-xs space-y-4">
@@ -13929,7 +14272,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
           </div>
         ) : (
           <div className="bg-white border border-slate-300 p-6 lg:p-10 rounded-none shadow-xs space-y-6">
-            {}
+            {/* Token & Cache Metadata Telemetry Header (Borderless) */}
             <div className="border-b border-slate-200 pb-3 text-xs flex flex-wrap items-center justify-between gap-2 no-print font-medium text-slate-600">
               <div className="flex items-center gap-2">
                 <Database size={15} className="text-teal-700" />
@@ -13945,7 +14288,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
               </div>
             </div>
 
-            {}
+            {/* Kop Header Laporan Resmi */}
             <div className="border-b-2 border-slate-900 pb-4">
               <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 mb-2">
                 <div>
@@ -14021,9 +14364,9 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                 <div className="space-y-3 divide-y divide-slate-100">
                   {currentReport.deviations.map((d: any, idx: number) => (
                     <div key={idx} className="pt-3 first:pt-0 space-y-1 text-xs">
-                      <strong className="block font-bold text-slate-900 text-sm">{sanitizeReportText(d.title)}</strong>
+                      <strong className="block font-bold text-slate-900 text-sm">{sanitizeReportText(d.title).replace(/\*\*/g, '')}</strong>
                       <p className="text-slate-700 font-medium">
-                        Baseline Target: <span className="font-bold text-slate-900">{sanitizeReportText(d.baseline)}</span> &bull; Realisasi Aktual: <span className="font-bold text-slate-900">{sanitizeReportText(d.realization)}</span> &bull; Deviasi: <span className={d.severityColor || 'text-red-700 font-bold'}>{sanitizeReportText(d.deviationText)}</span>
+                        Baseline Target: <span className="font-bold text-slate-900">{sanitizeReportText(d.baseline).replace(/\*\*/g, '')}</span> &bull; Realisasi Aktual: <span className="font-bold text-slate-900">{sanitizeReportText(d.realization).replace(/\*\*/g, '')}</span> &bull; Deviasi: <span className={d.severityColor || 'text-red-700 font-bold'}>{sanitizeReportText(d.deviationText).replace(/\*\*/g, '')}</span>
                       </p>
                       <div className="text-slate-600 font-normal pt-0.5">
                         <strong className="text-slate-800">Penyebab Utama:</strong>
@@ -14202,7 +14545,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                       {report.title}
                     </strong>
                     <p className="text-xs text-slate-600 line-clamp-2">
-                      {report.executiveSummary}
+                      {formatReportPreviewText(report.executiveSummary)}
                     </p>
                     <div className="text-[11px] text-slate-500 font-semibold flex flex-wrap items-center gap-3 pt-1">
                       <span>Tanggal: {new Date(report.createdAt).toLocaleString('id-ID')}</span>
@@ -14213,20 +14556,20 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 shrink-0">
+                  <div className="flex items-center gap-1 shrink-0">
                     <button
                       onClick={() => handleSelectFromHistory(report.id)}
-                      className="px-3 py-1.5 bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-1.5"
+                      className="p-1.5 text-teal-700 hover:text-teal-900 transition-colors cursor-pointer"
+                      title="Buka Laporan"
                     >
-                      <Eye size={14} />
-                      <span>Buka</span>
+                      <Eye size={16} />
                     </button>
                     <button
                       onClick={(e) => handleDeleteHistory(e, report.id)}
-                      className="px-2.5 py-1.5 bg-red-100 hover:bg-red-200 text-red-800 font-bold text-xs uppercase tracking-wider rounded-none border border-red-300 inline-flex items-center gap-1"
+                      className="p-1.5 text-red-600 hover:text-red-800 transition-colors cursor-pointer"
                       title="Hapus Laporan"
                     >
-                      <Trash2 size={14} />
+                      <Trash2 size={16} />
                     </button>
                   </div>
                 </div>
@@ -14743,6 +15086,39 @@ export const AnalysisService = {
     } catch (err: any) {
       throw new Error(formatError(err.message, 'Gagal terhubung ke server untuk perbandingan deviasi.'));
     }
+  },
+};
+
+--- FILE: src\services\auth.service.ts ---
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
+
+export interface LoginResponse {
+  success: boolean;
+  data: {
+    accessToken: string;
+    executive: {
+      nip: string;
+      fullName: string;
+    };
+  };
+}
+
+export const AuthService = {
+  async login(nip: string, password: string): Promise<LoginResponse> {
+    const response = await fetch(`${API_BASE_URL}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nip, password }),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok || !result.success) {
+      const errorMsg = result?.message || 'Gagal masuk. Periksa kembali NIP dan Kata Sandi Anda.';
+      throw new Error(Array.isArray(errorMsg) ? errorMsg.join(', ') : errorMsg);
+    }
+
+    return result;
   },
 };
 
