@@ -49,7 +49,7 @@ const MOCK_DRILLDOWN_DETAILS: Record<number, {
             jumlah_penduduk: 142000,
             deskripsi: "Distrik Mimika Baru berpusat di kota Timika, berfungsi sebagai episentrum aktivitas perekonomian, perbankan, industri kreatif, serta pusat pemerintahan. Kepadatan infrastruktur dasar di distrik ini merupakan yang paling maju di seluruh kabupaten.",
             batas_wilayah: "Utara: Kuala Kencana, Selatan: Wania, Barat: Iwaka, Timur: Mimika Timur",
-            images: ["https://picsum.photos/seed/m-baru-d1/320/180", "https://picsum.photos/seed/m-baru-d2/320/180"]
+            images: ["/img/mimika%20baru/aerial%20view.jpg", "/img/mimika%20baru/Pasar-Sentral-Timika.jpg"]
         },
         categories: [
             { category_id: 1, name: "Kesehatan & Pendidikan", total: 45 },
@@ -66,7 +66,7 @@ const MOCK_DRILLDOWN_DETAILS: Record<number, {
             jumlah_penduduk: 28000,
             deskripsi: "Distrik Kuala Kencana merupakan kota modern terencana yang dikelola secara eksklusif berkolaborasi dengan pihak swasta pertambangan. Memiliki tata kota ramah lingkungan, jaringan kabel bawah tanah, dan kualitas sanitasi berstandar internasional.",
             batas_wilayah: "Utara: Tembagapura, Selatan: Mimika Baru, Barat: Iwaka, Timur: Kwamki Narama",
-            images: ["https://picsum.photos/seed/kuala-k-d1/320/180", "https://picsum.photos/seed/kuala-k-d2/320/180"]
+            images: ["/img/kualakencana/images%20(1).jpg", "/img/kualakencana/images.jpg"]
         },
         categories: [
             { category_id: 1, name: "Kesehatan & Pendidikan", total: 22 },
@@ -83,7 +83,7 @@ const MOCK_DRILLDOWN_DETAILS: Record<number, {
             jumlah_penduduk: 23000,
             deskripsi: "Distrik Tembagapura terletak di wilayah pegunungan tinggi bersuhu dingin. Merupakan pusat operasi penambangan emas dan tembaga utama. Distrik ini memiliki tantangan geografis berupa lereng terjal dan risiko tanah longsor tinggi.",
             batas_wilayah: "Utara: Kabupaten Puncak, Selatan: Kuala Kencana, Barat: Alama, Timur: Hoya",
-            images: ["https://picsum.photos/seed/temb-d1/320/180", "https://picsum.photos/seed/temb-d2/320/180"]
+            images: ["/img/tembagapura/Grasberg_pano_(3200491589)_(cropped).jpg", "/img/tembagapura/Tembagapura_4.jpg"]
         },
         categories: [
             { category_id: 1, name: "Kesehatan & Pendidikan", total: 14 },
@@ -100,7 +100,7 @@ const MOCK_DRILLDOWN_DETAILS: Record<number, {
             jumlah_penduduk: 61000,
             deskripsi: "Distrik Wania dikembangkan sebagai kawasan penyangga pemukiman perkotaan Timika. Memiliki konsentrasi pemukiman transmigrasi yang padat, pasar sentral regional, dan perkembangan ruko komersial menengah yang sangat pesat.",
             batas_wilayah: "Utara: Mimika Baru, Selatan: Mimika Timur, Barat: Iwaka, Timur: Mimika Tengah",
-            images: ["https://picsum.photos/seed/wania-d1/320/180"]
+            images: ["/img/wania/Pasar-Sentral-1-scaled.jpg", "/img/mimika%20baru/Indahhnya-Wisata-Timika.jpg"]
         },
         categories: [
             { category_id: 1, name: "Kesehatan & Pendidikan", total: 31 },
@@ -117,7 +117,7 @@ const MOCK_DRILLDOWN_DETAILS: Record<number, {
             jumlah_penduduk: 12000,
             deskripsi: "Distrik Iwaka didominasi dataran rendah subur yang dimanfaatkan sebagai kawasan perkebunan buah, penangkaran sagu lokal, serta menjadi area perlintasan utama koridor logistik berat menuju pelabuhan dan tambang.",
             batas_wilayah: "Utara: Kuala Kencana, Selatan: Amar, Barat: Mimika Barat Tengah, Timur: Mimika Baru",
-            images: ["https://picsum.photos/seed/iwaka-d1/320/180"]
+            images: ["/img/iwaka/sagu-1-635c8e4408a8b57f2152e722.jpg", "/img/iwaka/WhatsApp-Image-2026-07-13-at-10.24.32.jpg"]
         },
         categories: [
             { category_id: 1, name: "Kesehatan & Pendidikan", total: 15 },
@@ -134,7 +134,7 @@ const MOCK_DRILLDOWN_DETAILS: Record<number, {
             jumlah_penduduk: 15000,
             deskripsi: "Distrik Kwamki Narama merupakan kawasan pemukiman adat yang padat. Pemerintah daerah memprioritaskan distrik ini untuk program asimilasi sosial, peningkatan literasi pendidikan dasar, dan pemberdayaan perkebunan rakyat.",
             batas_wilayah: "Utara: Kuala Kencana, Selatan: Mimika Baru, Barat: Kuala Kencana, Timur: Mimika Tengah",
-            images: ["https://picsum.photos/seed/kwamki-d1/320/180"]
+            images: ["/img/kwamki%20narama/prosesi-kremasi-jenazah-junius-m-janempa-di-kwamki-narama-rabu-142026-foto-cenderawasih-posmoh-wahyu-welerubun-xmAu6.webp", "/img/iwaka/traditional-honai-house-dani-tribe-260nw-2635906639.jpg"]
         },
         categories: [
             { category_id: 1, name: "Kesehatan & Pendidikan", total: 24 },
@@ -151,7 +151,7 @@ const MOCK_DRILLDOWN_DETAILS: Record<number, {
             jumlah_penduduk: 11000,
             deskripsi: "Distrik Mimika Timur merupakan pintu gerbang jalur logistik kelautan utama Mimika. Berpusat di Mapurujaya, distrik ini melayani operasional pelabuhan nasional Pomako dan industri pengolahan hasil laut laut.",
             batas_wilayah: "Utara: Mimika Baru, Selatan: Laut Arafura, Barat: Wania, Timur: Mimika Timur Jauh",
-            images: ["https://picsum.photos/seed/m-tim-d1/320/180"]
+            images: ["/img/mimika%20timur/624e6c8c105e5.jpg", "/img/mimika%20timur/images.jpg"]
         },
         categories: [
             { category_id: 1, name: "Kesehatan & Pendidikan", total: 19 },
@@ -168,7 +168,7 @@ const MOCK_DRILLDOWN_DETAILS: Record<number, {
             jumlah_penduduk: 5500,
             deskripsi: "Distrik Mimika Tengah didominasi oleh bentang alam perairan payau dan muara sungai pesisir selatan. Mata pencaharian utama penduduknya adalah nelayan kepiting bakau dan budidaya tambak ikan tradisional.",
             batas_wilayah: "Utara: Kwamki Narama, Selatan: Laut Arafura, Barat: Wania, Timur: Jita",
-            images: ["https://picsum.photos/seed/m-teng-d1/320/180"]
+            images: ["/img/jita/Panoramic_view_of_dock_at_Kampung_Rawa,_2014-06-21.jpg", "/img/mimika%20barat/061348_64937_INDAH_mimika_dalam.jpg"]
         },
         categories: [
             { category_id: 1, name: "Kesehatan & Pendidikan", total: 8 },
@@ -185,7 +185,7 @@ const MOCK_DRILLDOWN_DETAILS: Record<number, {
             jumlah_penduduk: 4200,
             deskripsi: "Distrik Mimika Barat berpusat di Kokonao. Merupakan kawasan administratif bersejarah yang menyimpan rekam jejak misionaris pendidikan awal di pesisir Papua. Fokus pada pelestarian peninggalan budaya lokal.",
             batas_wilayah: "Utara: Mimika Barat Tengah, Selatan: Laut Arafura, Barat: Mimika Barat Jauh, Timur: Amar",
-            images: ["https://picsum.photos/seed/m-barat-d1/320/180"]
+            images: ["/img/mimika%20barat/061348_64937_INDAH_mimika_dalam.jpg", "/img/mimika%20barat/IMG-20250929-WA0041-scaled.webp"]
         },
         categories: [
             { category_id: 1, name: "Kesehatan & Pendidikan", total: 13 },
@@ -202,7 +202,7 @@ const MOCK_DRILLDOWN_DETAILS: Record<number, {
             jumlah_penduduk: 3800,
             deskripsi: "Distrik Agimuga merupakan kawasan dataran rendah timur Mimika yang dilalui banyak aliran sungai besar. Pembangunan infrastruktur jalan darat penghubung terus diupayakan untuk mengikis isolasi logistik antar wilayah.",
             batas_wilayah: "Utara: Jila, Selatan: Laut Arafura, Barat: Jita, Timur: Mimika Timur Jauh",
-            images: ["https://picsum.photos/seed/agimuga-d1/320/180", "https://picsum.photos/seed/agimuga-d2/320/180"]
+            images: ["/img/agimuga/209.jpg", "/img/agimuga/7311.jpg"]
         },
         categories: [
             { category_id: 1, name: "Kesehatan & Pendidikan", total: 11 },
@@ -219,7 +219,7 @@ const MOCK_DRILLDOWN_DETAILS: Record<number, {
             jumlah_penduduk: 4500,
             deskripsi: "Distrik Jila membentang luas di kaki jajaran pegunungan tengah Mimika. Topografi berbukit curam dan lereng batu mempersulit jaringan telekomunikasi dan pembangunan jalan trans-kabupaten.",
             batas_wilayah: "Utara: Kabupaten Puncak, Selatan: Agimuga, Barat: Hoya, Timur: Jita",
-            images: ["https://picsum.photos/seed/jila-d1/320/180"]
+            images: ["/img/jila/615d4d4e6ff0c.jpg", "/img/jila/shutterstock_2362513197.jpg"]
         },
         categories: [
             { category_id: 1, name: "Kesehatan & Pendidikan", total: 9 },
@@ -236,7 +236,7 @@ const MOCK_DRILLDOWN_DETAILS: Record<number, {
             jumlah_penduduk: 2800,
             deskripsi: "Distrik Jita merupakan kawasan pedalaman berawa di timur Mimika. Sirkulasi mobilitas masyarakat sangat bergantung pada transportasi sungai, perahu kayu tradisional (*perahu jonson*), dan pasang surut air laut.",
             batas_wilayah: "Utara: Jila, Selatan: Laut Arafura, Barat: Mimika Tengah, Timur: Agimuga",
-            images: ["https://picsum.photos/seed/jita-d1/320/180"]
+            images: ["/img/jita/images.jpg", "/img/jita/Panoramic_view_of_dock_at_Kampung_Rawa,_2014-06-21.jpg"]
         },
         categories: [
             { category_id: 1, name: "Kesehatan & Pendidikan", total: 7 },
@@ -253,7 +253,7 @@ const MOCK_DRILLDOWN_DETAILS: Record<number, {
             jumlah_penduduk: 3200,
             deskripsi: "Distrik Mimika Timur Jauh terletak di pesisir muara sungai ujung timur Mimika yang berbatasan langsung dengan Kabupaten Asmat. Mayoritas penduduk bekerja mencari ikan dan mengolah sagu hutan alami.",
             batas_wilayah: "Utara: Agimuga, Selatan: Laut Arafura, Barat: Mimika Timur, Timur: Kabupaten Asmat",
-            images: ["https://picsum.photos/seed/mtimj-d1/320/180"]
+            images: ["/img/agimuga/7311.jpg", "/img/20170903_Papouasie_Baliem_valley_15.jpg"]
         },
         categories: [
             { category_id: 1, name: "Kesehatan & Pendidikan", total: 12 },
@@ -270,7 +270,7 @@ const MOCK_DRILLDOWN_DETAILS: Record<number, {
             jumlah_penduduk: 2100,
             deskripsi: "Distrik Mimika Barat Jauh berpusat di rumpun pesisir pantai Yaraya-Ipaya. Terkenal dengan potensi pasir pantai putih kelapa rakyat, dan pemanfaatan kincir angin skala mikro untuk listrik kampung pesisir.",
             batas_wilayah: "Utara: Mimika Barat Tengah, Selatan: Laut Arafura, Barat: Kabupaten Kaimana, Timur: Mimika Barat",
-            images: ["https://picsum.photos/seed/mbarj-d1/320/180"]
+            images: ["/img/mimika%20barat%20jauh/pantai-minajaya-sukabumi-1747457877972_169.jpeg", "/img/mimika%20barat/IMG-20250929-WA0041-scaled.webp"]
         },
         categories: [
             { category_id: 1, name: "Kesehatan & Pendidikan", total: 10 },
@@ -287,7 +287,7 @@ const MOCK_DRILLDOWN_DETAILS: Record<number, {
             jumlah_penduduk: 2400,
             deskripsi: "Distrik Mimika Barat Tengah melayani rute penghubung transportasi laut logistik ringan antar pesisir barat. Memiliki bentang muara yang luas dan dilindungi ekosistem hutan bakau (*mangrove*) tebal alami.",
             batas_wilayah: "Utara: Kabupaten Deiyai, Selatan: Mimika Barat, Barat: Mimika Barat Jauh, Timur: Iwaka",
-            images: ["https://picsum.photos/seed/mbar-t-d1/320/180"]
+            images: ["/img/AMANNSAGOAOWA.jpg", "/img/mimika%20barat/061348_64937_INDAH_mimika_dalam.jpg"]
         },
         categories: [
             { category_id: 1, name: "Kesehatan & Pendidikan", total: 11 },
@@ -304,7 +304,7 @@ const MOCK_DRILLDOWN_DETAILS: Record<number, {
             jumlah_penduduk: 1800,
             deskripsi: "Distrik Amar merupakan kawasan pesisir rawa dengan mayoritas vegetasi nipa dan hutan payau. Sentra andalan daerah untuk penangkapan kepiting bakau (*Scylla serrata*) berkualitas ekspor.",
             batas_wilayah: "Utara: Iwaka, Selatan: Laut Arafura, Barat: Mimika Barat, Timur: Mimika Barat Tengah",
-            images: ["https://picsum.photos/seed/amar-d1/320/180"]
+            images: ["/img/jita/Panoramic_view_of_dock_at_Kampung_Rawa,_2014-06-21.jpg", "/img/Mimika-300x200.jpg"]
         },
         categories: [
             { category_id: 1, name: "Kesehatan & Pendidikan", total: 6 },
@@ -321,7 +321,7 @@ const MOCK_DRILLDOWN_DETAILS: Record<number, {
             jumlah_penduduk: 1200,
             deskripsi: "Distrik Hoya terletak jauh di lembah sempit terdalam pegunungan Mimika. Akses jalan darat sama sekali tidak tersedia, membuat wilayah ini memiliki tantangan keterisolasian yang tinggi dalam pemenuhan kesehatan, logistik dasar, dan guru ajar.",
             batas_wilayah: "Utara: Kabupaten Intan Jaya, Selatan: Jila, Barat: Tembagapura, Timur: Alama",
-            images: ["https://picsum.photos/seed/hoya-d1/320/180", "https://picsum.photos/seed/hoya-d2/320/180"]
+            images: ["/img/hoya/images.jpg", "/img/hoya/JembatanHoya%20(2).jpg"]
         },
         categories: [
             { category_id: 1, name: "Kesehatan & Pendidikan", total: 14 },
@@ -338,7 +338,7 @@ const MOCK_DRILLDOWN_DETAILS: Record<number, {
             jumlah_penduduk: 1600,
             deskripsi: "Distrik Alama terletak di ujung timur laut pegunungan terjal Mimika. Memiliki kepadatan penduduk paling kecil dengan sebaran perkampungan adat tradisional di lembah-lembah perbukitan terpencil.",
             batas_wilayah: "Utara: Kabupaten Lanny Jaya, Selatan: Jita, Barat: Hoya, Timur: Kabupaten Nduga",
-            images: ["https://picsum.photos/seed/alama-d1/320/180"]
+            images: ["/img/alama/97295c5df6d1.jpg", "/img/alama/Taman-Nasional-Lorentz-1024x679.jpg"]
         },
         categories: [
             { category_id: 1, name: "Kesehatan & Pendidikan", total: 8 },
