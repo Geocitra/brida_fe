@@ -120,7 +120,29 @@ export default function DistrictListPanel() {
                     <div className="flex flex-col bg-white">
                         {filteredDistricts.map((district) => {
                             const isActive = focusedDistrict === district.name;
-                            const mockThumbnail = `https://picsum.photos/seed/mimika-dist-${district.id}/100/100`;
+                            
+                            // Local mapping of district thumbnails consistent with DetailPanel
+                            const thumbnailMap: Record<number, string> = {
+                                1: "/img/mimika%20baru/aerial%20view.jpg",
+                                2: "/img/kualakencana/images%20(1).jpg",
+                                3: "/img/tembagapura/Grasberg_pano_(3200491589)_(cropped).jpg",
+                                4: "/img/wania/Pasar-Sentral-1-scaled.jpg",
+                                5: "/img/iwaka/sagu-1-635c8e4408a8b57f2152e722.jpg",
+                                6: "/img/kwamki%20narama/prosesi-kremasi-jenazah-junius-m-janempa-di-kwamki-narama-rabu-142026-foto-cenderawasih-posmoh-wahyu-welerubun-xmAu6.webp",
+                                7: "/img/mimika%20timur/624e6c8c105e5.jpg",
+                                8: "/img/jita/Panoramic_view_of_dock_at_Kampung_Rawa,_2014-06-21.jpg",
+                                9: "/img/mimika%20barat/061348_64937_INDAH_mimika_dalam.jpg",
+                                10: "/img/agimuga/209.jpg",
+                                11: "/img/jila/615d4d4e6ff0c.jpg",
+                                12: "/img/jita/images.jpg",
+                                13: "/img/agimuga/7311.jpg",
+                                14: "/img/mimika%20barat%20jauh/pantai-minajaya-sukabumi-1747457877972_169.jpeg",
+                                15: "/img/AMANNSAGOAOWA.jpg",
+                                16: "/img/jita/Panoramic_view_of_dock_at_Kampung_Rawa,_2014-06-21.jpg",
+                                17: "/img/hoya/images.jpg",
+                                18: "/img/alama/97295c5df6d1.jpg"
+                            };
+                            const mockThumbnail = thumbnailMap[district.id] || "/img/Mimika-300x200.jpg";
 
                             return (
                                 <button

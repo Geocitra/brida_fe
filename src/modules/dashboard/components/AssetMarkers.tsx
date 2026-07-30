@@ -67,7 +67,7 @@ export default function AssetMarkers() {
                     type: "Rumah Sakit",
                     lat: -4.5448,
                     lng: 136.8870,
-                    image_url: "https://picsum.photos/seed/rsud-mimika/320/180",
+                    image_url: "/img/mimika%20baru/images.jpg",
                     config: { color: "#EF4444", iconUrl: "/icons/markers/hospital.svg" },
                     details: { "Kapasitas Tempat Tidur": "350 Bed", "Kelas Akreditasi": "Paripurna", "Status Operasional": "Aktif 24 Jam" }
                 },
@@ -77,7 +77,7 @@ export default function AssetMarkers() {
                     type: "Puskesmas",
                     lat: -4.1200,
                     lng: 137.4500,
-                    image_url: "https://picsum.photos/seed/pusk-hoya/320/180",
+                    image_url: "/img/hoya/images.jpg",
                     config: { color: "#F97316", iconUrl: "/icons/markers/clinic.svg" },
                     details: { "Tenaga Medis": "1 Dokter, 3 Perawat", "Fasilitas": "Rawat Jalan", "Kendala": "Hanya dijangkau Helikopter" }
                 }
@@ -89,7 +89,7 @@ export default function AssetMarkers() {
                     type: "Gedung Sekolah",
                     lat: -4.5710,
                     lng: 136.8920,
-                    image_url: "https://picsum.photos/seed/sd-nawaripi/320/180",
+                    image_url: "/img/mimika%20baru/Indahhnya-Wisata-Timika.jpg",
                     config: { color: "#10B981", iconUrl: "/icons/markers/school.svg" },
                     details: { "Jumlah Murid": "180 Siswa", "Jumlah Guru": "6 Pengajar", "Status Akreditasi": "B" }
                 }
@@ -101,7 +101,7 @@ export default function AssetMarkers() {
                     type: "Infrastruktur",
                     lat: -4.1350,
                     lng: 137.4650,
-                    image_url: "https://picsum.photos/seed/jemb-hoya/320/180",
+                    image_url: "/img/hoya/JembatanHoya%20(2).jpg",
                     config: { color: "#64748B", iconUrl: "/icons/markers/bridge.svg" },
                     details: { "Panjang Bentang": "120 Meter", "Target Anggaran": "Rp 16,12 Miliar", "Status Fisik": "Pengurangan Volume Kontrak" }
                 },
@@ -111,7 +111,7 @@ export default function AssetMarkers() {
                     type: "Infrastruktur",
                     lat: -4.7800,
                     lng: 137.3500,
-                    image_url: "https://picsum.photos/seed/jalan-agimuga/320/180",
+                    image_url: "/img/agimuga/209.jpg",
                     config: { color: "#64748B", iconUrl: "/icons/markers/bridge.svg" },
                     details: { "Target Pemadatan": "120 Km", "Pekerjaan Aktual": "98 Km", "Status": "Penyesuaian Biaya BBM" }
                 }
