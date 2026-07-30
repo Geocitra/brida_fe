@@ -90,32 +90,7 @@ export class MarkupConverter {
             },
         });
 
-        /**
-         * ATURAN KUSTOM 3: Normalisasi Spasi List Bullets & Numbering
-         * Memastikan list bertingkat tidak bergeser secara tidak konsisten saat dikonversi.
-         */
-        service.addRule('listStyleNormalization', {
-            filter: ['ul', 'ol'],
-            replacement: (content: string, node: Node) => {
-                const element = node as HTMLElement;
-                const tagName = element.nodeName.toLowerCase();
-                const prefix = tagName === 'ol' ? '1. ' : '- ';
 
-                const lines = content
-                    .split('\n')
-                    .filter((line) => line.trim().length > 0);
-
-                const normalizedLines = lines.map((line) => {
-                    // Jika baris sudah merupakan list item, biarkan (mendukung nested lists)
-                    if (line.trim().startsWith('-') || line.trim().match(/^\d+\./)) {
-                        return `  ${line}`; // Berikan indentasi level bersarang
-                    }
-                    return `${prefix}${line}`;
-                });
-
-                return `\n\n${normalizedLines.join('\n')}\n\n`;
-            }
-        });
 
         this.turndownService = service;
         return this.turndownService;

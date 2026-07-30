@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useId } from 'react';
 import { Maximize2, Map, Shield, Radio, Activity } from 'lucide-react';
-import { SpatialMap, type MapLocationPoint } from '../components/spatial-map.component';
+import { SpatialMap, type MapLocationPoint } from './spatial-map.component';
 
 interface SpatialPreviewWrapperProps {
     locations: MapLocationPoint[];
@@ -13,6 +13,9 @@ export const SpatialPreviewWrapper: React.FC<SpatialPreviewWrapperProps> = ({
 }) => {
     const [isActivated, setIsActivated] = useState(false);
     const [isTouchDevice, setIsTouchDevice] = useState(false);
+
+    // UUID unik untuk mencegah konflik instansiasi container Leaflet di DOM
+    const containerId = useId();
 
     // Deteksi kapabilitas sentuh perangkat keras secara dinamis
     useEffect(() => {
@@ -44,7 +47,7 @@ export const SpatialPreviewWrapper: React.FC<SpatialPreviewWrapperProps> = ({
     };
 
     return (
-        <div className="w-full py-1 flex flex-col rounded-none font-roboto select-none">
+        <div key={containerId} className="w-full py-1 flex flex-col rounded-none font-roboto select-none">
 
             {/* 1. HEADER SEKSI: Gaya Dashboard Kebijakan */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-200 pb-4 mb-4">
@@ -60,7 +63,7 @@ export const SpatialPreviewWrapper: React.FC<SpatialPreviewWrapperProps> = ({
                         Sistem PostGIS Spatial Engine pemantauan logistik fisik dan indikator pembangunan daerah.
                     </p>
                 </div>
-                <span className="text-[10px] font-black uppercase tracking-widest px-2.5 py-1 bg-teal-50 border border-teal-200 text-teal-800 shrink-0 self-start sm:self-auto flex items-center gap-1.5">
+                <span className="text-[10px] font-black uppercase tracking-widest text-teal-800 shrink-0 self-start sm:self-auto flex items-center gap-1.5">
                     <Activity size={12} className="text-teal-700" />
                     <span>PostGIS Active</span>
                 </span>
@@ -71,7 +74,7 @@ export const SpatialPreviewWrapper: React.FC<SpatialPreviewWrapperProps> = ({
                 onClick={handleInteractiveClick}
                 onMouseEnter={() => !isTouchDevice && setIsActivated(true)}
                 onMouseLeave={handleMouseLeave}
-                className="w-full relative overflow-hidden group cursor-pointer border border-slate-300 bg-slate-100"
+                className="w-full relative overflow-hidden group cursor-pointer border border-slate-300 bg-slate-100 animate-in fade-in duration-200"
                 style={{ height: '540px' }}
             >
                 {/* Render Map dengan Transisi Skala Visual (Tactile Zoom) */}
@@ -132,7 +135,7 @@ export const SpatialPreviewWrapper: React.FC<SpatialPreviewWrapperProps> = ({
                             Pusat Pengendali
                         </h3>
 
-                        <p className="text-[10px] text-slate-600 font-semibold leading-relaxed mb-4 max-w-[280px]">
+                        <p className="text-[10px] text-slate-600 font-semibold leading-relaxed mb-4 max-w-70">
                             {isTouchDevice
                                 ? "Ketuk sekali lagi pada layar atau lencana di bawah untuk masuk Pusat Pengendali Spasial penuh."
                                 : "Klik di mana saja untuk mengaktifkan sistem navigasi spasial interaktif penuh (GFW Command Center)."}

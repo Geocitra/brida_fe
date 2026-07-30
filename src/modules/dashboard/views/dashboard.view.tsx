@@ -53,10 +53,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         if (isMounted) {
           setDashboardMeta({
             tokenBudget: {
-              totalTokens: 412500,
-              estimatedCostIdr: 107250, // 412500 * 0.26
-              maxMonthlyPaguIdr: 500000,
-              quotaPercentage: 21.5,
+              totalTokens: 15000,
+              remainingTokens: 20818333,
+              estimatedCostIdr: 65,
+              remainingCostIdr: 90315,
+              maxMonthlyPaguIdr: 90380,
+              quotaPercentage: 0.1,
               paguStatus: 'SAFE'
             },
             recentChats: [

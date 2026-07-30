@@ -30,6 +30,7 @@ import {
   Loader2,
   BarChart3,
   FileCheck2,
+  FileText,
   Target,
   Newspaper,
   Play,
@@ -83,6 +84,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
   // Live filter states for saved cache sessions (Calendar Datepicker & Text Search)
   const [sessionSearchQuery, setSessionSearchQuery] = useState('');
   const [selectedCalendarDate, setSelectedCalendarDate] = useState<string>('');
+  const [activeTab, setActiveTab] = useState<'active' | 'history'>('active');
 
   // ===================== DIALOG MODAL STATE FOR ROLE MAPPING =====================
   const [isMappingModalOpen, setIsMappingModalOpen] = useState(false);
@@ -343,6 +345,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
   const handleSelectHistorySession = (session: SavedAnalysisSession) => {
     setCompareResult(session.compareResult);
     setActiveSessionId(session.id);
+    setActiveTab('active');
   };
 
   const handleDeleteHistorySession = (id: string, e: React.MouseEvent) => {
@@ -405,6 +408,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
           },
         };
         setCompareResult(cachedCompare);
+        setActiveTab('active');
       }
     } catch (err: any) {
       console.error('Gagal memuat cache dari DB:', err);
@@ -449,45 +453,339 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
       </div>
 
       { }
-      {cacheStatus?.isCached && (
-        <div className="bg-teal-50 border border-teal-300 p-4 rounded-none flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs font-roboto">
-          <div className="flex items-center gap-2.5">
-            <Database size={18} className="text-teal-700 shrink-0" />
-            <div>
-              <span className="font-bold text-teal-950 block text-sm">
-                Database Cache AI Ditemukan (PostgreSQL DB Ready)
+      {/* SECTION: Tab Navigation */}
+      <div className="flex items-center border-b border-slate-300 no-print">
+        <button
+          onClick={() => setActiveTab('active')}
+          className={`px-5 py-2.5 text-xs font-bold uppercase tracking-wider border-b-2 flex items-center gap-2 rounded-none transition-all cursor-pointer ${activeTab === 'active'
+            ? 'border-teal-700 text-teal-900 bg-white shadow-2xs font-extrabold'
+            : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            }`}
+        >
+          <FileText size={15} />
+          <span>Analisis Aktif</span>
+        </button>
+
+        <button
+          onClick={() => {
+            setActiveTab('history');
+          }}
+          className={`px-5 py-2.5 text-xs font-bold uppercase tracking-wider border-b-2 flex items-center gap-2 rounded-none transition-all cursor-pointer ${activeTab === 'history'
+            ? 'border-teal-700 text-teal-900 bg-white shadow-2xs font-extrabold'
+            : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            }`}
+        >
+          <History size={15} />
+          <span>Riwayat Analisis ({savedSessions.length})</span>
+        </button>
+      </div>
+
+      {activeTab === 'active' && (
+        <>
+          {cacheStatus?.isCached && (
+            <div className="bg-teal-50 border border-teal-300 p-4 rounded-none flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs font-roboto">
+              <div className="flex items-center gap-2.5">
+                <Database size={18} className="text-teal-700 shrink-0" />
+                <div>
+                  <span className="font-bold text-teal-950 block text-sm">
+                    Database Cache AI Ditemukan (PostgreSQL DB Ready)
+                  </span>
+                  <span className="text-teal-800 font-medium">
+                    Hasil analisis AI untuk kombinasi dokumen ini sudah tersimpan di database ({cacheStatus.createdAt ? new Date(cacheStatus.createdAt).toLocaleDateString('id-ID') : 'Tersimpan'}). Dimuat tanpa kuota token baru.
+                  </span>
+                </div>
+              </div>
+              {cacheStatus.reportId && (
+                <button
+                  onClick={() => handleLoadDbCachedReport(cacheStatus.reportId!)}
+                  className="px-4 py-2 bg-teal-800 hover:bg-teal-900 text-white font-bold text-xs uppercase tracking-wider rounded-none cursor-pointer shrink-0 transition-colors"
+                >
+                  Muat Cache dari DB
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Selector Card */}
+          <div className="bg-white border border-slate-200 p-6 rounded-none shadow-xs space-y-4 font-roboto">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+              <div className="flex items-center gap-2">
+                <BarChart3 size={18} className="text-teal-700 shrink-0" />
+                <h2 className="text-sm font-bold text-slate-900 tracking-wide">
+                  Pilih Dokumen Acuan yang Akan Dianalisis
+                </h2>
+              </div>
+              <span className="text-xs font-bold text-teal-800 bg-teal-50 px-2.5 py-0.5 rounded-none">
+                {selectedDocIds.length} Dokumen Terpilih
               </span>
-              <span className="text-teal-800 font-medium">
-                Hasil analisis AI untuk kombinasi dokumen ini sudah tersimpan di database ({cacheStatus.createdAt ? new Date(cacheStatus.createdAt).toLocaleDateString('id-ID') : 'Tersimpan'}). Dimuat tanpa kuota token baru.
-              </span>
+            </div>
+
+            {isLoadingDocs ? (
+              <div className="flex items-center gap-2 py-8 justify-center text-slate-600 text-xs font-bold">
+                <Loader2 size={18} className="animate-spin text-teal-700" />
+                <span>Memuat daftar dokumen dari database...</span>
+              </div>
+            ) : documents.length === 0 ? (
+              <div className="p-6 bg-slate-50 border border-slate-200 text-center space-y-2">
+                <AlertCircle size={24} className="mx-auto text-slate-400" />
+                <p className="text-xs font-semibold text-slate-700">
+                  Belum ada dokumen diunggah di Repositori.
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-slate-200 border-y border-slate-200 py-1">
+                {/* Group 1: Target (Baseline) */}
+                <div className="p-2 space-y-1.5">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
+                    <span className="text-xs font-semibold text-slate-800 flex items-center gap-1.5">
+                      <Target size={14} className="text-teal-600 shrink-0" />
+                      1. Target (Baseline)
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => selectAllCategoryDocs('BASELINE')}
+                      className="text-slate-500 hover:text-teal-700 transition-colors cursor-pointer p-0.5"
+                      title={isAllBaselineSelected ? 'Batal Pilih Semua (Uncheck All)' : 'Pilih Semua (Check All)'}
+                    >
+                      {isAllBaselineSelected ? (
+                        <CheckSquare size={16} className="text-teal-700" />
+                      ) : (
+                        <Square size={16} className="text-slate-400" />
+                      )}
+                    </button>
+                  </div>
+                  <div className="space-y-0.5 max-h-28 overflow-y-auto pr-1 custom-scrollbar">
+                    {baselineDocs.length === 0 ? (
+                      <p className="text-xs text-slate-400 italic py-1">Tidak ada dokumen Target Baseline.</p>
+                    ) : (
+                      baselineDocs.map((doc) => {
+                        const isSelected = selectedDocIds.includes(doc.id);
+                        return (
+                          <div
+                            key={doc.id}
+                            onClick={() => toggleDocumentSelection(doc.id)}
+                            className={`py-0.5 px-1.5 text-xs cursor-pointer flex items-start gap-2 transition-colors rounded-none ${isSelected ? 'bg-teal-50/80 font-semibold text-slate-900' : 'hover:bg-slate-50 text-slate-600'
+                              }`}
+                          >
+                            {isSelected ? <CheckSquare size={15} className="text-teal-700 shrink-0 mt-0.5" /> : <Square size={15} className="text-slate-400 shrink-0 mt-0.5" />}
+                            <span className="truncate">{doc.title}</span>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+
+                {/* Group 2: Realisasi (Capaian) */}
+                <div className="p-2 space-y-1.5">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
+                    <span className="text-xs font-semibold text-slate-800 flex items-center gap-1.5">
+                      <BarChart3 size={14} className="text-teal-600 shrink-0" />
+                      2. Realisasi (Capaian)
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => selectAllCategoryDocs('REALIZATION')}
+                      className="text-slate-500 hover:text-teal-700 transition-colors cursor-pointer p-0.5"
+                      title={isAllRealizationSelected ? 'Batal Pilih Semua (Uncheck All)' : 'Pilih Semua (Check All)'}
+                    >
+                      {isAllRealizationSelected ? (
+                        <CheckSquare size={16} className="text-teal-700" />
+                      ) : (
+                        <Square size={16} className="text-slate-400" />
+                      )}
+                    </button>
+                  </div>
+                  <div className="space-y-0.5 max-h-28 overflow-y-auto pr-1 custom-scrollbar">
+                    {realizationDocs.length === 0 ? (
+                      <p className="text-xs text-slate-400 italic py-1">Tidak ada dokumen Realisasi.</p>
+                    ) : (
+                      realizationDocs.map((doc) => {
+                        const isSelected = selectedDocIds.includes(doc.id);
+                        return (
+                          <div
+                            key={doc.id}
+                            onClick={() => toggleDocumentSelection(doc.id)}
+                            className={`py-0.5 px-1.5 text-xs cursor-pointer flex items-start gap-2 transition-colors rounded-none ${isSelected ? 'bg-teal-50/80 font-semibold text-slate-900' : 'hover:bg-slate-50 text-slate-600'
+                              }`}
+                          >
+                            {isSelected ? <CheckSquare size={15} className="text-teal-700 shrink-0 mt-0.5" /> : <Square size={15} className="text-slate-400 shrink-0 mt-0.5" />}
+                            <span className="truncate">{doc.title}</span>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+
+                {/* Group 3: Referensi (Umum) */}
+                <div className="p-2 space-y-1.5">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
+                    <span className="text-xs font-semibold text-slate-800 flex items-center gap-1.5">
+                      <Newspaper size={14} className="text-teal-600 shrink-0" />
+                      3. Referensi (Umum)
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => selectAllCategoryDocs('GENERAL_REFERENCE')}
+                      className="text-slate-500 hover:text-teal-700 transition-colors cursor-pointer p-0.5"
+                      title={isAllGeneralSelected ? 'Batal Pilih Semua (Uncheck All)' : 'Pilih Semua (Check All)'}
+                    >
+                      {isAllGeneralSelected ? (
+                        <CheckSquare size={16} className="text-teal-700" />
+                      ) : (
+                        <Square size={16} className="text-slate-400" />
+                      )}
+                    </button>
+                  </div>
+                  <div className="space-y-0.5 max-h-28 overflow-y-auto pr-1 custom-scrollbar">
+                    {generalDocs.length === 0 ? (
+                      <p className="text-xs text-slate-400 italic py-1">Tidak ada dokumen Referensi Umum.</p>
+                    ) : (
+                      generalDocs.map((doc) => {
+                        const isSelected = selectedDocIds.includes(doc.id);
+                        return (
+                          <div
+                            key={doc.id}
+                            onClick={() => toggleDocumentSelection(doc.id)}
+                            className={`py-0.5 px-1.5 text-xs cursor-pointer flex items-start gap-2 transition-colors rounded-none ${isSelected ? 'bg-teal-50/80 font-semibold text-slate-900' : 'hover:bg-slate-50 text-slate-600'
+                              }`}
+                          >
+                            {isSelected ? <CheckSquare size={15} className="text-teal-700 shrink-0 mt-0.5" /> : <Square size={15} className="text-slate-400 shrink-0 mt-0.5" />}
+                            <span className="truncate">{doc.title}</span>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="pt-2 flex justify-end">
+              <button
+                onClick={handleOpenMappingModal}
+                disabled={isComparing || selectedDocIds.length === 0}
+                className="px-5 py-2.5 bg-teal-700 hover:bg-teal-800 disabled:bg-slate-300 text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-2 border border-teal-900 shadow-sm cursor-pointer transition-colors"
+              >
+                {isComparing ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <Play size={16} />
+                )}
+                <span>Jalankan Analisis Deviasi Multidokumen</span>
+              </button>
             </div>
           </div>
-          {cacheStatus.reportId && (
-            <button
-              onClick={() => handleLoadDbCachedReport(cacheStatus.reportId!)}
-              className="px-4 py-2 bg-teal-800 hover:bg-teal-900 text-white font-bold text-xs uppercase tracking-wider rounded-none cursor-pointer shrink-0 transition-colors"
-            >
-              Muat Cache dari DB
-            </button>
+
+          {/* Results Block */}
+          {(isComparing || compareResult) && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between bg-white border border-slate-300 p-3 rounded-none">
+                <span className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                  Hasil Analisa Kebijakan: {compareResult?.math?.indicatorName || 'Analisis Multidokumen'}
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleExportPdf}
+                    disabled={isExportingPdf || !compareResult}
+                    className="px-3 py-1.5 bg-teal-700 hover:bg-teal-800 disabled:bg-slate-200 disabled:text-slate-400 text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-1.5 cursor-pointer transition-colors"
+                  >
+                    {isExportingPdf ? <Loader2 size={12} className="animate-spin text-teal-400" /> : <Download size={12} />}
+                    <span>{isExportingPdf ? 'Mencetak PDF...' : 'Ekspor PDF'}</span>
+                  </button>
+
+                  {onNavigateToGenerator && compareResult && (
+                    <button
+                      onClick={() =>
+                        onNavigateToGenerator(
+                          `Buatkan artikel publikasi mengenai analisis deviasi ${compareResult.math.indicatorName}.`,
+                        )
+                      }
+                      className="px-3 py-1.5 bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-1.5 border border-teal-700 shadow-xs cursor-pointer"
+                    >
+                      <PenTool size={12} />
+                      <span>Buat Artikel</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div id="deep-dive-analysis-container" className="space-y-6 bg-white p-4 border border-slate-300">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                  <div>
+                    <h2 className="text-base font-bold text-slate-900 uppercase tracking-tight">
+                      DOKUMEN ANALISIS KEBIJAKAN UTAMA
+                    </h2>
+                    <span className="text-[12px] font-bold text-teal-800 uppercase tracking-widest block">
+                      NASKAH DIAGNOSTIK ANALISIS DEVIASI INDIKATOR DAERAH
+                    </span>
+                  </div>
+                  <div className="text-left sm:text-right">
+                    <span className="text-xs font-bold text-slate-700 block">Tahun Anggaran 2026</span>
+                    <span className="text-[10px] text-teal-800 font-bold flex items-center gap-1 sm:justify-end">
+                      <FileCheck2 size={12} className="text-teal-600" /> Confirmed Factual
+                    </span>
+                  </div>
+                </div>
+
+                {compareResult && (
+                  <>
+                    <hr className="border-slate-200" />
+                    <DeviationSummaryCard
+                      indicatorName={compareResult.math.indicatorName}
+                      sector={compareResult.math.sector}
+                      targetText={compareResult.math.targetText}
+                      realizationText={compareResult.math.realizationText}
+                      deviationPercentage={compareResult.math.deviationPercentage}
+                      urgencyStatus={compareResult.math.urgencyStatus}
+                    />
+                  </>
+                )}
+
+                {isComparing ? (
+                  <div className="bg-white border border-slate-300 p-12 text-center text-slate-600 space-y-2">
+                    <Loader2 size={28} className="animate-spin text-teal-700 mx-auto" />
+                    <p className="font-bold text-sm text-slate-800">
+                      Menganalisis Causal Inference AI dari {selectedDocIds.length} dokumen sumber terpilih...
+                    </p>
+                  </div>
+                ) : compareResult ? (
+                  <>
+                    <hr className="border-slate-200" />
+                    <CausalFactorChart
+                      summaryText={compareResult.causal.summary}
+                      causalFactors={compareResult.causal.causalFactors}
+                    />
+                  </>
+                ) : null}
+
+                {compareResult && (
+                  <>
+                    <hr className="border-slate-200" />
+                    <RecommendationList
+                      recommendations={compareResult.causal.recommendations}
+                    />
+                  </>
+                )}
+              </div>
+            </div>
           )}
-        </div>
+        </>
       )}
 
-      { }
-      {savedSessions.length > 0 && (
-        <div className="bg-white border border-slate-300 p-4 rounded-none shadow-2xs space-y-3 font-roboto">
-          { }
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 border-b border-slate-200 pb-2.5">
+      {activeTab === 'history' && (
+        <div className="bg-white border border-slate-300 p-6 rounded-none shadow-xs space-y-4 font-roboto text-left">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-slate-200 pb-3">
             <div className="flex items-center gap-2">
               <History size={16} className="text-teal-700 shrink-0" />
-              <span className="text-xs font-bold uppercase tracking-wider text-teal-900">
-                Riwayat Analisis Tersimpan ({filteredSavedSessions.length} dari {savedSessions.length} Sesi)
-              </span>
+              <h2 className="text-sm font-bold uppercase tracking-wider text-slate-900">
+                Daftar Sesi Analisis Kebijakan ({filteredSavedSessions.length} dari {savedSessions.length} Tersimpan)
+              </h2>
             </div>
 
-            { }
-            <div className="flex flex-wrap items-center gap-2">
-              { }
+            <div className="flex flex-wrap items-center gap-3">
+              {/* Calendar date picker */}
               <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-300 px-2 py-1 text-xs">
                 <Calendar size={13} className="text-teal-700 shrink-0" />
                 <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wider hidden sm:inline">
@@ -497,12 +795,12 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
                   type="date"
                   value={selectedCalendarDate}
                   onChange={(e) => setSelectedCalendarDate(e.target.value)}
-                  className="bg-transparent text-slate-900 text-xs font-semibold focus:outline-none cursor-pointer rounded-none"
+                  className="bg-transparent text-slate-900 text-xs font-semibold focus:outline-none cursor-pointer rounded-none border-none"
                 />
                 {selectedCalendarDate && (
                   <button
                     onClick={() => setSelectedCalendarDate('')}
-                    className="p-0.5 text-slate-400 hover:text-red-600 cursor-pointer"
+                    className="p-0.5 text-slate-400 hover:text-red-600 cursor-pointer border-none bg-transparent"
                     title="Hapus tanggal kalender"
                   >
                     <X size={12} />
@@ -510,7 +808,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
                 )}
               </div>
 
-              { }
+              {/* Text search query */}
               <div className="relative w-full sm:w-56">
                 <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
@@ -523,7 +821,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
                 {sessionSearchQuery && (
                   <button
                     onClick={() => setSessionSearchQuery('')}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer border-none bg-transparent"
                     title="Hapus kata kunci filter"
                   >
                     <X size={12} />
@@ -533,317 +831,53 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
             </div>
           </div>
 
-          { }
           {filteredSavedSessions.length === 0 ? (
-            <p className="text-xs text-slate-500 py-2 italic font-normal">
-              Tidak ada cache sesi analisis yang cocok dengan filter kata kunci "{sessionSearchQuery}".
-            </p>
+            <div className="p-8 text-center text-slate-500 space-y-2">
+              <AlertCircle size={28} className="mx-auto text-slate-400" />
+              <p className="text-xs font-bold">Tidak ada riwayat sesi analisis yang ditemukan.</p>
+              <p className="text-[11px] text-slate-400">Silakan sesuaikan filter pencarian atau jalankan analisis kebijakan baru pada tab aktif.</p>
+            </div>
           ) : (
-            <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-1">
-              {filteredSavedSessions.map((session) => {
-                const isActive = session.id === activeSessionId;
-                return (
-                  <div
-                    key={session.id}
-                    onClick={() => handleSelectHistorySession(session)}
-                    className={`px-3.5 py-2 border text-xs cursor-pointer flex items-center gap-2.5 shrink-0 transition-all rounded-none ${isActive
-                      ? 'bg-teal-50 border-teal-600 text-teal-950 font-bold shadow-2xs'
-                      : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
-                      }`}
-                  >
-                    <Clock size={13} className="text-teal-700 shrink-0" />
-                    <div className="flex flex-col">
-                      <span className="truncate max-w-50 font-semibold text-slate-900">{session.indicatorName}</span>
-                      <span className="text-[9px] text-slate-500 font-normal">
-                        {session.timestamp} &bull; {session.selectedDocTitles?.length || 1} Dokumen
-                      </span>
+            <div className="divide-y divide-slate-200">
+              {filteredSavedSessions.map((session) => (
+                <div
+                  key={session.id}
+                  className="py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 first:pt-2 last:pb-2"
+                >
+                  <div className="space-y-1 text-left flex-1 min-w-0">
+                    <strong className="text-xs font-bold text-slate-900 block truncate">
+                      {session.indicatorName}
+                    </strong>
+                    <div className="text-xs text-slate-500 font-medium">
+                      Dokumen Acuan: {session.selectedDocTitles?.join(', ') || 'Tidak ada dokumen'}
                     </div>
+                    <div className="text-[11px] text-slate-400 font-bold uppercase tracking-wider flex flex-wrap items-center gap-3 pt-1">
+                      <span>Analisis Sesi: {session.timestamp}</span>
+                      <span>&bull;</span>
+                      <span className="text-teal-700">Status: {session.compareResult?.math?.urgencyStatus || 'NORMAL'}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      onClick={() => handleSelectHistorySession(session)}
+                      className="p-1.5 text-teal-700 hover:text-teal-900 transition-colors cursor-pointer"
+                      title="Buka Sesi"
+                    >
+                      <Clock size={16} />
+                    </button>
                     <button
                       onClick={(e) => handleDeleteHistorySession(session.id, e)}
-                      className="p-1 text-slate-400 hover:text-red-600 ml-1 cursor-pointer"
-                      title="Hapus riwayat ini"
+                      className="p-1.5 text-red-600 hover:text-red-800 transition-colors cursor-pointer"
+                      title="Hapus Sesi"
                     >
-                      <Trash2 size={12} />
+                      <Trash2 size={16} />
                     </button>
                   </div>
-                );
-              })}
+                </div>
+              ))}
             </div>
           )}
-        </div>
-      )}
-
-      { }
-      <div className="bg-white border border-slate-200 p-6 rounded-none shadow-xs space-y-4 font-roboto">
-        <div className="flex items-center justify-between border-b border-slate-200 pb-3">
-          <div className="flex items-center gap-2">
-            <BarChart3 size={18} className="text-teal-700 shrink-0" />
-            <h2 className="text-sm font-bold text-slate-900 tracking-wide">
-              Pilih Dokumen Acuan yang Akan Dianalisis
-            </h2>
-          </div>
-          <span className="text-xs font-bold text-teal-800 bg-teal-50 px-2.5 py-0.5 rounded-none">
-            {selectedDocIds.length} Dokumen Terpilih
-          </span>
-
-        </div>
-
-        {isLoadingDocs ? (
-          <div className="flex items-center gap-2 py-8 justify-center text-slate-600 text-xs font-bold">
-            <Loader2 size={18} className="animate-spin text-teal-700" />
-            <span>Memuat daftar dokumen dari database...</span>
-          </div>
-        ) : documents.length === 0 ? (
-          <div className="p-6 bg-slate-50 border border-slate-200 text-center space-y-2">
-            <AlertCircle size={24} className="mx-auto text-slate-400" />
-            <p className="text-xs font-semibold text-slate-700">
-              Belum ada dokumen diunggah di Repositori.
-            </p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-slate-200 border-y border-slate-200 py-2">
-            { }
-            <div className="p-3 space-y-2.5">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                <span className="text-xs font-semibold text-slate-800 flex items-center gap-1.5">
-                  <Target size={14} className="text-teal-600 shrink-0" />
-                  1. Target (Baseline)
-                </span>
-                <button
-                  type="button"
-                  onClick={() => selectAllCategoryDocs('BASELINE')}
-                  className="text-slate-500 hover:text-teal-700 transition-colors cursor-pointer p-0.5"
-                  title={isAllBaselineSelected ? 'Batal Pilih Semua (Uncheck All)' : 'Pilih Semua (Check All)'}
-                >
-                  {isAllBaselineSelected ? (
-                    <CheckSquare size={16} className="text-teal-700" />
-                  ) : (
-                    <Square size={16} className="text-slate-400" />
-                  )}
-                </button>
-              </div>
-              <div className="space-y-1 max-h-52 overflow-y-auto pr-1">
-                {baselineDocs.length === 0 ? (
-                  <p className="text-xs text-slate-400 italic py-1">Tidak ada dokumen Target Baseline.</p>
-                ) : (
-                  baselineDocs.map((doc) => {
-                    const isSelected = selectedDocIds.includes(doc.id);
-                    return (
-                      <div
-                        key={doc.id}
-                        onClick={() => toggleDocumentSelection(doc.id)}
-                        className={`p-2 text-xs cursor-pointer flex items-start gap-2 transition-colors ${isSelected ? 'bg-teal-50/80 font-semibold text-slate-900' : 'hover:bg-slate-50 text-slate-600'
-                          }`}
-                      >
-                        {isSelected ? <CheckSquare size={15} className="text-teal-700 shrink-0 mt-0.5" /> : <Square size={15} className="text-slate-400 shrink-0 mt-0.5" />}
-                        <span className="truncate">{doc.title}</span>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-
-            { }
-            <div className="p-3 space-y-2.5">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                <span className="text-xs font-semibold text-slate-800 flex items-center gap-1.5">
-                  <BarChart3 size={14} className="text-teal-600 shrink-0" />
-                  2. Realisasi (Capaian)
-                </span>
-                <button
-                  type="button"
-                  onClick={() => selectAllCategoryDocs('REALIZATION')}
-                  className="text-slate-500 hover:text-teal-700 transition-colors cursor-pointer p-0.5"
-                  title={isAllRealizationSelected ? 'Batal Pilih Semua (Uncheck All)' : 'Pilih Semua (Check All)'}
-                >
-                  {isAllRealizationSelected ? (
-                    <CheckSquare size={16} className="text-teal-700" />
-                  ) : (
-                    <Square size={16} className="text-slate-400" />
-                  )}
-                </button>
-              </div>
-              <div className="space-y-1 max-h-52 overflow-y-auto pr-1">
-                {realizationDocs.length === 0 ? (
-                  <p className="text-xs text-slate-400 italic py-1">Tidak ada dokumen Realisasi.</p>
-                ) : (
-                  realizationDocs.map((doc) => {
-                    const isSelected = selectedDocIds.includes(doc.id);
-                    return (
-                      <div
-                        key={doc.id}
-                        onClick={() => toggleDocumentSelection(doc.id)}
-                        className={`p-2 text-xs cursor-pointer flex items-start gap-2 transition-colors ${isSelected ? 'bg-teal-50/80 font-semibold text-slate-900' : 'hover:bg-slate-50 text-slate-600'
-                          }`}
-                      >
-                        {isSelected ? <CheckSquare size={15} className="text-teal-700 shrink-0 mt-0.5" /> : <Square size={15} className="text-slate-400 shrink-0 mt-0.5" />}
-                        <span className="truncate">{doc.title}</span>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-
-            { }
-            <div className="p-3 space-y-2.5">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                <span className="text-xs font-semibold text-slate-800 flex items-center gap-1.5">
-                  <Newspaper size={14} className="text-teal-600 shrink-0" />
-                  3. Referensi (Umum)
-                </span>
-                <button
-                  type="button"
-                  onClick={() => selectAllCategoryDocs('GENERAL_REFERENCE')}
-                  className="text-slate-500 hover:text-teal-700 transition-colors cursor-pointer p-0.5"
-                  title={isAllGeneralSelected ? 'Batal Pilih Semua (Uncheck All)' : 'Pilih Semua (Check All)'}
-                >
-                  {isAllGeneralSelected ? (
-                    <CheckSquare size={16} className="text-teal-700" />
-                  ) : (
-                    <Square size={16} className="text-slate-400" />
-                  )}
-                </button>
-              </div>
-              <div className="space-y-1 max-h-52 overflow-y-auto pr-1">
-                {generalDocs.length === 0 ? (
-                  <p className="text-xs text-slate-400 italic py-1">Tidak ada dokumen Referensi Umum.</p>
-                ) : (
-                  generalDocs.map((doc) => {
-                    const isSelected = selectedDocIds.includes(doc.id);
-                    return (
-                      <div
-                        key={doc.id}
-                        onClick={() => toggleDocumentSelection(doc.id)}
-                        className={`p-2 text-xs cursor-pointer flex items-start gap-2 transition-colors ${isSelected ? 'bg-teal-50/80 font-semibold text-slate-900' : 'hover:bg-slate-50 text-slate-600'
-                          }`}
-                      >
-                        {isSelected ? <CheckSquare size={15} className="text-teal-700 shrink-0 mt-0.5" /> : <Square size={15} className="text-slate-400 shrink-0 mt-0.5" />}
-                        <span className="truncate">{doc.title}</span>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        { }
-        <div className="pt-2 flex justify-end">
-          <button
-            onClick={handleOpenMappingModal} // Alihkan dari handleExecute ke pembukaan modal dialog [5]
-            disabled={isComparing || selectedDocIds.length === 0}
-            className="px-5 py-2.5 bg-teal-700 hover:bg-teal-800 disabled:bg-slate-300 text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-2 border border-teal-900 shadow-sm"
-          >
-            {isComparing ? (
-              <Loader2 size={16} className="animate-spin" />
-            ) : (
-              <Play size={16} />
-            )}
-            <span>Jalankan Analisis Deviasi Multidokumen</span>
-          </button>
-        </div>
-      </div>
-
-      { }
-      {(isComparing || compareResult) && (
-        <div className="space-y-4">
-          { }
-          <div className="flex items-center justify-between bg-white border border-slate-300 p-3 rounded-none">
-            <span className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-              Hasil Analisa Kebijakan: {compareResult?.math?.indicatorName || 'Analisis Multidokumen'}
-            </span>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleExportPdf}
-                disabled={isExportingPdf || !compareResult}
-                className="px-3 py-1.5 bg-teal-700 hover:bg-teal-800 disabled:bg-slate-200 disabled:text-slate-400 text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-1.5 cursor-pointer transition-colors"
-              >
-                {isExportingPdf ? <Loader2 size={12} className="animate-spin text-teal-400" /> : <Download size={12} />}
-                <span>{isExportingPdf ? 'Mencetak PDF...' : 'Ekspor PDF'}</span>
-              </button>
-
-              {onNavigateToGenerator && compareResult && (
-                <button
-                  onClick={() =>
-                    onNavigateToGenerator(
-                      `Buatkan artikel publikasi mengenai analisis deviasi ${compareResult.math.indicatorName}.`,
-                    )
-                  }
-                  className="px-3 py-1.5 bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-1.5 border border-teal-700 shadow-xs"
-                >
-                  <PenTool size={12} />
-                  <span>Buat Artikel</span>
-                </button>
-              )}
-            </div>
-          </div>
-
-          { }
-          <div id="deep-dive-analysis-container" className="space-y-6 bg-white p-4 border border-slate-300">
-            { }
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-              <div>
-                <h2 className="text-base font-bold text-slate-900 uppercase tracking-tight">
-                  DOKUMEN ANALISIS KEBIJAKAN UTAMA
-                </h2>
-                <span className="text-[12px] font-bold text-teal-800 uppercase tracking-widest block">
-                  NASKAH DIAGNOSTIK ANALISIS DEVIASI INDIKATOR DAERAH
-                </span>
-              </div>
-              <div className="text-left sm:text-right">
-                <span className="text-xs font-bold text-slate-700 block">Tahun Anggaran 2026</span>
-                <span className="text-[10px] text-teal-800 font-bold flex items-center gap-1 sm:justify-end">
-                  <FileCheck2 size={12} className="text-teal-600" /> Confirmed Factual
-                </span>
-              </div>
-            </div>
-
-            { }
-            {compareResult && (
-              <>
-                <hr className="border-slate-200" />
-                <DeviationSummaryCard
-                  indicatorName={compareResult.math.indicatorName}
-                  sector={compareResult.math.sector}
-                  targetText={compareResult.math.targetText}
-                  realizationText={compareResult.math.realizationText}
-                  deviationPercentage={compareResult.math.deviationPercentage}
-                  urgencyStatus={compareResult.math.urgencyStatus}
-                />
-              </>
-            )}
-
-            { }
-            {isComparing ? (
-              <div className="bg-white border border-slate-300 p-12 text-center text-slate-600 space-y-2">
-                <Loader2 size={28} className="animate-spin text-teal-700 mx-auto" />
-                <p className="font-bold text-sm text-slate-800">
-                  Menganalisis Causal Inference AI dari {selectedDocIds.length} dokumen sumber terpilih...
-                </p>
-              </div>
-            ) : compareResult ? (
-              <>
-                <hr className="border-slate-200" />
-                <CausalFactorChart
-                  summaryText={compareResult.causal.summary}
-                  causalFactors={compareResult.causal.causalFactors}
-                />
-              </>
-            ) : null}
-
-            { }
-            {compareResult && (
-              <>
-                <hr className="border-slate-200" />
-                <RecommendationList
-                  recommendations={compareResult.causal.recommendations}
-                />
-              </>
-            )}
-          </div>
         </div>
       )}
 

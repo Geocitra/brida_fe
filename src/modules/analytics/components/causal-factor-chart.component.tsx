@@ -1,18 +1,13 @@
 import React from 'react';
 import type { CausalFactorItem } from '../../../services/analysis.service';
 import { Cpu, Info } from 'lucide-react';
+import { marked } from 'marked';
 
 const stripCitationTokens = (content?: string | null): string => {
   if (!content) return '';
-
   return content
     .replace(/\[(?:[a-f0-9-]{8,}|doc(?:[-_a-z0-9]+)?):\d+\]/gi, '')
     .replace(/\[(?:[a-f0-9-]{8,}|doc(?:[-_a-z0-9]+)?):\d+\]\[(?:[a-f0-9-]{8,}|doc(?:[-_a-z0-9]+)?):\d+\]/gi, '')
-    .replace(/#{1,6}\s*/g, '')
-    .replace(/\*\*(.*?)\*\*/g, '$1')
-    .replace(/\*(.*?)\*/g, '$1')
-    .replace(/`([^`]+)`/g, '$1')
-    .replace(/\s{2,}/g, ' ')
     .trim();
 };
 
@@ -25,6 +20,17 @@ export const CausalFactorChart: React.FC<CausalFactorChartProps> = ({
   summaryText,
   causalFactors,
 }) => {
+  const renderedHtml = React.useMemo(() => {
+    const cleaned = stripCitationTokens(summaryText);
+    try {
+      const parsed = marked.parse(cleaned, { breaks: true });
+      return typeof parsed === 'string' ? parsed : '';
+    } catch (err) {
+      console.error('[Markdown Parser Error] Gagal menerjemahkan summaryText:', err);
+      return cleaned;
+    }
+  }, [summaryText]);
+
   return (
     <div className="font-roboto space-y-4">
       <div className="flex items-center justify-between border-b border-slate-200 pb-3">
@@ -34,9 +40,11 @@ export const CausalFactorChart: React.FC<CausalFactorChartProps> = ({
         </div>
       </div>
 
-      <p className="text-xs text-slate-700 font-medium leading-relaxed text-justify" style={{ textAlign: 'justify' }}>
-        {stripCitationTokens(summaryText)}
-      </p>
+      <div 
+        className="text-xs text-slate-700 leading-relaxed text-justify prose max-w-none font-medium"
+        style={{ textAlign: 'justify' }}
+        dangerouslySetInnerHTML={{ __html: renderedHtml }}
+      />
 
       <div className="divide-y divide-slate-200 pt-1">
         {causalFactors.map((item, idx) => (

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AppShell } from './components/layout/app-shell';
 import { LoginView } from './modules/auth/views/login.view';
 import { DashboardView } from './modules/dashboard/views/dashboard.view';
@@ -34,6 +34,19 @@ export function App() {
       return undefined;
     }
   });
+
+  /**
+   * SINKRONISASI STATE SCROLL (Scroll State Lifecycle Guard)
+   * Memastikan setiap kali rute aktif berubah, posisi gulir layar segera
+   * dikembalikan ke koordinat (0,0) secara instan demi menjaga integritas pembacaan.
+   */
+  useEffect(() => {
+    try {
+      window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    } catch (err) {
+      window.scrollTo(0, 0);
+    }
+  }, [activeRoute]);
 
   const pageTitles: Record<string, string> = {
     landing: 'Portal Utama & Asisten Analisis',

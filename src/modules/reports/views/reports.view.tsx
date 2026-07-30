@@ -49,6 +49,27 @@ const stripCitationTokens = (content?: string | null): string => {
 
 const sanitizeReportText = (content?: string | null): string => stripCitationTokens(content);
 
+const formatReportPreviewText = (content?: string | null): string => {
+  if (!content) return '';
+  let text = content;
+  try {
+    const parsed = JSON.parse(content);
+    if (parsed && typeof parsed === 'object') {
+      text = parsed.executiveSummary || parsed.answer || content;
+    }
+  } catch {
+    // Normal string
+  }
+  return text
+    .replace(/\[(?:[a-f0-9-]{8,}|doc(?:[-_a-z0-9]+)?):\d+\]/gi, '')
+    .replace(/#{1,6}\s*/g, '')
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/\*(.*?)\*/g, '$1')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+};
+
 const MarkdownContent: React.FC<{ content?: string | null; className?: string }> = ({ content, className = '' }) => {
   const html = React.useMemo(() => {
     const safeContent = sanitizeReportText(content);
@@ -619,9 +640,9 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                 <div className="space-y-3 divide-y divide-slate-100">
                   {currentReport.deviations.map((d: any, idx: number) => (
                     <div key={idx} className="pt-3 first:pt-0 space-y-1 text-xs">
-                      <strong className="block font-bold text-slate-900 text-sm">{sanitizeReportText(d.title)}</strong>
+                      <strong className="block font-bold text-slate-900 text-sm">{sanitizeReportText(d.title).replace(/\*\*/g, '')}</strong>
                       <p className="text-slate-700 font-medium">
-                        Baseline Target: <span className="font-bold text-slate-900">{sanitizeReportText(d.baseline)}</span> &bull; Realisasi Aktual: <span className="font-bold text-slate-900">{sanitizeReportText(d.realization)}</span> &bull; Deviasi: <span className={d.severityColor || 'text-red-700 font-bold'}>{sanitizeReportText(d.deviationText)}</span>
+                        Baseline Target: <span className="font-bold text-slate-900">{sanitizeReportText(d.baseline).replace(/\*\*/g, '')}</span> &bull; Realisasi Aktual: <span className="font-bold text-slate-900">{sanitizeReportText(d.realization).replace(/\*\*/g, '')}</span> &bull; Deviasi: <span className={d.severityColor || 'text-red-700 font-bold'}>{sanitizeReportText(d.deviationText).replace(/\*\*/g, '')}</span>
                       </p>
                       <div className="text-slate-600 font-normal pt-0.5">
                         <strong className="text-slate-800">Penyebab Utama:</strong>
@@ -800,7 +821,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                       {report.title}
                     </strong>
                     <p className="text-xs text-slate-600 line-clamp-2">
-                      {report.executiveSummary}
+                      {formatReportPreviewText(report.executiveSummary)}
                     </p>
                     <div className="text-[11px] text-slate-500 font-semibold flex flex-wrap items-center gap-3 pt-1">
                       <span>Tanggal: {new Date(report.createdAt).toLocaleString('id-ID')}</span>
@@ -811,20 +832,20 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 shrink-0">
+                  <div className="flex items-center gap-1 shrink-0">
                     <button
                       onClick={() => handleSelectFromHistory(report.id)}
-                      className="px-3 py-1.5 bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-1.5"
+                      className="p-1.5 text-teal-700 hover:text-teal-900 transition-colors cursor-pointer"
+                      title="Buka Laporan"
                     >
-                      <Eye size={14} />
-                      <span>Buka</span>
+                      <Eye size={16} />
                     </button>
                     <button
                       onClick={(e) => handleDeleteHistory(e, report.id)}
-                      className="px-2.5 py-1.5 bg-red-100 hover:bg-red-200 text-red-800 font-bold text-xs uppercase tracking-wider rounded-none border border-red-300 inline-flex items-center gap-1"
+                      className="p-1.5 text-red-600 hover:text-red-800 transition-colors cursor-pointer"
                       title="Hapus Laporan"
                     >
-                      <Trash2 size={14} />
+                      <Trash2 size={16} />
                     </button>
                   </div>
                 </div>

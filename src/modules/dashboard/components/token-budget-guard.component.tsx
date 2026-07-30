@@ -3,7 +3,9 @@ import { Coins, Database, Loader2 } from 'lucide-react';
 
 export interface TokenBudget {
     totalTokens: number;
+    remainingTokens: number;
     estimatedCostIdr: number;
+    remainingCostIdr: number;
     maxMonthlyPaguIdr: number;
     quotaPercentage: number;
     paguStatus: 'SAFE' | 'ALERT' | 'WARNING';
@@ -28,25 +30,25 @@ export const TokenBudgetGuard: React.FC<TokenBudgetGuardProps> = ({ budget, isLo
 
   if (!budget) return null;
 
-  const { totalTokens, estimatedCostIdr, maxMonthlyPaguIdr, quotaPercentage, paguStatus } = budget;
+  const { totalTokens, remainingTokens, estimatedCostIdr, remainingCostIdr, maxMonthlyPaguIdr, quotaPercentage, paguStatus } = budget;
 
   const statusConfigs = {
     SAFE: {
-      badge: 'bg-emerald-100 text-emerald-800 border-emerald-300',
+      badge: 'text-emerald-800',
       bar: 'bg-emerald-600 shadow-[0_0_8px_rgba(16,185,129,0.3)]',
       label: 'Aman',
       pulse: 'bg-emerald-500',
       description: 'Penggunaan AI masih sangat aman. Sisa kuota bulanan Anda masih melimpah.',
     },
     ALERT: {
-      badge: 'bg-amber-100 text-amber-800 border-amber-300',
+      badge: 'text-amber-800',
       bar: 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.3)]',
       label: 'Waspada',
       pulse: 'bg-amber-500',
       description: 'Penggunaan AI sudah setengah jalan dari limit bulanan. Batasi aktivitas yang tidak terlalu penting.',
     },
     WARNING: {
-      badge: 'bg-rose-100 text-rose-800 border-rose-300',
+      badge: 'text-rose-800',
       bar: 'bg-rose-600 shadow-[0_0_8px_rgba(225,29,72,0.3)]',
       label: 'Hampir Habis / Kritis',
       pulse: 'bg-rose-500',
@@ -68,7 +70,7 @@ export const TokenBudgetGuard: React.FC<TokenBudgetGuardProps> = ({ budget, isLo
           <span className="text-[10px] font-black tracking-widest text-slate-400 uppercase">
             PEMANTAUAN KUOTA AI BULANAN
           </span>
-          <span className={`px-2 py-0.5 text-[9px] font-black uppercase border tracking-wider rounded-none ${currentConfig.badge}`}>
+          <span className={`text-[9px] font-black uppercase tracking-wider ${currentConfig.badge}`}>
             Status Kuota: {currentConfig.label}
           </span>
         </div>
@@ -93,31 +95,31 @@ export const TokenBudgetGuard: React.FC<TokenBudgetGuardProps> = ({ budget, isLo
 
       {/* Sisi Kanan: Detail Transaksional dengan Jarak Simetris yang Lega */}
       <div className="flex items-center divide-x divide-slate-200 min-w-full lg:min-w-0 lg:pl-6 text-left no-print">
-        {/* Kolom 1: Estimasi Biaya (IDR) */}
+        {/* Kolom 1: Estimasi Sisa Saldo (IDR) */}
         <div className="flex flex-col justify-center pr-6">
           <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5 mb-1.5 select-none">
             <Coins size={11} className="text-teal-700 shrink-0" />
-            <span>Biaya Terpakai</span>
+            <span>Sisa Saldo</span>
           </span>
           <span className="text-lg font-black text-slate-900 tracking-tight font-mono">
-            Rp {estimatedCostIdr.toLocaleString('id-ID')}
+            Rp {remainingCostIdr.toLocaleString('id-ID')}
           </span>
           <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-1 select-none">
-            Limit: Rp {maxMonthlyPaguIdr.toLocaleString('id-ID')}
+            Kredit: Rp {maxMonthlyPaguIdr.toLocaleString('id-ID')}
           </span>
         </div>
 
-        {/* Kolom 2: Akumulasi Token */}
+        {/* Kolom 2: Sisa Token */}
         <div className="pl-6 flex flex-col justify-center">
           <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5 mb-1.5 select-none">
             <Database size={11} className="text-teal-700 shrink-0" />
-            <span>Total Token</span>
+            <span>Sisa Token</span>
           </span>
           <span className="text-lg font-black text-slate-900 tracking-tight font-mono">
-            {totalTokens.toLocaleString('id-ID')}
+            {remainingTokens.toLocaleString('id-ID')}
           </span>
           <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-1 select-none">
-            Sesi Input + Output
+            Tersedia dari Pagu
           </span>
         </div>
       </div>

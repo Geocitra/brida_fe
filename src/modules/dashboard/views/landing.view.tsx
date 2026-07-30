@@ -4,50 +4,29 @@ import {
   MessageSquareCode,
   BarChart3,
   FileText,
-  LayoutDashboard,
-  FolderOpen,
-  Clock,
-  Sparkles,
   ChevronRight,
   Database,
   Globe,
-  Cpu,
-  Activity,
-  Atom
+  Search,
+  ChevronDown
 } from 'lucide-react';
+import { SpatialPreviewWrapper } from '../components/spatial-preview-wrapper.component';
+import { MOCK_DATA } from '../../../services/mock-data.service';
 
 interface LandingViewProps {
   onNavigate: (route: string) => void;
 }
 
 export const LandingView: React.FC<LandingViewProps> = ({ onNavigate }) => {
-  const [currentTime, setCurrentTime] = useState<string>('');
-  const [currentDate, setCurrentDate] = useState<string>('');
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
 
   useEffect(() => {
-    const updateDateTime = () => {
-      const now = new Date();
-      setCurrentTime(
-        now.toLocaleTimeString('id-ID', {
-          hour: '2-digit',
-          minute: '2-digit',
-          second: '2-digit',
-          hour12: false,
-        })
-      );
-      setCurrentDate(
-        now.toLocaleDateString('id-ID', {
-          weekday: 'long',
-          day: 'numeric',
-          month: 'long',
-          year: 'numeric',
-        })
-      );
+    const handleMouseMove = (e: MouseEvent) => {
+      setMousePos({ x: e.clientX, y: e.clientY });
     };
 
-    updateDateTime();
-    const intervalId = setInterval(updateDateTime, 1000);
-    return () => clearInterval(intervalId);
+    window.addEventListener('mousemove', handleMouseMove);
+    return () => window.removeEventListener('mousemove', handleMouseMove);
   }, []);
 
   const mainModules = [
@@ -60,10 +39,10 @@ export const LandingView: React.FC<LandingViewProps> = ({ onNavigate }) => {
       accentBg: 'bg-teal-500',
       accentLight: 'bg-teal-50',
       accentText: 'text-teal-700',
-      accentBorder: 'border-teal-200 hover:border-teal-400',
+      accentBorder: 'border-slate-200 hover:border-teal-400',
       iconBg: 'bg-teal-100 text-teal-600',
       badgeBg: 'bg-teal-50 text-teal-600 border-teal-200',
-      hoverAccent: 'hover:shadow-teal-100',
+      hoverAccent: 'hover:shadow-teal-100/60',
     },
     {
       id: 'ai-request',
@@ -74,24 +53,24 @@ export const LandingView: React.FC<LandingViewProps> = ({ onNavigate }) => {
       accentBg: 'bg-blue-500',
       accentLight: 'bg-blue-50',
       accentText: 'text-blue-700',
-      accentBorder: 'border-blue-200 hover:border-blue-400',
+      accentBorder: 'border-slate-200 hover:border-blue-400',
       iconBg: 'bg-blue-100 text-blue-600',
       badgeBg: 'bg-blue-50 text-blue-600 border-blue-200',
-      hoverAccent: 'hover:shadow-blue-100',
+      hoverAccent: 'hover:shadow-blue-100/60',
     },
     {
       id: 'analytics',
-      title: 'Lembar Diagnostik & Analisisa Kebijakan',
+      title: 'Lembar Diagnostik & Analisa',
       badge: 'Causal Inference',
       desc: 'Sistem analisis deviasi capaian kinerja antara baseline target pembangunan vs realisasi lapangan dengan pemodelan faktor penyebab (AI).',
       icon: BarChart3,
       accentBg: 'bg-indigo-500',
       accentLight: 'bg-indigo-50',
       accentText: 'text-indigo-700',
-      accentBorder: 'border-indigo-200 hover:border-indigo-400',
+      accentBorder: 'border-slate-200 hover:border-indigo-400',
       iconBg: 'bg-indigo-100 text-indigo-600',
       badgeBg: 'bg-indigo-50 text-indigo-600 border-indigo-200',
-      hoverAccent: 'hover:shadow-indigo-100',
+      hoverAccent: 'hover:shadow-indigo-100/60',
     },
     {
       id: 'reports',
@@ -102,218 +81,236 @@ export const LandingView: React.FC<LandingViewProps> = ({ onNavigate }) => {
       accentBg: 'bg-amber-500',
       accentLight: 'bg-amber-50',
       accentText: 'text-amber-700',
-      accentBorder: 'border-amber-200 hover:border-amber-400',
+      accentBorder: 'border-slate-200 hover:border-amber-400',
       iconBg: 'bg-amber-100 text-amber-600',
       badgeBg: 'bg-amber-50 text-amber-600 border-amber-200',
-      hoverAccent: 'hover:shadow-amber-100',
+      hoverAccent: 'hover:shadow-amber-100/60',
     }
   ];
 
-  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
-
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      setMousePos({ x: e.clientX, y: e.clientY });
-    };
-
-    window.addEventListener('mousemove', handleMouseMove);
-    return () => window.removeEventListener('mousemove', handleMouseMove);
-  }, []);
-
   return (
-    <div className="min-h-screen w-full bg-slate-50 text-slate-800 flex flex-col justify-between relative overflow-hidden font-roboto">
+    <div className="min-h-screen w-full bg-slate-50 text-slate-800 flex flex-col justify-between relative overflow-x-hidden font-roboto">
 
-      {/* FASE 2: LAYERED GEOMETRIC GRID (Efek Kedalaman) */}
+      {/* LAYERED GEOMETRIC GRID & DYNAMIC GLOW (Latar Belakang Estetis) */}
       <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
-
-        {/* Layer 1: Fine Dot Grid (Bergerak Sangat Lambat) */}
         <div
           className="absolute inset-0 opacity-[0.25] transition-transform duration-1000 ease-out"
           style={{
             backgroundImage: `radial-gradient(circle at 1px 1px, #94a3b8 1px, transparent 0)`,
             backgroundSize: '32px 32px',
-            // Gerakan mikro: hanya 1% dari pergerakan mouse
             transform: `translate(${mousePos.x * 0.01}px, ${mousePos.y * 0.01}px)`,
           }}
         />
-
-        {/* Layer 2: Subtle Square Grid (Bergerak Sedikit Lebih Cepat) */}
         <div
-          className="absolute inset-0 opacity-[0.12] transition-transform duration-700 ease-out"
-          style={{
-            backgroundImage: `
-              linear-gradient(to right, #cbd5e1 1px, transparent 1px),
-              linear-gradient(to bottom, #cbd5e1 1px, transparent 1px)
-            `,
-            backgroundSize: '128px 128px', // Kotak lebih besar untuk struktur
-            // Gerakan sedikit lebih kuat: 2% dari pergerakan mouse
-            transform: `translate(${mousePos.x * -0.015}px, ${mousePos.y * -0.015}px)`,
-          }}
-        />
-
-        {/* Garis Horizontal Dekoratif (Efek Scanning) */}
-        <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-teal-500/20 to-transparent animate-[scan_8s_linear_infinite]" />
-      </div>
-
-      {/* FASE 1: DYNAMIC MOUSE GLOW (Peningkatan Visual) */}
-      <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
-        {/* Blob Utama (Teal) - Mengikuti Mouse dengan delay halus */}
-        <div
-          className="absolute w-[600px] h-[600px] bg-teal-400/10 rounded-full blur-[120px] transition-transform duration-700 ease-out"
-          style={{
-            // Kita kurangi 300px agar titik tengah blob pas di ujung kursor
-            transform: `translate(${mousePos.x - 300}px, ${mousePos.y - 300}px)`,
-          }}
-        />
-
-        {/* Blob Pendukung (Indigo) - Bergerak berlawanan (Parallax) */}
-        <div
-          className="absolute w-[800px] h-[800px] bg-indigo-500/10 rounded-full blur-[140px] transition-transform duration-[1500ms] ease-out"
+          className="absolute w-200 h-200 bg-blue-500/5 rounded-full blur-[140px] transition-transform duration-1500 ease-out"
           style={{
             right: '10%',
             bottom: '10%',
-            // Pergerakan hanya sedikit (3% dari gerakan mouse) untuk efek kedalaman
             transform: `translate(${(mousePos.x * -0.03)}px, ${(mousePos.y * -0.03)}px)`,
           }}
         />
       </div>
 
-      {/* ── HEADER ── */}
-      <header className="w-full bg-white/90 backdrop-blur-sm border-b border-slate-200 px-6 py-4 flex flex-col md:flex-row items-center justify-between gap-4 z-10 shadow-xs">
-        <div className="flex items-center gap-3">
-          <FileText size={24} className="text-teal-600 shrink-0" />
+      {/* ── HEADER UTAMA ── */}
+      <header className="w-full bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between gap-4 z-45 shadow-xs shrink-0 select-none">
+        <div 
+          onClick={() => onNavigate('landing')}
+          className="flex items-center gap-3 cursor-pointer hover:opacity-90 transition-opacity"
+        >
+          <FileText size={24} className="text-blue-600 shrink-0" />
+          <div className="w-px h-6 bg-slate-300 mx-2" />
           <div className="flex flex-col text-left">
-            <span className="font-extrabold text-sm uppercase tracking-widest text-teal-700">
-              AKLS
-            </span>
-            <span className="text-[10px] text-slate-500 font-medium">
+            <h1 className="text-base font-black tracking-tight leading-none text-slate-900 m-0 p-0 flex items-center">
+              <span>AKLS</span>
+              <span className="text-blue-600 ml-1">Platform</span>
+            </h1>
+            <span className="text-[12px] text-slate-500 font-semibold mt-1">
               Aplikasi Analisa Kebijakan &amp; Laporan Strategis
             </span>
           </div>
         </div>
 
-        {/* Real-time Clock */}
-        <div className="flex items-center gap-5 text-xs text-slate-500">
-          <div className="flex items-center gap-2 border-r border-slate-200 pr-5">
-            <Clock size={13} className="text-teal-500" />
-            <div className="text-left font-mono">
-              <span className="text-slate-800 font-bold block leading-none text-sm">{currentTime}</span>
-              <span className="text-[9px] text-slate-400 block mt-0.5">{currentDate}</span>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Activity size={13} className="text-emerald-500" />
-            <div>
-              <span className="font-bold text-slate-700 block leading-none text-xs">SISTEM AKTIF</span>
-              <span className="text-[9px] text-slate-400 block mt-0.5">Secure AI Connection</span>
-            </div>
-          </div>
+        {/* Right side navigation */}
+        <div className="flex items-center gap-8">
+          <button 
+            onClick={() => onNavigate('generator')} 
+            className="bg-[#0070c0] hover:bg-blue-700 text-white font-extrabold text-xs uppercase tracking-widest px-6 py-2.5 border-none cursor-pointer transition-colors rounded-none"
+          >
+            MASUK
+          </button>
         </div>
       </header>
 
-      {/* ── MAIN CONTENT ── */}
-      <main className="flex-1 w-full max-w-6xl mx-auto px-6 py-12 flex flex-col justify-center gap-10 z-10">
+      {/* ── MAIN CONTENT (Top-to-Bottom Flow) ── */}
+      <main className="flex-1 w-full flex flex-col gap-6 z-10 pb-10">
 
-        {/* Welcome Section */}
-        <div className="text-center flex flex-col items-center">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-teal-50 border border-teal-200 text-[10px] font-bold text-teal-700 uppercase tracking-widest mb-4">
-            <Sparkles size={11} className="text-teal-500" />
-            PORTAL UTAMA EKSEKUTIF
-          </div>
-          <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-slate-900 uppercase">
-            Aplikasi Analisa Kebijakan &amp; Laporan Strategis
-          </h1>
-          <div className="w-16 h-1 bg-teal-500 mt-3 mb-3" />
-          <p className="text-sm text-slate-500 max-w-2xl font-normal leading-relaxed text-center">
-            Pusat pengendali analitik terintegrasi. Silakan pilih instrumen cerdas di bawah untuk merancang kebijakan, menguji analisis deviasi, atau memantau metrik spasial.
-          </p>
-        </div>
-
-        {/* 2x2 Grid of Premium Light Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 w-full max-w-5xl mx-auto">
-          {mainModules.map((mod) => {
-            const Icon = mod.icon;
-            return (
-              <button
-                key={mod.id}
-                onClick={() => onNavigate(mod.id)}
-                className={`group relative text-left bg-white border-2 ${mod.accentBorder} p-6 flex gap-5 transition-all duration-300 hover:-translate-y-1.5 cursor-pointer ${mod.hoverAccent} hover:shadow-xl shadow-sm`}
-              >
-                {/* Top accent bar */}
-                <div className={`absolute top-0 left-0 right-0 h-[3px] ${mod.accentBg} opacity-0 group-hover:opacity-100 transition-opacity duration-300`} />
-
-                {/* Left: Icon */}
-                <div className={`w-13 h-13 w-12 h-12 flex items-center justify-center shrink-0 ${mod.iconBg} transition-transform duration-300 group-hover:scale-105`}>
-                  <Icon size={22} />
-                </div>
-
-                {/* Right: Content */}
-                <div className="flex flex-col flex-1 justify-between gap-2 text-left">
-                  <div>
-                    <div className="flex items-center justify-between gap-2 mb-2">
-                      <h2 className={`text-sm font-bold text-slate-800 uppercase tracking-wide group-hover:${mod.accentText} transition-colors`}>
-                        {mod.title}
-                      </h2>
-                      <span className={`text-[9px] font-black tracking-widest uppercase border px-2 py-0.5 shrink-0 ${mod.badgeBg}`}>
-                        {mod.badge}
-                      </span>
-                    </div>
-                    <p className="text-[11.5px] text-slate-500 leading-relaxed font-normal">
-                      {mod.desc}
-                    </p>
-                  </div>
-
-                  <div className={`inline-flex items-center gap-1 text-[10px] font-bold ${mod.accentText} opacity-0 group-hover:opacity-100 uppercase tracking-widest transition-all group-hover:translate-x-1 mt-1`}>
-                    <span>Mulai Akses Modul</span>
-                    <ChevronRight size={12} />
-                  </div>
-                </div>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* ── SECONDARY QUICK ACTIONS ── */}
-        <div className="w-full max-w-5xl mx-auto border-t border-slate-200 pt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2 text-slate-400 text-xs">
-            <Cpu size={13} className="text-teal-500" />
-            <span>Akses Cepat Pengendali Data Daerah</span>
-          </div>
-
-          <div className="flex flex-wrap justify-center gap-3">
-            <button
-              onClick={() => onNavigate('dashboard')}
-              className="px-4 py-2 bg-white border border-slate-300 hover:border-teal-400 hover:bg-teal-50 text-slate-600 hover:text-teal-700 text-xs font-bold uppercase tracking-wider transition-all cursor-pointer flex items-center gap-2 shadow-xs active:scale-95"
+        {/* SEKSI 1: HERO COVER BANNER */}
+        <section
+          className="w-full bg-[#f8fafc] bg-cover bg-center bg-no-repeat py-12 relative overflow-hidden shrink-0 select-none border-b border-slate-200"
+          style={{
+            backgroundImage: `url('/bg/landingpage.png')`
+          }}
+        >
+          <div className="w-full px-4 md:px-8 relative z-10 text-left">
+            <h1 
+              className="text-4xl md:text-5xl font-black tracking-tight text-white! uppercase leading-none mb-4 font-roboto"
+              style={{ textShadow: '0 2px 10px rgba(0, 0, 0, 0.8)' }}
             >
-              <LayoutDashboard size={13} className="text-teal-500" />
-              <span>Dashboard Metrik</span>
-            </button>
-            <button
-              onClick={() => onNavigate('gis-explorer')}
-              className="px-4 py-2 bg-white border border-slate-300 hover:border-indigo-400 hover:bg-indigo-50 text-slate-600 hover:text-indigo-700 text-xs font-bold uppercase tracking-wider transition-all cursor-pointer flex items-center gap-2 shadow-xs active:scale-95"
+              Aplikasi Analisa Kebijakan <br className="hidden md:inline" /> &amp; Laporan Strategis
+            </h1>
+            <p 
+              className="text-sm md:text-base text-slate-100! max-w-4xl font-medium leading-relaxed mb-4"
+              style={{ textShadow: '0 1px 6px rgba(0, 0, 0, 0.8)' }}
             >
-              <Globe size={13} className="text-indigo-500" />
-              <span>Pusat Spasial (GIS)</span>
-            </button>
-            <button
+              Akses cepat dan terpadu untuk data pembangunan kognitif Mimika. Silakan pilih instrumen cerdas di bawah untuk merancang naskah kebijakan, menguji analisis deviasi kinerja daerah, atau mengakses pusat monitoring geospasial secara langsung melalui data rujukan terpercaya.
+            </p>
+          </div>
+        </section>
+
+        {/* SEKSI 2: DIRECT DATA EXPLORER */}
+        <section className="w-full bg-white border-y border-slate-200 z-20 -mt-6 relative">
+          <div className="w-full grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-slate-200 py-4 px-4 md:px-8">
+            <div
               onClick={() => onNavigate('knowledge-hub')}
-              className="px-4 py-2 bg-white border border-slate-300 hover:border-amber-400 hover:bg-amber-50 text-slate-600 hover:text-amber-700 text-xs font-bold uppercase tracking-wider transition-all cursor-pointer flex items-center gap-2 shadow-xs active:scale-95"
+              className="px-4 py-3 md:py-2 flex items-start gap-4 group cursor-pointer transition-colors hover:bg-slate-50/40"
             >
-              <FolderOpen size={13} className="text-amber-500" />
-              <span>Repositori Dokumen</span>
-            </button>
+              <div className="w-12 h-12 flex items-center justify-center text-blue-600 shrink-0 shadow-xs group-hover:scale-105 transition-transform duration-300 rounded-none">
+                <Database size={20} className="text-blue-600" />
+              </div>
+              <div className="flex flex-col gap-1 text-left">
+                <h3 className="text-xs font-black uppercase tracking-wider text-slate-800 group-hover:text-blue-700 transition-colors">
+                  Repositori Dokumen
+                </h3>
+                <p className="text-[11px] text-slate-500 font-medium leading-relaxed text-justify line-clamp-3">
+                  Pencarian dokumen kajian akademis, rencana strategis, regulasi, dan arsip data sektoral daerah.
+                </p>
+                <div className="text-[10px] font-black text-blue-600 uppercase tracking-wider inline-flex items-center gap-1 mt-2.5">
+                  <span>LIHAT REPOSITORI</span>
+                  <span className="text-[8px] font-normal ml-0.5">&gt;</span>
+                </div>
+              </div>
+            </div>
+            <div
+              onClick={() => onNavigate('dashboard')}
+              className="px-4 py-3 md:py-2 flex items-start gap-4 group cursor-pointer transition-colors hover:bg-slate-50/40"
+            >
+              <div className="w-12 h-12 flex items-center justify-center text-blue-600 shrink-0 shadow-xs group-hover:scale-105 transition-transform duration-300 rounded-none">
+                <BarChart3 size={20} className="text-blue-600" />
+              </div>
+              <div className="flex flex-col gap-1 text-left">
+                <h3 className="text-xs font-black uppercase tracking-wider text-slate-800 group-hover:text-blue-700 transition-colors">
+                  Dashboard
+                </h3>
+                <p className="text-[11px] text-slate-500 font-medium leading-relaxed text-justify line-clamp-3">
+                  Monitoring status sesi kerja aktif, pemakaian token kuota AI, serta pratinjau ringkas peta spasial daerah.
+                </p>
+                <div className="text-[10px] font-black text-blue-600 uppercase tracking-wider inline-flex items-center gap-1 mt-2.5">
+                  <span>LIHAT DASHBOARD</span>
+                  <span className="text-[8px] font-normal ml-0.5">&gt;</span>
+                </div>
+              </div>
+            </div>
+            <div
+              onClick={() => onNavigate('gis-explorer')}
+              className="px-4 py-3 md:py-2 flex items-start gap-4 group cursor-pointer transition-colors hover:bg-slate-50/40"
+            >
+              <div className="w-12 h-12 flex items-center justify-center text-blue-600 shrink-0 shadow-xs group-hover:scale-105 transition-transform duration-300 rounded-none">
+                <Globe size={20} className="text-blue-600" />
+              </div>
+              <div className="flex flex-col gap-1 text-left">
+                <h3 className="text-xs font-black uppercase tracking-wider text-slate-800 group-hover:text-blue-700 transition-colors">
+                  Pusat Spasial
+                </h3>
+                <p className="text-[11px] text-slate-500 font-medium leading-relaxed text-justify line-clamp-3">
+                  Analisis geospasial dan pemetaan wilayah terintegrasi untuk pemantauan sebaran pembangunan secara spasial analitik.
+                </p>
+                <div className="text-[10px] font-black text-blue-600 uppercase tracking-wider inline-flex items-center gap-1 mt-2.5">
+                  <span>BUKA PUSAT SPASIAL</span>
+                  <span className="text-[8px] font-normal ml-0.5">&gt;</span>
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
+        </section>
+
+        {/* SEKSI 3: RUANG KERJA & ANALISIS AI (Premium 2x2 Bento Grid) */}
+        <section className="w-full px-4 md:px-8 space-y-4">
+          <div className="text-left space-y-1 select-none">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">INSTRUMEN KOGNITIF AKTIF</span>
+            <h2 className="text-sm font-black text-slate-900 uppercase tracking-wider">Ruang Kerja &amp; Analisis AI</h2>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 border border-slate-200 bg-white shadow-xs rounded-none">
+            {mainModules.map((mod, index) => {
+              const Icon = mod.icon;
+              // Determine border classes dynamically to form a clean flat grid divided only by 1px slate lines
+              let borderClasses = "border-slate-200";
+              if (index === 0) {
+                borderClasses += " border-b md:border-r";
+              } else if (index === 1) {
+                borderClasses += " border-b";
+              } else if (index === 2) {
+                borderClasses += " border-b md:border-b-0 md:border-r";
+              } else if (index === 3) {
+                borderClasses += " border-b-0";
+              }
+
+              return (
+                <button
+                  key={mod.id}
+                  onClick={() => onNavigate(mod.id)}
+                  className={`group text-left bg-white p-6 flex gap-5 transition-colors duration-200 hover:bg-slate-50/50 cursor-pointer rounded-none ${borderClasses}`}
+                >
+                  {/* Icon (no bg) */}
+                  <div className={`w-8 h-8 flex items-center justify-center shrink-0 ${mod.accentText} mt-0.5`}>
+                    <Icon size={24} />
+                  </div>
+
+                  {/* Text Details */}
+                  <div className="flex flex-col flex-1 justify-between gap-2 text-left">
+                    <div>
+                      <div className="flex items-center justify-between gap-2 mb-2 select-none">
+                        <h3 className={`text-xs font-extrabold text-slate-800 uppercase tracking-wide group-hover:${mod.accentText} transition-colors line-clamp-1`}>
+                          {mod.title}
+                        </h3>
+                        <span className={`text-[9px] font-black tracking-widest uppercase shrink-0 ${mod.accentText}`}>
+                          {mod.badge}
+                        </span>
+                      </div>
+                      <p className="text-[11.5px] text-slate-500 leading-relaxed font-normal text-justify">
+                        {mod.desc}
+                      </p>
+                    </div>
+
+                    {/* Footer link */}
+                    <div className={`inline-flex items-center gap-1 text-[10px] font-bold ${mod.accentText} opacity-0 group-hover:opacity-100 uppercase tracking-widest transition-all group-hover:translate-x-1 mt-2 border-t border-slate-100 pt-2.5 w-full justify-between select-none`}>
+                      <span>Mulai Akses Modul</span>
+                      <ChevronRight size={12} />
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
+        {/* SEKSI 4: SPATIAL PREVIEW (Paling Bawah - Expansive Container) */}
+        <section className="w-full px-4 md:px-8 pt-0">
+          <SpatialPreviewWrapper
+            locations={MOCK_DATA.spatialLocations}
+            onNavigate={onNavigate}
+          />
+        </section>
 
       </main>
 
-      {/* ── FOOTER ── */}
-      <footer className="w-full bg-white/80 border-t border-slate-200 py-4 px-6 flex flex-col sm:flex-row items-center justify-between gap-2 text-[10px] text-slate-400 z-10">
+      {/* ── FOOTER UTAMA ── */}
+      <footer className="w-full bg-white/80 border-t border-slate-200 py-4 px-6 flex flex-col sm:flex-row items-center justify-between gap-2 text-[10px] text-slate-400 z-10 select-none">
         <div className="flex items-center gap-2">
           <Database size={11} className="text-teal-500" />
-          <span className="font-medium"> AKLS Platform v1.1.0</span>
+          <span className="font-semibold text-slate-650"> AKLS Platform v1.1.0</span>
         </div>
-        <span>Hak Cipta © 2026 AKLS</span>
+        <span className="font-semibold text-slate-500">Hak Cipta © 2026 AKLS</span>
       </footer>
 
     </div>

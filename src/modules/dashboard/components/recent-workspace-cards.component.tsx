@@ -135,7 +135,7 @@ export const RecentWorkspaceCards: React.FC<RecentWorkspaceCardsProps> = ({
                             >
                                 <div className="space-y-2">
                                     <div className="flex items-center justify-between select-none">
-                                        <span className="text-[9px] font-black text-teal-800 bg-teal-50 px-2 py-0.5 border border-teal-150 uppercase tracking-widest">
+                                        <span className="text-[9px] font-black text-teal-800 uppercase tracking-widest">
                                             {article.tone || 'Solutif'}
                                         </span>
                                         <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
@@ -182,7 +182,7 @@ export const RecentWorkspaceCards: React.FC<RecentWorkspaceCardsProps> = ({
                                 className="flex-1 p-5 flex flex-col justify-between h-48 hover:bg-slate-50/50 cursor-pointer transition-all duration-300 rounded-none relative text-left group"
                             >
                                 <div className="space-y-2">
-                                    <span className="text-[9px] font-black text-teal-800 bg-teal-50 px-2 py-0.5 border border-teal-150 uppercase tracking-widest select-none inline-block">
+                                    <span className="text-[9px] font-black text-teal-800 uppercase tracking-widest select-none inline-block">
                                         Diskusi Faktual RAG
                                     </span>
                                     <h3 className="text-xs font-bold text-slate-800 group-hover:text-teal-800 line-clamp-2 leading-snug transition-colors">

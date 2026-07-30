@@ -42,7 +42,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({ activeRoute, onNavigate, o
             <span className="font-roboto font-bold text-sm tracking-wider text-teal-400 uppercase group-hover:text-teal-300 transition-colors">
               AKLS
             </span>
-            <span className="font-roboto text-[10px] text-slate-400 font-medium hidden sm:inline">
+            <span className="font-roboto text-[12px] text-slate-400 font-medium hidden sm:inline">
               Aplikasi Analisa Kebijakan &amp; Laporan Strategis
             </span>
           </div>

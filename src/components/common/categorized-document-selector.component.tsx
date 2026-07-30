@@ -89,9 +89,9 @@ export const CategorizedDocumentSelector: React.FC<CategorizedDocumentSelectorPr
   };
 
   return (
-    <div className="space-y-4 font-roboto">
+    <div className="space-y-2.5 font-roboto">
       {/* Header Toolbar & Controls */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-200 pb-3">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-200 pb-2">
         <div className="flex items-center gap-2">
           <FileText size={18} className="text-teal-700 shrink-0" />
           <h2 className="text-sm font-bold text-slate-900 tracking-wide uppercase flex items-center gap-2">
@@ -145,18 +145,6 @@ export const CategorizedDocumentSelector: React.FC<CategorizedDocumentSelectorPr
           >
             Kosongkan
           </button>
-
-          {/* {onUploadNew && (
-            <button
-              type="button"
-              onClick={onUploadNew}
-              disabled={isLocked}
-              className="px-2.5 py-1 bg-teal-700 hover:bg-teal-800 disabled:bg-slate-300 text-white text-xs font-bold uppercase rounded-none inline-flex items-center gap-1 cursor-pointer transition-colors disabled:cursor-not-allowed disabled:text-slate-500 disabled:border-slate-300"
-            >
-              <Plus size={13} />
-              <span>+ Unggah</span>
-            </button>
-          )} */}
         </div>
       </div>
 
@@ -187,7 +175,7 @@ export const CategorizedDocumentSelector: React.FC<CategorizedDocumentSelectorPr
         /* Categorized 3-Column Grid (Compact with Max Height Scrollable Columns) */
         <div className={`grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-slate-200 border-slate-200 py-1 font-roboto ${isLocked ? 'opacity-50 pointer-events-none' : ''}`}>
           {/* Group 1: Target (Baseline) */}
-          <div className="p-3 space-y-2">
+          <div className="p-2 space-y-1.5">
             <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
               <span className="text-xs font-bold text-slate-900 uppercase flex items-center gap-1.5">
                 <Target size={14} className="text-teal-700 shrink-0" />
@@ -209,7 +197,7 @@ export const CategorizedDocumentSelector: React.FC<CategorizedDocumentSelectorPr
                 </button>
               )}
             </div>
-            <div className="space-y-1 max-h-48 overflow-y-auto pr-1">
+            <div className="space-y-0.5 max-h-28 overflow-y-auto pr-1 custom-scrollbar">
               {baselineDocs.length === 0 ? (
                 <p className="text-xs text-slate-400 italic py-1">Tidak ada dokumen Target Baseline.</p>
               ) : (
@@ -219,7 +207,7 @@ export const CategorizedDocumentSelector: React.FC<CategorizedDocumentSelectorPr
                     <div
                       key={doc.id}
                       onClick={() => onToggleDoc(doc.id)}
-                      className={`p-2 text-xs cursor-pointer flex items-start gap-2 transition-colors rounded-none ${isSelected
+                      className={`py-0.5 px-1.5 text-xs cursor-pointer flex items-start gap-2 transition-colors rounded-none ${isSelected
                         ? 'bg-teal-50 font-bold text-teal-950'
                         : 'hover:bg-slate-50 text-slate-700'
                         }`}
@@ -238,7 +226,7 @@ export const CategorizedDocumentSelector: React.FC<CategorizedDocumentSelectorPr
           </div>
 
           {/* Group 2: Realisasi (Capaian) */}
-          <div className="p-3 space-y-2">
+          <div className="p-2 space-y-1.5">
             <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
               <span className="text-xs font-bold text-slate-900 uppercase flex items-center gap-1.5">
                 <BarChart3 size={14} className="text-teal-700 shrink-0" />
@@ -260,7 +248,7 @@ export const CategorizedDocumentSelector: React.FC<CategorizedDocumentSelectorPr
                 </button>
               )}
             </div>
-            <div className="space-y-1 max-h-48 overflow-y-auto pr-1">
+            <div className="space-y-0.5 max-h-28 overflow-y-auto pr-1 custom-scrollbar">
               {realizationDocs.length === 0 ? (
                 <p className="text-xs text-slate-400 italic py-1">Tidak ada dokumen Realisasi.</p>
               ) : (
@@ -270,7 +258,7 @@ export const CategorizedDocumentSelector: React.FC<CategorizedDocumentSelectorPr
                     <div
                       key={doc.id}
                       onClick={() => onToggleDoc(doc.id)}
-                      className={`p-2 text-xs cursor-pointer flex items-start gap-2 transition-colors rounded-none ${isSelected
+                      className={`py-0.5 px-1.5 text-xs cursor-pointer flex items-start gap-2 transition-colors rounded-none ${isSelected
                         ? 'bg-teal-50 font-bold text-teal-950'
                         : 'hover:bg-slate-50 text-slate-700'
                         }`}
@@ -289,7 +277,7 @@ export const CategorizedDocumentSelector: React.FC<CategorizedDocumentSelectorPr
           </div>
 
           {/* Group 3: Referensi & Dokumen Lainnya */}
-          <div className="p-3 space-y-2">
+          <div className="p-2 space-y-1.5">
             <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
               <span className="text-xs font-bold text-slate-900 uppercase flex items-center gap-1.5">
                 <Newspaper size={14} className="text-teal-700 shrink-0" />
@@ -311,7 +299,7 @@ export const CategorizedDocumentSelector: React.FC<CategorizedDocumentSelectorPr
                 </button>
               )}
             </div>
-            <div className="space-y-1 max-h-48 overflow-y-auto pr-1">
+            <div className="space-y-0.5 max-h-28 overflow-y-auto pr-1 custom-scrollbar">
               {referenceDocs.length === 0 ? (
                 <p className="text-xs text-slate-400 italic py-1">Tidak ada dokumen Referensi Lain.</p>
               ) : (
@@ -321,7 +309,7 @@ export const CategorizedDocumentSelector: React.FC<CategorizedDocumentSelectorPr
                     <div
                       key={doc.id}
                       onClick={() => onToggleDoc(doc.id)}
-                      className={`p-2 text-xs cursor-pointer flex items-start gap-2 transition-colors rounded-none ${isSelected
+                      className={`py-0.5 px-1.5 text-xs cursor-pointer flex items-start gap-2 transition-colors rounded-none ${isSelected
                         ? 'bg-teal-50 font-bold text-teal-950'
                         : 'hover:bg-slate-50 text-slate-700'
                         }`}

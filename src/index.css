@@ -230,3 +230,54 @@ path.leaflet-interactive:focus-visible {
     transform: translateY(100vh);
   }
 }
+
+/* ============================================================================
+   6. GLOBAL PROSE MARKDOWN RENDER STYLING (BORDERS FOR TABLES & BULLET LISTS)
+   ============================================================================ */
+.prose table {
+  width: 100% !important;
+  border-collapse: collapse !important;
+  margin-top: 1rem !important;
+  margin-bottom: 1rem !important;
+}
+
+.prose table th,
+.prose table td {
+  border: 1px solid #cbd5e1 !important; /* border-slate-300 */
+  padding: 0.5rem 0.75rem !important;
+  text-align: left !important;
+  font-size: 0.825rem !important;
+}
+
+.prose table th {
+  background-color: #f8fafc !important; /* bg-slate-50 */
+  font-weight: 700 !important;
+  color: #0f172a !important;
+}
+
+.prose ul {
+  list-style-type: disc !important;
+  padding-left: 1.5rem !important;
+  margin-top: 0.75rem !important;
+  margin-bottom: 0.75rem !important;
+}
+
+.prose ol {
+  list-style-type: decimal !important;
+  padding-left: 1.5rem !important;
+  margin-top: 0.75rem !important;
+  margin-bottom: 0.75rem !important;
+}
+
+.prose li {
+  margin-top: 0.25rem !important;
+  margin-bottom: 0.25rem !important;
+  display: list-item !important;
+}
+
+.prose h1, .prose h2, .prose h3, .prose h4 {
+  color: #0f172a !important;
+  font-weight: 700 !important;
+  margin-top: 1.25rem !important;
+  margin-bottom: 0.5rem !important;
+}

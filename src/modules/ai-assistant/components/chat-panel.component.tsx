@@ -304,16 +304,57 @@ interface SuggestionChipsProps {
   disabled: boolean;
 }
 
+const normalizeSuggestions = (suggestions?: string[]): string[] => {
+  if (!suggestions || suggestions.length === 0) return [];
+  
+  if (suggestions.length === 1 && typeof suggestions[0] === 'string') {
+    const raw = suggestions[0];
+    
+    if (raw.includes('\n-') || raw.includes(' - ') || raw.includes('? -') || raw.includes('?* -')) {
+      let cleaned = raw.replace(/^##\s*Opsi\s*Lanjutan\s*/i, '').trim();
+      
+      const parts = cleaned
+        .split(/(?:\r?\n)?-\s+/)
+        .map(p => p.trim())
+        .filter(p => p.length > 0);
+      
+      if (parts.length > 1) {
+        return parts;
+      }
+      
+      const inlineParts = cleaned
+        .split(/\?\s+-\s+/)
+        .map((p, idx, arr) => {
+          let item = p.trim();
+          if (idx < arr.length - 1 && !item.endsWith('?')) {
+            item += '?';
+          }
+          return item;
+        })
+        .filter(p => p.length > 0);
+        
+      if (inlineParts.length > 1) {
+        return inlineParts;
+      }
+    }
+  }
+  
+  return suggestions
+    .map(s => s.replace(/^##\s*Opsi\s*Lanjutan\s*/i, '').replace(/^-\s+/, '').trim())
+    .filter(s => s.length > 0);
+};
+
 const SuggestionChips: React.FC<SuggestionChipsProps> = ({
   suggestions,
   onClick,
   disabled,
 }) => {
-  if (!suggestions || suggestions.length === 0) return null;
+  const normalized = normalizeSuggestions(suggestions);
+  if (normalized.length === 0) return null;
 
   return (
     <div className="flex flex-wrap gap-2 mt-3 pt-2.5 border-t border-slate-100 no-print">
-      {suggestions.map((s, idx) => (
+      {normalized.map((s, idx) => (
         <button
           key={idx}
           type="button"
@@ -321,7 +362,7 @@ const SuggestionChips: React.FC<SuggestionChipsProps> = ({
           disabled={disabled}
           className="px-3 py-1.5 bg-teal-50 hover:bg-teal-100 disabled:opacity-50 text-teal-800 hover:text-teal-950 font-bold text-xs border border-teal-200 hover:border-teal-300 rounded-none shadow-2xs transition-colors cursor-pointer disabled:cursor-not-allowed inline-flex items-center gap-1.5"
         >
-          <span>{s}</span>
+          <span>{parseInlineStyles(s)}</span>
           <ArrowRight size={11} className="text-teal-600 shrink-0 animate-pulse" />
         </button>
       ))}
@@ -487,6 +528,27 @@ interface ChatPanelProps {
   onDraftUpdated?: (newDraft: string, title: string) => void; // Sinkronisasi otomatis ke lembar visual kanan [1, 5]
   initialSessionId?: string | null;
 }
+
+const formatLastMessage = (content?: string | null): string => {
+  if (!content) return 'Belum ada pesan.';
+  let text = content;
+  try {
+    const parsed = JSON.parse(content);
+    if (parsed && typeof parsed === 'object') {
+      text = parsed.answer || parsed.fullArticleText || content;
+    }
+  } catch {
+    // Normal string
+  }
+  return text
+    .replace(/\[(?:[a-f0-9-]{8,}|doc(?:[-_a-z0-9]+)?):\d+\]/gi, '')
+    .replace(/#{1,6}\s*/g, '')
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/\*(.*?)\*/g, '$1')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+};
 
 export const ChatPanel: React.FC<ChatPanelProps> = ({
   selectedDocumentId,
@@ -875,18 +937,18 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 h-150 lg:h-162.5">
+    <div className="flex flex-col lg:flex-row border border-slate-300 shadow-2xs h-150 lg:h-162.5 rounded-none overflow-hidden bg-white">
       { }
       {showHistorySidebar && (
-        <div className="bg-white border border-slate-300 flex flex-col rounded-none shadow-xs h-full overflow-hidden">
+        <div className="w-full lg:w-80 shrink-0 flex flex-col h-full bg-white border-b lg:border-b-0 lg:border-r border-slate-300 overflow-hidden">
           <div className="p-3 border-b border-slate-300 bg-slate-100 flex items-center justify-between">
-            <h3 className="text-xs font-bold text-slate-900 uppercase flex items-center gap-1.5">
+            <h3 className="text-xs font-bold text-slate-900 uppercase flex items-center gap-1.5 font-roboto">
               <History size={14} className="text-teal-700" />
               <span>Riwayat Chat DB ({qaSessions.length})</span>
             </h3>
             <button
               onClick={handleCreateNewSession}
-              className="px-2 py-1 bg-teal-700 hover:bg-teal-800 text-white font-bold text-[11px] uppercase tracking-wider rounded-none inline-flex items-center gap-1"
+              className="px-2 py-1 bg-teal-700 hover:bg-teal-800 text-white font-bold text-[11px] uppercase tracking-wider rounded-none inline-flex items-center gap-1 cursor-pointer transition-colors"
               title="Mulai Sesi Chat Baru"
             >
               <Plus size={12} />
@@ -922,13 +984,13 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                       <span className="truncate font-bold text-slate-900 text-[12px]">{s.title}</span>
                       <button
                         onClick={(e) => handleDeleteQaSession(e, s.id)}
-                        className="text-slate-400 hover:text-red-600 shrink-0"
+                        className="text-slate-400 hover:text-red-600 shrink-0 cursor-pointer"
                         title="Hapus Sesi Ini"
                       >
                         <Trash2 size={12} />
                       </button>
                     </div>
-                    <div className="text-[11px] text-slate-500 truncate">{s.lastMessage || 'Belum ada pesan.'}</div>
+                    <div className="text-[11px] text-slate-500 truncate">{formatLastMessage(s.lastMessage)}</div>
                     <div className="text-[10px] text-slate-400 font-medium flex items-center justify-between pt-0.5">
                       <span>{s.messagesCount} Pesan</span>
                       <span>{new Date(s.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
@@ -942,13 +1004,13 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       )}
 
       { }
-      <div className={`bg-white border border-slate-300 flex flex-col rounded-none shadow-xs h-full overflow-hidden ${showHistorySidebar ? 'lg:col-span-3' : 'lg:col-span-4'}`}>
+      <div className="flex-1 flex flex-col h-full overflow-hidden bg-white">
         { }
         <div className="px-6 py-3 border-b border-slate-300 bg-slate-100 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button
               onClick={() => setShowHistorySidebar(!showHistorySidebar)}
-              className="p-1 text-slate-600 hover:text-slate-900 bg-white"
+              className="p-1 text-slate-600 hover:text-slate-900 bg-transparent border-0 cursor-pointer focus:outline-none"
               title="Toggle Sidebar Riwayat Chat"
             >
               <History size={16} />
