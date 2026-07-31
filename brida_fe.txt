@@ -4763,7 +4763,7 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
   };
 
   return (
-    <div className="flex flex-col w-full h-[calc(100vh-180px)] min-h-[600px] bg-slate-100/70 p-4 space-y-4 font-roboto overflow-hidden">
+    <div className="flex flex-col w-full bg-slate-100/70 p-6 space-y-6 font-roboto">
       {}
       {toastMessage && (
         <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-5 py-3 border border-slate-700 shadow-xl flex items-center gap-3 rounded-none animate-in fade-in duration-200">
@@ -4810,7 +4810,7 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
       </div>
 
       {}
-      <div className="flex-1 flex flex-row gap-0 min-h-0 w-full overflow-hidden">
+      <div className="flex flex-row gap-0 w-full h-[850px] overflow-hidden">
 
         {}
         {showHistorySidebar && (
@@ -5170,7 +5170,7 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
           levels: [1, 2, 3],
         },
       }),
-      UnderlineExtension,
+      UnderlineExtension.configure(),
       TextAlign.configure({
         types: ['heading', 'paragraph'],
         alignments: ['left', 'center', 'right', 'justify'],
@@ -5312,7 +5312,7 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
       showToast('🖨️ Mengonversi dan merakit dokumen PDF resmi...');
       const fontSize = fontFamily === 'Times New Roman' ? 11 : fontFamily === 'Verdana' ? 10 : 11;
 
-      await PdfExportService.exportCustomFormattedArticlePdf(
+      const result = await PdfExportService.exportCustomFormattedArticlePdf(
         exportHtmlContent,
         {
           fontFamily,
@@ -5323,7 +5323,11 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
         exportTitle || 'Draf_Artikel_AKLS_Mimika'
       );
 
-      showToast('✅ Dokumen PDF resmi berhasil diunduh!');
+      if (result && result.fallback) {
+        showToast('⚠️ Font kustom tidak ditemukan di server. Dokumen berhasil dicetak menggunakan font default (Roboto).');
+      } else {
+        showToast('✅ Dokumen PDF resmi berhasil diunduh!');
+      }
     } catch (err: any) {
       const displayMsg = err.rawMessage || err.message || 'Gagal melakukan ekspor.';
       console.error('[ArticlePreviewEditor] Gagal generate PDF:', err);
@@ -15684,14 +15688,8 @@ const stripCitationTokens = (content?: string | null): string => {
     .trim();
 };
 
-// Inisialisasi VFS pdfMake dengan biner Roboto bawaan — JANGAN pernah dioverwrite seluruhnya
+// Inisialisasi VFS pdfMake dengan biner Roboto bawaan
 const vfsFonts = (pdfFonts as any)?.pdfMake?.vfs || (pdfFonts as any)?.vfs || (pdfFonts as any);
-if (vfsFonts) {
-  if (!(pdfMake as any).vfs) {
-    (pdfMake as any).vfs = {};
-  }
-  Object.assign((pdfMake as any).vfs, vfsFonts);
-}
 
 // Default font definitions untuk Roboto
 const defaultFonts = {
@@ -15727,6 +15725,13 @@ async function fetchLocalFontToBase64(url: string): Promise<string> {
   if (!response.ok) {
     throw new Error(`Gagal memuat aset biner font dari jalur server lokal: ${url} (HTTP ${response.status})`);
   }
+
+  // Proteksi SPA Fallback: Deteksi jika server mengembalikan HTML alih-alih berkas font asli (.ttf)
+  const contentType = response.headers.get('content-type') || '';
+  if (contentType.includes('text/html')) {
+    throw new Error(`Berkas font tidak ditemukan di server (respon berupa HTML/SPA Fallback): ${url}`);
+  }
+
   const blob = await response.blob();
   return new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
@@ -15754,7 +15759,7 @@ export const PdfExportService = {
     htmlText: string,
     config: PDFFormatConfig,
     filename: string,
-  ): Promise<void> {
+  ): Promise<{ fallback: boolean }> {
     const fontFileMap: Record<string, { normal: string; bold: string; italics: string; bolditalics: string }> = {
       'Times New Roman': { normal: 'times.ttf', bold: 'timesbd.ttf', italics: 'timesi.ttf', bolditalics: 'timesbi.ttf' },
       'Arial': { normal: 'arial.ttf', bold: 'arialbd.ttf', italics: 'ariali.ttf', bolditalics: 'arialbi.ttf' },
@@ -15767,25 +15772,33 @@ export const PdfExportService = {
     const vfsPrefix = files.normal.replace('.ttf', '');
 
     // 1. Ambil berkas font .ttf secara paralel dari /public/fonts/ dengan dukungan cache
-    const [vNormal, vBold, vItalics, vBoldItalics] = await Promise.all([
-      fetchLocalFontToBase64(`/fonts/${files.normal}`),
-      fetchLocalFontToBase64(`/fonts/${files.bold}`),
-      fetchLocalFontToBase64(`/fonts/${files.italics}`),
-      fetchLocalFontToBase64(`/fonts/${files.bolditalics}`),
-    ]);
+    let vNormal = '', vBold = '', vItalics = '', vBoldItalics = '';
+    let useFallbackRoboto = false;
 
-    // 2. Suntikkan biner font ke VFS pdfMake — TAMBAH ke VFS yang sudah ada, jangan replace seluruhnya
-    const customVfs = {
+    try {
+      [vNormal, vBold, vItalics, vBoldItalics] = await Promise.all([
+        fetchLocalFontToBase64(`/fonts/${files.normal}`),
+        fetchLocalFontToBase64(`/fonts/${files.bold}`),
+        fetchLocalFontToBase64(`/fonts/${files.italics}`),
+        fetchLocalFontToBase64(`/fonts/${files.bolditalics}`),
+      ]);
+
+      // Validasi: Berkas font TTF yang valid setidaknya berukuran > 10KB (Base64 length > ~13KB)
+      if (vNormal.length < 13000 || vBold.length < 13000 || vItalics.length < 13000 || vBoldItalics.length < 13000) {
+        throw new Error('Aset font terunduh terlalu kecil (rute teralihkan ke SPA fallback atau kosong).');
+      }
+    } catch (err: any) {
+      console.warn(`[PdfExportService] Gagal memuat font kustom ${config.fontFamily}. Otomatis beralih ke Roboto:`, err);
+      useFallbackRoboto = true;
+    }
+
+    // 2. Biner font kustom disimpan secara lokal untuk dilewatkan ke pembuat dokumen kustom
+    const customVfs = useFallbackRoboto ? {} : {
       [`${vfsPrefix}-Regular.ttf`]: vNormal,
       [`${vfsPrefix}-Bold.ttf`]: vBold,
       [`${vfsPrefix}-Italic.ttf`]: vItalics,
       [`${vfsPrefix}-BoldItalic.ttf`]: vBoldItalics,
     };
-
-    if (!(pdfMake as any).vfs) {
-      (pdfMake as any).vfs = {};
-    }
-    Object.assign((pdfMake as any).vfs, customVfs);
 
     // 3. Konversi satuan margin kertas dari Sentimeter ke Satuan Point (1 cm = ~28.3465 pt)
     const marginPoints = Math.round(config.marginCm * 28.3465);
@@ -15822,10 +15835,10 @@ export const PdfExportService = {
         bolditalics: 'Roboto-MediumItalic.ttf',
       },
       CustomFont: {
-        normal: `${vfsPrefix}-Regular.ttf`,
-        bold: `${vfsPrefix}-Bold.ttf`,
-        italics: `${vfsPrefix}-Italic.ttf`,
-        bolditalics: `${vfsPrefix}-BoldItalic.ttf`,
+        normal: useFallbackRoboto ? 'Roboto-Regular.ttf' : `${vfsPrefix}-Regular.ttf`,
+        bold: useFallbackRoboto ? 'Roboto-Medium.ttf' : `${vfsPrefix}-Bold.ttf`,
+        italics: useFallbackRoboto ? 'Roboto-Italic.ttf' : `${vfsPrefix}-Italic.ttf`,
+        bolditalics: useFallbackRoboto ? 'Roboto-MediumItalic.ttf' : `${vfsPrefix}-BoldItalic.ttf`,
       },
     };
 
@@ -15868,10 +15881,17 @@ export const PdfExportService = {
       content: pdfContent,
     };
 
-    // 7. Render PDF: Set definitions ke instance pdfMake secara lokal dan buat PDF
-    (pdfMake as any).setFonts(fontDefinitions);
+    // 7. Render PDF: Daftarkan VFS dan Font secara global pada objek pdfMake
     const targetFilename = filename.toLowerCase().endsWith('.pdf') ? filename : `${filename}.pdf`;
+    const combinedVfs = {
+      ...(vfsFonts || {}),
+      ...customVfs
+    };
+    (pdfMake as any).fonts = fontDefinitions;
+    (pdfMake as any).vfs = combinedVfs;
+
     (pdfMake as any).createPdf(docDefinition).download(targetFilename);
+    return { fallback: useFallbackRoboto };
   },
 
   /**
@@ -16045,7 +16065,8 @@ export const PdfExportService = {
       },
     };
 
-    (pdfMake as any).setFonts(defaultFonts);
+    (pdfMake as any).fonts = defaultFonts;
+    (pdfMake as any).vfs = vfsFonts;
     const targetFilename = filename || `Analisis_Deviasi_${indicator.id.toUpperCase()}_Mimika.pdf`;
     (pdfMake as any).createPdf(docDefinition).download(targetFilename);
   },
@@ -16194,7 +16215,8 @@ export const PdfExportService = {
       },
     };
 
-    (pdfMake as any).setFonts(defaultFonts);
+    (pdfMake as any).fonts = defaultFonts;
+    (pdfMake as any).vfs = vfsFonts;
     (pdfMake as any).createPdf(docDefinition).download('Nota_Dinas_Resmi_Bupati_Mimika_Maret_2026.pdf');
   },
 

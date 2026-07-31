@@ -393,7 +393,7 @@ export const PdfExportService = {
     };
 
     const targetFilename = filename || `Analisis_Deviasi_${indicator.id.toUpperCase()}_Mimika.pdf`;
-
+    
     // EKSEKUSI PROTECTED VARIATION: Gunakan injeksi lokal secara deterministik untuk parameter ke-3 (fonts) dan ke-4 (vfs) [5]
     (pdfMake as any).createPdf(docDefinition, null, defaultFonts, vfsFonts).download(targetFilename);
   },
