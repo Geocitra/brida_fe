@@ -63,10 +63,7 @@ export const TokenBudgetGuard: React.FC<TokenBudgetGuardProps> = ({ budget, isLo
       {/* Sisi Kiri: Monitor Kuota & Progress Line */}
       <div className="flex-1 space-y-3.5 text-left">
         <div className="flex flex-wrap items-center gap-2.5 select-none">
-          <span className="relative flex h-2 w-2">
-            <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${currentConfig.pulse}`} />
-            <span className={`relative inline-flex h-2 w-2 rounded-full ${currentConfig.pulse}`} />
-          </span>
+         
           <span className="text-[10px] font-black tracking-widest text-slate-400 uppercase">
             PEMANTAUAN KUOTA AI BULANAN
           </span>
@@ -95,8 +92,19 @@ export const TokenBudgetGuard: React.FC<TokenBudgetGuardProps> = ({ budget, isLo
 
       {/* Sisi Kanan: Detail Transaksional dengan Jarak Simetris yang Lega */}
       <div className="flex items-center divide-x divide-slate-200 min-w-full lg:min-w-0 lg:pl-6 text-left no-print">
-        {/* Kolom 1: Estimasi Sisa Saldo (IDR) */}
+        {/* Kolom 1: Total Kredit */}
         <div className="flex flex-col justify-center pr-6">
+          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5 mb-1.5 select-none">
+            <Coins size={11} className="text-teal-700 shrink-0" />
+            <span>Total Kredit</span>
+          </span>
+          <span className="text-lg font-black text-slate-900 tracking-tight font-mono">
+            Rp {maxMonthlyPaguIdr.toLocaleString('id-ID')}
+          </span>
+        </div>
+
+        {/* Kolom 2: Sisa Saldo (IDR) */}
+        <div className="flex flex-col justify-center px-6">
           <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5 mb-1.5 select-none">
             <Coins size={11} className="text-teal-700 shrink-0" />
             <span>Sisa Saldo</span>
@@ -104,12 +112,9 @@ export const TokenBudgetGuard: React.FC<TokenBudgetGuardProps> = ({ budget, isLo
           <span className="text-lg font-black text-slate-900 tracking-tight font-mono">
             Rp {remainingCostIdr.toLocaleString('id-ID')}
           </span>
-          <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-1 select-none">
-            Kredit: Rp {maxMonthlyPaguIdr.toLocaleString('id-ID')}
-          </span>
         </div>
 
-        {/* Kolom 2: Sisa Token */}
+        {/* Kolom 3: Sisa Token */}
         <div className="pl-6 flex flex-col justify-center">
           <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5 mb-1.5 select-none">
             <Database size={11} className="text-teal-700 shrink-0" />
@@ -117,9 +122,6 @@ export const TokenBudgetGuard: React.FC<TokenBudgetGuardProps> = ({ budget, isLo
           </span>
           <span className="text-lg font-black text-slate-900 tracking-tight font-mono">
             {remainingTokens.toLocaleString('id-ID')}
-          </span>
-          <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-1 select-none">
-            Tersedia dari Pagu
           </span>
         </div>
       </div>

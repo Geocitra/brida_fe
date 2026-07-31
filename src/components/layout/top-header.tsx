@@ -74,7 +74,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({ activeRoute, onNavigate, o
 
         {/* Right Status Dot & Logout Button */}
         <div className="flex items-center gap-3 shrink-0">
-          <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse" title="System Online" />
+          
 
           {onLogout && (
             <button
