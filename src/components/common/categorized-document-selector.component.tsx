@@ -121,7 +121,13 @@ export const CategorizedDocumentSelector: React.FC<CategorizedDocumentSelectorPr
             {docSearchQuery && !isLocked && (
               <button
                 type="button"
-            <Search size={13} className="text-slate-400 absolute left-3 top-2.5" />
+                onClick={() => setDocSearchQuery('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer"
+                title="Hapus filter pencarian"
+              >
+                <X size={12} />
+              </button>
+            )}
           </div>
 
           <button

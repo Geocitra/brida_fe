@@ -1,5 +1,5 @@
 import React from 'react';
-import { LucideIcon, FileText } from 'lucide-react';
+import { type LucideIcon, FileText } from 'lucide-react';
 
 interface EmptyStateProps {
   icon?: LucideIcon;
