@@ -4,6 +4,7 @@ import type { DocumentRecord } from '../../../services/document.service';
 import { AiAssistantService, AiServiceException } from '../../../services/ai-assistant.service';
 import type { ArticleSessionDetail } from '../../../services/ai-assistant.service';
 import { CategorizedDocumentSelector } from '../../../components/common/categorized-document-selector.component';
+import { EmptyState } from '../../../components/common/empty-state.component';
 import { ChatInputBar } from '../components/chat-input-bar.component';
 import type { StagedAttachment } from '../components/chat-input-bar.component'; // Type-only import
 import { RichMessageRenderer } from '../components/chat-panel.component';
@@ -579,7 +580,13 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
                   <span>Memuat...</span>
                 </div>
               ) : filteredArticleSessions.length === 0 ? (
-                <p className="text-[10px] text-slate-400 py-8 px-3 italic">Belum ada riwayat naskah.</p>
+                <div className="p-4">
+                  <EmptyState
+                    icon={History}
+                    title="Naskah Kosong"
+                    description="Belum ada riwayat naskah dibuat."
+                  />
+                </div>
               ) : (
                 filteredArticleSessions.map((sess) => {
                   const isActive = activeSessionId === sess.id;

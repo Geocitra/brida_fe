@@ -832,11 +832,11 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
           </div>
 
           {filteredSavedSessions.length === 0 ? (
-            <div className="p-8 text-center text-slate-500 space-y-2">
-              <AlertCircle size={28} className="mx-auto text-slate-400" />
-              <p className="text-xs font-bold">Tidak ada riwayat sesi analisis yang ditemukan.</p>
-              <p className="text-[11px] text-slate-400">Silakan sesuaikan filter pencarian atau jalankan analisis kebijakan baru pada tab aktif.</p>
-            </div>
+            <EmptyState
+              icon={Database}
+              title="Sesi Analisis Tidak Ditemukan"
+              description="Tidak ada riwayat sesi analisis yang ditemukan. Silakan sesuaikan filter pencarian atau jalankan analisis kebijakan baru."
+            />
           ) : (
             <div className="divide-y divide-slate-200">
               {filteredSavedSessions.map((session) => (

@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { AiAssistantService, AiServiceException } from '../../../services/ai-assistant.service';
 import { AiErrorMapper } from '../utils/error-mapper.util';
+import { EmptyState } from '../../../components/common/empty-state.component';
 
 // --- SUB-KOMPONEN 1: PENAMPIL TABEL MARKDOWN DINAMIS ---
 
@@ -963,10 +964,12 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                 <span>Memuat riwayat...</span>
               </div>
             ) : qaSessions.length === 0 ? (
-              <div className="py-8 text-center text-slate-400 text-xs px-3 space-y-1">
-                <MessageSquare size={24} className="mx-auto opacity-50" />
-                <p className="font-semibold">Belum ada riwayat chat.</p>
-                <p className="text-[11px]">Kirim pertanyaan untuk membuat sesi pertama.</p>
+              <div className="p-4">
+                <EmptyState
+                  icon={MessageSquare}
+                  title="Chat Kosong"
+                  description="Kirim pertanyaan untuk membuat sesi pertama."
+                />
               </div>
             ) : (
               qaSessions.map((s) => {

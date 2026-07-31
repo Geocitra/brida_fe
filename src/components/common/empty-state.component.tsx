@@ -15,10 +15,9 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
   actionButton,
 }) => {
   return (
-    <div className="flex flex-col items-center justify-center p-8 border border-dashed border-slate-350 bg-slate-50/30 rounded-none text-center select-none space-y-4 w-full">
-      <div className="w-12 h-12 flex items-center justify-center bg-white border border-slate-200 text-slate-400 rounded-none shadow-xs">
-        <Icon size={20} className="text-slate-500 shrink-0" />
-      </div>
+    <div className="flex flex-col items-center justify-center p-8 border border-dashed border-slate-300 bg-slate-50/30 rounded-none text-center select-none space-y-3 w-full">
+      <Icon size={32} className="text-slate-400 shrink-0" />
+
       <div className="space-y-1 max-w-md">
         <h3 className="text-xs font-black uppercase tracking-wider text-slate-800 font-roboto">
           {title}

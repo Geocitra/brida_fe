@@ -6,6 +6,7 @@ import type { DocumentRecord } from '../../../services/document.service';
 import { ReportService } from '../../../services/report.service';
 import type { GeneratedReportDetail } from '../../../services/report.service';
 import { CategorizedDocumentSelector } from '../../../components/common/categorized-document-selector.component';
+import { EmptyState } from '../../../components/common/empty-state.component';
 import {
   ArrowLeft,
   Download,
@@ -803,11 +804,11 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
               <span>Memuat riwayat laporan tersimpan...</span>
             </div>
           ) : filteredSavedReports.length === 0 ? (
-            <div className="py-12 text-center text-slate-500 space-y-2">
-              <Database size={32} className="mx-auto text-slate-400" />
-              <p className="text-sm font-semibold">Tidak ditemukan laporan yang cocok dengan filter.</p>
-              <p className="text-xs text-slate-400">Coba ubah tanggal kalender atau kata kunci pencarian Anda.</p>
-            </div>
+            <EmptyState
+              icon={Database}
+              title="Laporan Tidak Ditemukan"
+              description="Tidak ditemukan laporan yang cocok dengan filter. Coba ubah tanggal kalender atau kata kunci pencarian Anda."
+            />
           ) : (
             <div className="divide-y divide-slate-200 border border-slate-200">
               {filteredSavedReports.map((report) => (
