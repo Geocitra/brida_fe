@@ -23,6 +23,7 @@ import {
 import { PdfExportService } from '../../../services/pdf-export.service';
 import { DocumentService, type DocumentRecord } from '../../../services/document.service';
 import { ReportService, type CheckCacheResponse } from '../../../services/report.service';
+import { EmptyState } from '../../../components/common/empty-state.component';
 import {
   Download,
   Send,
@@ -526,12 +527,11 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
                 <span>Memuat daftar dokumen dari database...</span>
               </div>
             ) : documents.length === 0 ? (
-              <div className="p-6 bg-slate-50 border border-slate-200 text-center space-y-2">
-                <AlertCircle size={24} className="mx-auto text-slate-400" />
-                <p className="text-xs font-semibold text-slate-700">
-                  Belum ada dokumen diunggah di Repositori.
-                </p>
-              </div>
+              <EmptyState
+                icon={Database}
+                title="Repositori Dokumen Kosong"
+                description="Belum ada dokumen diunggah di Repositori."
+              />
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-slate-200 border-y border-slate-200 py-1">
                 {/* Group 1: Target (Baseline) */}

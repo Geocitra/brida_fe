@@ -12,7 +12,9 @@ import {
   AlertCircle,
   Plus,
   FileText,
+  Database,
 } from 'lucide-react';
+import { EmptyState } from './empty-state.component';
 
 interface CategorizedDocumentSelectorProps {
   documents: DocumentRecord[];
@@ -119,24 +121,18 @@ export const CategorizedDocumentSelector: React.FC<CategorizedDocumentSelectorPr
             {docSearchQuery && !isLocked && (
               <button
                 type="button"
-                onClick={() => setDocSearchQuery('')}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer"
-                title="Hapus filter pencarian"
-              >
-                <X size={12} />
-              </button>
-            )}
+            <Search size={13} className="text-slate-400 absolute left-3 top-2.5" />
           </div>
 
           <button
             type="button"
             onClick={onSelectAll}
             disabled={isLocked}
-            className={`text-xs font-bold text-teal-700 ${isLocked ? 'opacity-40 cursor-not-allowed' : 'hover:underline cursor-pointer'}`}
+            className={`text-xs font-bold ${isLocked ? 'opacity-40 cursor-not-allowed' : 'text-teal-700 hover:text-teal-900 cursor-pointer'}`}
           >
             Pilih Semua
           </button>
-          <span className="text-slate-300 text-xs">&bull;</span>
+          <span className="text-slate-300">|</span>
           <button
             type="button"
             onClick={onClearAll}
@@ -154,23 +150,22 @@ export const CategorizedDocumentSelector: React.FC<CategorizedDocumentSelectorPr
           <span>Memuat daftar dokumen dari database...</span>
         </div>
       ) : documents.length === 0 ? (
-        <div className="p-6 bg-slate-50 border border-slate-200 text-center space-y-2">
-          <AlertCircle size={24} className="mx-auto text-slate-400" />
-          <p className="text-xs font-semibold text-slate-700">
-            Belum ada dokumen terindeks di Repositori database.
-          </p>
-          {onUploadNew && (
+        <EmptyState
+          icon={Database}
+          title="Repositori Dokumen Kosong"
+          description="Belum ada dokumen terindeks di Repositori database."
+          actionButton={onUploadNew && (
             <button
               type="button"
               onClick={onUploadNew}
               disabled={isLocked}
-              className="px-3 py-1.5 bg-teal-700 text-white text-xs font-bold uppercase rounded-none inline-flex items-center gap-1.5 cursor-pointer disabled:bg-slate-300"
+              className="px-4 py-2 bg-teal-700 hover:bg-teal-800 text-white text-xs font-bold uppercase rounded-none inline-flex items-center gap-1.5 cursor-pointer disabled:bg-slate-300"
             >
               <Plus size={13} />
               <span>Unggah Dokumen Acuan Pertama</span>
             </button>
           )}
-        </div>
+        />
       ) : (
         /* Categorized 3-Column Grid (Compact with Max Height Scrollable Columns) */
         <div className={`grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-slate-200 border-slate-200 py-1 font-roboto ${isLocked ? 'opacity-50 pointer-events-none' : ''}`}>

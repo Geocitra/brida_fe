@@ -1,6 +1,7 @@
 import React from 'react';
-import { FileText, Eye, Download, Trash2, Clock } from 'lucide-react';
+import { FileText, Eye, Download, Trash2, Clock, Database } from 'lucide-react';
 import type { DocumentRecord } from '../../../services/document.service';
+import { EmptyState } from '../../../components/common/empty-state.component';
 
 interface DocumentTableProps {
   documents: DocumentRecord[];
@@ -20,9 +21,11 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
 
   if (documents.length === 0) {
     return (
-      <div className="bg-white border border-slate-200 p-8 text-center rounded-none shadow-sm">
-        <p className="text-body text-slate-500">Belum ada dokumen laporan yang diunggah ke dalam sistem.</p>
-      </div>
+      <EmptyState
+        icon={Database}
+        title="Repositori Dokumen Kosong"
+        description="Belum ada dokumen laporan yang diunggah ke dalam sistem. Silakan klik tombol Unggah Dokumen Baru untuk menambahkan berkas acuan."
+      />
     );
   }
 

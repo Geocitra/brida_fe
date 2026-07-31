@@ -27,7 +27,19 @@ export function App() {
     }
   });
 
-  const [activeRoute, setActiveRoute] = useState<string>('landing');
+  const [activeRoute, setActiveRoute] = useState<string>(() => {
+    try {
+      const isAuth = sessionStorage.getItem(AUTH_SESSION_KEY) === 'true';
+      const savedRoute = sessionStorage.getItem('brida_active_route');
+      if (isAuth) {
+        return savedRoute && savedRoute !== 'landing' ? savedRoute : 'dashboard';
+      }
+      return 'landing';
+    } catch {
+      return 'landing';
+    }
+  });
+
   const [initialArticlePrompt, setInitialArticlePrompt] = useState<string | undefined>(undefined);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
 
@@ -56,6 +68,16 @@ export function App() {
       window.scrollTo(0, 0);
     }
   }, [activeRoute]);
+
+  // Simpan rute aktif ke sessionStorage agar bertahan saat reload
+  useEffect(() => {
+    try {
+      sessionStorage.setItem('brida_active_route', activeRoute);
+    } catch (err) {
+      console.warn('[SessionStorage] Gagal menyimpan rute aktif:', err);
+    }
+  }, [activeRoute]);
+
 
   const pageTitles: Record<string, string> = {
     landing: 'Portal Utama & Asisten Analisis',
@@ -95,6 +117,8 @@ export function App() {
       sessionStorage.removeItem(AUTH_SESSION_KEY);
       sessionStorage.removeItem(SESSION_FORWARD_DOCS_KEY);
       sessionStorage.removeItem(PENDING_ROUTE_KEY);
+      sessionStorage.removeItem('brida_active_route');
+      sessionStorage.removeItem('brida_last_activity');
     } catch (err) {
       console.warn('[Auth] Gagal membersihkan session saat logout:', err);
     }
@@ -104,9 +128,59 @@ export function App() {
     setSharedDocIds(undefined);
   };
 
+  // Inactivity timeout guard (15 minutes automatic logout)
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    const INACTIVITY_TIMEOUT = 15 * 60 * 1000; // 15 menit
+    const LAST_ACTIVITY_KEY = 'brida_last_activity';
+
+    const updateActivity = () => {
+      try {
+        sessionStorage.setItem(LAST_ACTIVITY_KEY, Date.now().toString());
+      } catch (err) {
+        // ignore
+      }
+    };
+
+    // Initialize activity timestamp
+    updateActivity();
+
+    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'];
+    const handleEvent = () => updateActivity();
+
+    events.forEach(event => {
+      window.addEventListener(event, handleEvent);
+    });
+
+    const interval = setInterval(() => {
+      try {
+        const lastActivity = sessionStorage.getItem(LAST_ACTIVITY_KEY);
+        if (lastActivity) {
+          const timeDiff = Date.now() - parseInt(lastActivity, 10);
+          if (timeDiff > INACTIVITY_TIMEOUT) {
+            console.log('[Auth] Sesi berakhir karena tidak ada aktivitas selama 15 menit.');
+            handleLogout();
+          }
+        }
+      } catch (err) {
+        // ignore
+      }
+    }, 10000); // Cek setiap 10 detik
+
+    return () => {
+      events.forEach(event => {
+        window.removeEventListener(event, handleEvent);
+      });
+      clearInterval(interval);
+    };
+  }, [isAuthenticated]);
+
+
   const handleNavigationAttempt = (route: string, sessionId?: string | null) => {
-    // Daftar rute publik yang bebas diakses tanpa login
-    const publicRoutes = ['landing', 'gis-explorer'];
+    // Daftar rute publik yang bebas diakses tanpa login (Hanya landing page)
+    const publicRoutes = ['landing'];
+
 
     if (!publicRoutes.includes(route) && !isAuthenticated) {
       // Jika belum login dan mencoba akses modul privat, simpan tujuan & tampilkan login
@@ -188,6 +262,8 @@ export function App() {
         return (
           <LandingView
             onNavigate={handleNavigationAttempt}
+            isAuthenticated={isAuthenticated}
+            onLogout={handleLogout}
           />
         );
       case 'dashboard':
@@ -261,6 +337,8 @@ export function App() {
         return (
           <LandingView
             onNavigate={handleNavigationAttempt}
+            isAuthenticated={isAuthenticated}
+            onLogout={handleLogout}
           />
         );
     }

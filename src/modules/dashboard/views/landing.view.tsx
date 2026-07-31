@@ -15,9 +15,11 @@ import { MOCK_DATA } from '../../../services/mock-data.service';
 
 interface LandingViewProps {
   onNavigate: (route: string) => void;
+  isAuthenticated: boolean;
+  onLogout: () => void;
 }
 
-export const LandingView: React.FC<LandingViewProps> = ({ onNavigate }) => {
+export const LandingView: React.FC<LandingViewProps> = ({ onNavigate, isAuthenticated, onLogout }) => {
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
 
   useEffect(() => {
@@ -131,13 +133,33 @@ export const LandingView: React.FC<LandingViewProps> = ({ onNavigate }) => {
         </div>
 
         {/* Right side navigation */}
-        <div className="flex items-center gap-8">
-          <button 
-            onClick={() => onNavigate('generator')} 
-            className="bg-[#0070c0] hover:bg-blue-700 text-white font-extrabold text-xs uppercase tracking-widest px-6 py-2.5 border-none cursor-pointer transition-colors rounded-none"
-          >
-            MASUK
-          </button>
+        <div className="flex items-center gap-4">
+          {isAuthenticated ? (
+            <>
+              <span className="text-xs font-bold text-slate-650 font-mono hidden sm:inline">
+                {sessionStorage.getItem('brida_executive_name') || 'Eksekutif'}
+              </span>
+              <button 
+                onClick={() => onNavigate('dashboard')} 
+                className="bg-[#0070c0] hover:bg-blue-700 text-white font-extrabold text-xs uppercase tracking-widest px-5 py-2.5 border border-blue-800 cursor-pointer transition-colors rounded-none"
+              >
+                PLATFORM
+              </button>
+              <button 
+                onClick={onLogout} 
+                className="bg-red-650 hover:bg-red-700 text-white font-extrabold text-xs uppercase tracking-widest px-5 py-2.5 border border-red-800 cursor-pointer transition-colors rounded-none"
+              >
+                KELUAR
+              </button>
+            </>
+          ) : (
+            <button 
+              onClick={() => onNavigate('dashboard')} 
+              className="bg-[#0070c0] hover:bg-blue-700 text-white font-extrabold text-xs uppercase tracking-widest px-6 py-2.5 border border-blue-800 cursor-pointer transition-colors rounded-none"
+            >
+              MASUK
+            </button>
+          )}
         </div>
       </header>
 
