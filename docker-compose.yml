@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  brida-fe:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_BASE_URL=https://akls.geocitra.com/api
+    container_name: brida-fe
+    restart: unless-stopped
+    networks:
+      - e-daily-report_default
+
+networks:
+  e-daily-report_default:
+    external: true
