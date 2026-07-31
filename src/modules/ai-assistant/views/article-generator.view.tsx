@@ -499,7 +499,7 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
 
 
   return (
-    <div className="flex flex-col w-full h-[calc(100vh-120px)] min-h-[950px] bg-slate-100/70 p-4 space-y-4 font-roboto overflow-hidden">
+    <div className="flex flex-col w-full bg-slate-100/70 p-6 space-y-6 font-roboto">
       {/* Toast Notification Banner */}
       {toastMessage && (
         <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-5 py-3 border border-slate-700 shadow-xl flex items-center gap-3 rounded-none animate-in fade-in duration-200">
@@ -546,7 +546,7 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
       </div>
 
       {/* SECTION 2. DUAL-PANE COOPERATIVE WORKSPACE AREA */}
-      <div className="flex-1 flex flex-row gap-0 min-h-0 w-full overflow-hidden">
+      <div className="flex flex-row gap-0 w-full h-[850px] overflow-hidden">
 
         {/* Sub-Sidebar: Riwayat Sesi Kolaboratif (Chat History) */}
         {showHistorySidebar && (
