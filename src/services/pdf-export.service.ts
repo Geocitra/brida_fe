@@ -19,7 +19,7 @@ const stripCitationTokens = (content?: string | null): string => {
 // Inisialisasi VFS pdfMake dengan biner Roboto bawaan — JANGAN pernah dioverwrite seluruhnya
 const vfsFonts = (pdfFonts as any)?.pdfMake?.vfs || (pdfFonts as any)?.vfs || (pdfFonts as any);
 if (vfsFonts) {
-  (pdfMake as any).addVirtualFileSystem(vfsFonts);
+  (pdfMake as any).vfs = vfsFonts;
 }
 
 // Default font definitions untuk Roboto

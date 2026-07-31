@@ -165,7 +165,7 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
       setEditableText(htmlContent);
       editor.commands.setContent(htmlContent);
 
-      showToast('💾 Perubahan naskah Anda berhasil disimpan permanen ke database BRIDA!');
+      showToast('💾 Perubahan naskah Anda berhasil disimpan permanen ke database AKLS!');
     } catch (err: any) {
       const displayMsg = err.rawMessage || err.message || 'Gagal menyinkronkan data.';
       showToast(`Gagal menyimpan ke database: ${displayMsg}`);
@@ -258,7 +258,7 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
           lineSpacing,
           marginCm,
         },
-        exportTitle || 'Draf_Artikel_BRIDA_Mimika'
+        exportTitle || 'Draf_Artikel_AKLS_Mimika'
       );
 
       showToast('✅ Dokumen PDF resmi berhasil diunduh!');

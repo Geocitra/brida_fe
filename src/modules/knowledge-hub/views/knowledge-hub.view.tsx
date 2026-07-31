@@ -97,7 +97,7 @@ export const KnowledgeHubView: React.FC<KnowledgeHubViewProps> = ({ onForward })
             Repositori Dokumen
           </h1>
           <p className="text-xs text-slate-500 font-normal mt-1">
-            Repositori pengumpulan dan pengelolaan dokumen acuan makro, laporan realisasi fisik, serta referensi pengetahuan BRIDA.
+            Repositori pengumpulan dan pengelolaan dokumen acuan makro, laporan realisasi fisik, serta referensi pengetahuan AKLS.
           </p>
         </div>
 

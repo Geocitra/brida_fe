@@ -60,12 +60,14 @@ interface AnalyticsViewProps {
   onNavigateToGenerator?: (initialPrompt?: string) => void;
   initialSelectedDocIds?: string[]; // Prop baru hasil forward [3]
   onClearSharedDocIds?: () => void;  // Callback pembersihan [3]
+  onNavigate?: (route: string) => void;
 }
 
 export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
   onNavigateToGenerator,
   initialSelectedDocIds,
   onClearSharedDocIds,
+  onNavigate,
 }) => {
   const [compareResult, setCompareResult] = useState<DeviationCompareResult | null>(null);
 
@@ -531,6 +533,14 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
                 icon={Database}
                 title="Repositori Dokumen Kosong"
                 description="Belum ada dokumen diunggah di Repositori."
+                actionButton={onNavigate && (
+                  <button
+                    onClick={() => onNavigate('knowledge-hub')}
+                    className="px-4 py-2 bg-[#0070c0] hover:bg-blue-700 text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <span>Kelola & Unggah Dokumen Repositori</span>
+                  </button>
+                )}
               />
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-slate-200 border-y border-slate-200 py-1">

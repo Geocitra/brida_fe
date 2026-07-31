@@ -36,6 +36,7 @@ interface ReportsViewProps {
   onNavigateToDashboard?: () => void;
   initialSelectedDocIds?: string[]; // Prop baru hasil forward [3]
   onClearSharedDocIds?: () => void;  // Callback pembersihan [3]
+  onNavigate?: (route: string) => void;
 }
 
 const stripCitationTokens = (content?: string | null): string => {
@@ -87,6 +88,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
   onNavigateToDashboard,
   initialSelectedDocIds,
   onClearSharedDocIds,
+  onNavigate,
 }) => {
   // State for available source documents
   const [documents, setDocuments] = useState<DocumentRecord[]>([]);
@@ -460,6 +462,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
           onClearAll={handleClearAll}
           isLoading={isLoadingDocs}
           onUploadNew={() => setIsUploadModalOpen(true)}
+          onNavigate={onNavigate}
           title="Pilihan Dokumen Acuan Laporan"
         />
 

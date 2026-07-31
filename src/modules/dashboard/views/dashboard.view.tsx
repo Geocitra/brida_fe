@@ -83,7 +83,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               {
                 id: 'sess-art-001',
                 title: 'Rilis Pers: Strategi Penurunan Kemiskinan Ekstrem Mimika',
-                snippet: 'BRIDA Mimika merumuskan 3 rekomendasi taktis akselerasi alokasi dana bantuan sosial pasca penyesuaian tarif BBM daerah...',
+                snippet: 'Tim Analis AKLS merumuskan 3 rekomendasi taktis akselerasi alokasi dana bantuan sosial pasca penyesuaian tarif BBM daerah...',
                 updatedAt: new Date(Date.now() - 1800000).toISOString(), // 30 menit lalu
                 sourcesCount: 3,
                 sources: ['Laporan Kebijakan Pembangunan Mimika 2026', 'Dokumen RTRW & Infrastruktur Wilayah', 'Audit Investigasi Pengadaan Jalan Agimuga'],

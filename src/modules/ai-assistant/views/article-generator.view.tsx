@@ -499,7 +499,7 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
 
 
   return (
-    <div className="flex flex-col w-full h-250 min-h-0 bg-slate-100/70 p-4 space-y-4 font-roboto overflow-hidden">
+    <div className="flex flex-col w-full h-[calc(100vh-180px)] min-h-[600px] bg-slate-100/70 p-4 space-y-4 font-roboto overflow-hidden">
       {/* Toast Notification Banner */}
       {toastMessage && (
         <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-5 py-3 border border-slate-700 shadow-xl flex items-center gap-3 rounded-none animate-in fade-in duration-200">
@@ -672,7 +672,7 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <span className="text-xs font-bold text-slate-800 uppercase tracking-wide">
-                        {msg.sender === 'user' ? 'Editor BRIDA' : 'BRIDA AI Writer'}
+                        {msg.sender === 'user' ? 'Editor AKLS' : 'AKLS AI Writer'}
                       </span>
                       <span className="text-[10px] text-slate-400">{msg.timestamp}</span>
                     </div>
@@ -728,7 +728,7 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
         <div className="w-1/2 h-full flex flex-col min-h-0 bg-white border border-slate-300 shadow-xs overflow-hidden relative">
 
           {isGenerating && (
-            <div className="absolute inset-0 z-40 bg-slate-900/15 backdrop-blur-md flex flex-col items-center justify-center text-teal-900 font-bold space-y-3 no-print animate-in fade-in duration-200">
+            <div className="absolute inset-0 z-30 bg-slate-900/15 backdrop-blur-md flex flex-col items-center justify-center text-teal-900 font-bold space-y-3 no-print animate-in fade-in duration-200">
               <Loader2 size={32} className="animate-spin text-teal-700" />
               <span className="text-xs uppercase tracking-wider bg-white border border-slate-300 px-4 py-2 shadow-sm font-roboto font-extrabold rounded-none">
                 AI sedang menyusun naskah...
@@ -756,7 +756,7 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
                 >
                   {/* Judul Dokumen Terjangkar di Atas Kanvas */}
                   <h1 className="text-center font-bold uppercase border-b-2 border-slate-900 pb-2 mb-6 tracking-wide text-xs">
-                    {articleTitle || 'Draf Naskah Kebijakan BRIDA'}
+                    {articleTitle || 'Draf Naskah Kebijakan AKLS'}
                   </h1>
 
                   {/* 

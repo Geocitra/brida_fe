@@ -52,7 +52,7 @@ export const AiErrorMapper = {
             case 'CONNECTION_FAILURE':
                 return {
                     title: 'Hambatan Koneksi Server',
-                    description: 'Sistem mengalami kegagalan transmisi data sementara dengan server BRIDA Mimika. Silakan pastikan perangkat Anda terhubung ke internet dan coba kirim kembali pesan Anda.',
+                    description: 'Sistem mengalami kegagalan transmisi data sementara dengan server AKLS. Silakan pastikan perangkat Anda terhubung ke internet dan coba kirim kembali pesan Anda.',
                     iconName: 'WifiOff',
                     actionType: 'RETRY',
                 };
@@ -132,7 +132,7 @@ export const AiErrorMapper = {
         if (statusCode >= 500 && statusCode < 600) {
             return {
                 title: 'Kendala Sistem Internal',
-                description: 'Sistem BRIDA sedang mengalami kendala teknis internal saat mengolah data. Tim analis telah diberi tahu untuk melakukan perbaikan. Mohon coba beberapa saat lagi.',
+                description: 'Sistem AKLS sedang mengalami kendala teknis internal saat mengolah data. Tim analis telah diberi tahu untuk melakukan perbaikan. Mohon coba beberapa saat lagi.',
                 iconName: 'AlertCircle',
                 actionType: 'RETRY',
             };

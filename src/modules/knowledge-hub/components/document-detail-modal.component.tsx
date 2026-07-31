@@ -411,7 +411,7 @@ export const DocumentDetailModal: React.FC<DocumentDetailModalProps> = ({ docume
 
                   <div>
                     <dt className="text-slate-500 mb-0.5">Pengunggah</dt>
-                    <dd className="font-bold text-slate-900 text-sm">{currentDoc.metadata?.uploadedBy || 'Kepala BRIDA'}</dd>
+                    <dd className="font-bold text-slate-900 text-sm">{currentDoc.metadata?.uploadedBy || 'Tim Analis AKLS'}</dd>
                   </div>
                 </dl>
               </div>

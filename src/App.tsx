@@ -292,6 +292,7 @@ export function App() {
             initialSelectedDocIds={sharedDocIds}
             onClearSharedDocIds={handleClearSharedDocIds}
             onNavigateToGenerator={(prompt) => handleForwardAction(sharedDocIds || [], 'generator', prompt)}
+            onNavigate={handleNavigationAttempt}
           />
         );
       case 'reports':
@@ -301,6 +302,7 @@ export function App() {
             onClearSharedDocIds={handleClearSharedDocIds}
             onNavigateToGenerator={(prompt) => handleForwardAction(sharedDocIds || [], 'generator', prompt)}
             onNavigateToDashboard={() => handleNavigationAttempt('dashboard')}
+            onNavigate={handleNavigationAttempt}
           />
         );
       case 'ai-request':

@@ -13,6 +13,7 @@ import {
   Plus,
   FileText,
   Database,
+  FolderOpen,
 } from 'lucide-react';
 import { EmptyState } from './empty-state.component';
 
@@ -24,6 +25,7 @@ interface CategorizedDocumentSelectorProps {
   onClearAll: () => void;
   isLoading?: boolean;
   onUploadNew?: () => void;
+  onNavigate?: (route: string) => void;
   title?: string;
   isLocked?: boolean;
 }
@@ -36,6 +38,7 @@ export const CategorizedDocumentSelector: React.FC<CategorizedDocumentSelectorPr
   onClearAll,
   isLoading = false,
   onUploadNew,
+  onNavigate,
   title = 'Pilih Dokumen Acuan Berdasarkan Kategori',
   isLocked = false,
 }) => {
@@ -160,17 +163,29 @@ export const CategorizedDocumentSelector: React.FC<CategorizedDocumentSelectorPr
           icon={Database}
           title="Repositori Dokumen Kosong"
           description="Belum ada dokumen terindeks di Repositori database."
-          actionButton={onUploadNew && (
-            <button
-              type="button"
-              onClick={onUploadNew}
-              disabled={isLocked}
-              className="px-4 py-2 bg-teal-700 hover:bg-teal-800 text-white text-xs font-bold uppercase rounded-none inline-flex items-center gap-1.5 cursor-pointer disabled:bg-slate-300"
-            >
-              <Plus size={13} />
-              <span>Unggah Dokumen Acuan Pertama</span>
-            </button>
-          )}
+          actionButton={
+            onUploadNew ? (
+              <button
+                type="button"
+                onClick={onUploadNew}
+                disabled={isLocked}
+                className="px-4 py-2 bg-teal-700 hover:bg-teal-800 text-white text-xs font-bold uppercase rounded-none inline-flex items-center gap-1.5 cursor-pointer disabled:bg-slate-300"
+              >
+                <Plus size={13} />
+                <span>Unggah Dokumen Acuan Pertama</span>
+              </button>
+            ) : onNavigate ? (
+              <button
+                type="button"
+                onClick={() => onNavigate('knowledge-hub')}
+                disabled={isLocked}
+                className="px-4 py-2 bg-[#0070c0] hover:bg-blue-700 text-white text-xs font-bold uppercase rounded-none inline-flex items-center gap-1.5 cursor-pointer disabled:bg-slate-300"
+              >
+                <FolderOpen size={13} />
+                <span>Unggah & Kelola Dokumen di Repositori</span>
+              </button>
+            ) : null
+          }
         />
       ) : (
         /* Categorized 3-Column Grid (Compact with Max Height Scrollable Columns) */

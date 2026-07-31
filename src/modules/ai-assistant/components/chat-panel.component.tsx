@@ -1079,7 +1079,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
                     <span className="text-xs font-bold text-slate-800 uppercase tracking-wide font-roboto">
-                      {msg.sender === 'user' ? 'User' : 'BRIDA AI Assistant'}
+                      {msg.sender === 'user' ? 'User' : 'AKLS AI Assistant'}
                     </span>
                     <span className="text-[10px] text-slate-400 font-medium">{msg.timestamp}</span>
                   </div>
