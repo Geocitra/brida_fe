@@ -19,7 +19,10 @@ const stripCitationTokens = (content?: string | null): string => {
 // Inisialisasi VFS pdfMake dengan biner Roboto bawaan — JANGAN pernah dioverwrite seluruhnya
 const vfsFonts = (pdfFonts as any)?.pdfMake?.vfs || (pdfFonts as any)?.vfs || (pdfFonts as any);
 if (vfsFonts) {
-  (pdfMake as any).vfs = vfsFonts;
+  if (!(pdfMake as any).vfs) {
+    (pdfMake as any).vfs = {};
+  }
+  Object.assign((pdfMake as any).vfs, vfsFonts);
 }
 
 // Default font definitions untuk Roboto
@@ -111,11 +114,10 @@ export const PdfExportService = {
       [`${vfsPrefix}-BoldItalic.ttf`]: vBoldItalics,
     };
 
-    const currentVfs = (pdfMake as any).vfs || {};
-    (pdfMake as any).vfs = {
-      ...currentVfs, // Pertahankan Roboto bawaan agar html-to-pdfmake tidak crash
-      ...customVfs,
-    };
+    if (!(pdfMake as any).vfs) {
+      (pdfMake as any).vfs = {};
+    }
+    Object.assign((pdfMake as any).vfs, customVfs);
 
     // 3. Konversi satuan margin kertas dari Sentimeter ke Satuan Point (1 cm = ~28.3465 pt)
     const marginPoints = Math.round(config.marginCm * 28.3465);
