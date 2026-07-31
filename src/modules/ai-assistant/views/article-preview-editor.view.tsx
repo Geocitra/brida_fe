@@ -97,7 +97,7 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
           levels: [1, 2, 3],
         },
       }),
-      UnderlineExtension,
+      UnderlineExtension.configure(),
       TextAlign.configure({
         types: ['heading', 'paragraph'],
         alignments: ['left', 'center', 'right', 'justify'],

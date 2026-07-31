@@ -16,14 +16,8 @@ const stripCitationTokens = (content?: string | null): string => {
     .trim();
 };
 
-// Inisialisasi VFS pdfMake dengan biner Roboto bawaan — JANGAN pernah dioverwrite seluruhnya
+// Inisialisasi VFS pdfMake dengan biner Roboto bawaan
 const vfsFonts = (pdfFonts as any)?.pdfMake?.vfs || (pdfFonts as any)?.vfs || (pdfFonts as any);
-if (vfsFonts) {
-  if (!(pdfMake as any).vfs) {
-    (pdfMake as any).vfs = {};
-  }
-  Object.assign((pdfMake as any).vfs, vfsFonts);
-}
 
 // Default font definitions untuk Roboto
 const defaultFonts = {
@@ -106,18 +100,13 @@ export const PdfExportService = {
       fetchLocalFontToBase64(`/fonts/${files.bolditalics}`),
     ]);
 
-    // 2. Suntikkan biner font ke VFS pdfMake — TAMBAH ke VFS yang sudah ada, jangan replace seluruhnya
+    // 2. Biner font kustom disimpan secara lokal untuk dilewatkan ke pembuat dokumen kustom
     const customVfs = {
       [`${vfsPrefix}-Regular.ttf`]: vNormal,
       [`${vfsPrefix}-Bold.ttf`]: vBold,
       [`${vfsPrefix}-Italic.ttf`]: vItalics,
       [`${vfsPrefix}-BoldItalic.ttf`]: vBoldItalics,
     };
-
-    if (!(pdfMake as any).vfs) {
-      (pdfMake as any).vfs = {};
-    }
-    Object.assign((pdfMake as any).vfs, customVfs);
 
     // 3. Konversi satuan margin kertas dari Sentimeter ke Satuan Point (1 cm = ~28.3465 pt)
     const marginPoints = Math.round(config.marginCm * 28.3465);
@@ -200,10 +189,13 @@ export const PdfExportService = {
       content: pdfContent,
     };
 
-    // 7. Render PDF: Set definitions ke instance pdfMake secara lokal dan buat PDF
-    (pdfMake as any).setFonts(fontDefinitions);
+    // 7. Render PDF: Kirim font dan VFS lokal secara terisolasi ke createPdf agar terhindar dari batasan ESM Vite
     const targetFilename = filename.toLowerCase().endsWith('.pdf') ? filename : `${filename}.pdf`;
-    (pdfMake as any).createPdf(docDefinition).download(targetFilename);
+    const combinedVfs = {
+      ...(vfsFonts || {}),
+      ...customVfs
+    };
+    (pdfMake as any).createPdf(docDefinition, undefined, fontDefinitions, combinedVfs).download(targetFilename);
   },
 
   /**
@@ -377,9 +369,8 @@ export const PdfExportService = {
       },
     };
 
-    (pdfMake as any).setFonts(defaultFonts);
     const targetFilename = filename || `Analisis_Deviasi_${indicator.id.toUpperCase()}_Mimika.pdf`;
-    (pdfMake as any).createPdf(docDefinition).download(targetFilename);
+    (pdfMake as any).createPdf(docDefinition, undefined, defaultFonts, vfsFonts).download(targetFilename);
   },
 
   /**
@@ -526,8 +517,7 @@ export const PdfExportService = {
       },
     };
 
-    (pdfMake as any).setFonts(defaultFonts);
-    (pdfMake as any).createPdf(docDefinition).download('Nota_Dinas_Resmi_Bupati_Mimika_Maret_2026.pdf');
+    (pdfMake as any).createPdf(docDefinition, undefined, defaultFonts, vfsFonts).download('Nota_Dinas_Resmi_Bupati_Mimika_Maret_2026.pdf');
   },
 
   /**
