@@ -15,6 +15,7 @@ export interface DocumentRecord {
     category: string;
     uploadedBy: string;
     docType?: 'BASELINE' | 'REALIZATION' | string;
+    sourceUrl?: string;
   };
   chunkCount?: number;
   extractedLocationsCount?: number;

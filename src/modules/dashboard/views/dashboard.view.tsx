@@ -56,9 +56,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               totalTokens: 15000,
               remainingTokens: 20818333,
               estimatedCostIdr: 65,
-              remainingCostIdr: 90315,
+              remainingCostIdr: 79433600,
+              remainingCostUsd: 4.40,
+              totalCreditUsd: 5.00,
               maxMonthlyPaguIdr: 90380,
-              quotaPercentage: 0.1,
+              quotaPercentage: 12.0,
               paguStatus: 'SAFE'
             },
             recentChats: [

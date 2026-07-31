@@ -34,6 +34,7 @@ export interface AiInteractResult {
   intent: string;
   sessionId?: string;
   documentId?: string;
+  documentIds?: string[];
   data: {
     answer?: string;           // Teks jawaban utama dalam format Rich Markdown
     suggestions?: string[];    // Pertanyaan rekomendasi dinamis (chips)

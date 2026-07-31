@@ -54,9 +54,9 @@ export class MarkupConverter {
                 if (alignAttr) {
                     alignment = alignAttr.toLowerCase();
                 } else {
-                    const match = styleAttr.match(/text-align:\s*(left|center|right|justify)/i);
-                    if (match) {
-                        alignment = match[1].toLowerCase();
+                    const styleMatch = styleAttr.match(/text-align:\s*(left|center|right|justify)/i);
+                    if (styleMatch) {
+                        alignment = styleMatch[1].toLowerCase();
                     }
                 }
 
@@ -90,7 +90,31 @@ export class MarkupConverter {
             },
         });
 
+        /**
+         * ATURAN KUSTOM 3 [Open-Closed Principle]: Preservasi Ukuran Font (Font Size WYSIWYG) [1.1.2]
+         * Mencegah Turndown melucuti atribut inline CSS "style='font-size: ...pt'" pada elemen span.
+         * Menjamin ukuran font kustom dari editor tetap terekam secara utuh saat disimpan ke DB.
+         */
+        service.addRule('fontSizeRule', {
+            filter: (node: HTMLElement) => {
+                const tagName = node.nodeName.toLowerCase();
+                const styleAttr = node.getAttribute('style') || '';
+                return tagName === 'span' && styleAttr.includes('font-size');
+            },
+            replacement: (content: string, node: Node) => {
+                const element = node as HTMLElement;
+                const styleAttr = element.getAttribute('style') || '';
+                // Menangkap satuan pt, px, em, maupun rem secara defensif
+                const fontMatch = styleAttr.match(/font-size:\s*([\d.]+(?:pt|px|em|rem))/i);
 
+                if (fontMatch) {
+                    const size = fontMatch[1];
+                    // Kembalikan sebagai span inline murni agar aman terekam dalam format draf Markdown DB
+                    return `<span style="font-size: ${size}">${content}</span>`;
+                }
+                return content;
+            }
+        });
 
         this.turndownService = service;
         return this.turndownService;
@@ -109,13 +133,30 @@ export class MarkupConverter {
         }
 
         try {
-            // Tahap 1: Konversi tag div alignment pembungkus dari database menjadi paragraf CSS inline style
-            let processedMarkdown = markdown.replace(
+            // Bersihkan token sitasi RAG (misal: [doc1:1] atau \\\\\\\\\\\\[doc1:1\\\\\\\\\\\\]) agar tidak tampil di editor naskah
+            let processedMarkdown = markdown.replace(/\\*\[(?:[a-f0-9-]{8,}|doc(?:[-_a-z0-9]+)?):\d+\\*\]/gi, '');
+
+            // Tahap 1: Konversi tag div alignment pembungkus menjadi paragraf individu dengan inline style perataan
+            processedMarkdown = processedMarkdown.replace(
                 /<div align="(left|center|right|justify)">([\s\S]*?)<\/div>/gi,
                 (_, align, content) => {
-                    const cleanContent = content.trim();
-                    // Pertahankan baris baru ganda di dalam block kontainer agar parser marked tetap mengenali list/paragraf
-                    return `\n\n<p style="text-align: ${align.toLowerCase()}">${cleanContent}</p>\n\n`;
+                    const paragraphs = content.split(/\r?\n\s*\r?\n/);
+                    return paragraphs
+                        .map(p => {
+                            const trimmed = p.trim();
+                            if (!trimmed) return '';
+                            // Jika sudah berwujud tag HTML block, biarkan
+                            if (trimmed.startsWith('<p') || trimmed.startsWith('<h') || trimmed.startsWith('<div')) {
+                                return trimmed;
+                            }
+                            // Jika merupakan list markdown atau header, biarkan untuk di-parse oleh marked
+                            if (trimmed.startsWith('#') || trimmed.startsWith('- ') || trimmed.startsWith('* ') || trimmed.match(/^\d+\.\s/)) {
+                                return trimmed;
+                            }
+                            return `<p style="text-align: ${align.toLowerCase()}">${trimmed}</p>`;
+                        })
+                        .filter(Boolean)
+                        .join('\n\n');
                 }
             );
 
@@ -157,6 +198,7 @@ export class MarkupConverter {
             const sanitizedMarkdown = rawMarkdown
                 .replace(/\n{3,}/g, '\n\n')
                 .replace(/&nbsp;/g, ' ') // Konversi entitas non-breaking space menjadi spasi normal
+                .replace(/\\([\[\]])/g, '$1') // Unescape bracket characters (e.g. \[doc1:13\] -> [doc1:13])
                 .trim();
 
             return sanitizedMarkdown;

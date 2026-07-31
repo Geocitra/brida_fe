@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   Send,
   Bot,
@@ -21,10 +21,12 @@ import {
   Paperclip,
   Sparkles,
   FileCheck,
+  Globe,
 } from 'lucide-react';
 import { AiAssistantService, AiServiceException } from '../../../services/ai-assistant.service';
 import { AiErrorMapper } from '../utils/error-mapper.util';
 import { EmptyState } from '../../../components/common/empty-state.component';
+import { DocumentService } from '../../../services/document.service';
 
 // --- SUB-KOMPONEN 1: PENAMPIL TABEL MARKDOWN DINAMIS ---
 
@@ -78,7 +80,7 @@ const MarkdownTableRenderer: React.FC<MarkdownTableRendererProps> = ({ rawTable 
       <div className="border border-slate-300 my-3 p-3 bg-white rounded-none">
         <div className="flex justify-between items-center border-b border-slate-200 pb-2 mb-3 select-none">
           <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Grafik Visualisasi</span>
-          <button 
+          <button
             onClick={() => setViewMode('table')}
             className="px-2.5 py-1 text-[9px] font-bold uppercase tracking-wider border border-slate-300 hover:bg-slate-100 transition-colors rounded-none cursor-pointer"
           >
@@ -98,8 +100,8 @@ const MarkdownTableRenderer: React.FC<MarkdownTableRendererProps> = ({ rawTable 
                   <span className="font-mono text-teal-800">{rawVal}</span>
                 </div>
                 <div className="w-full bg-slate-100 h-2.5 rounded-none overflow-hidden">
-                  <div 
-                    className="bg-teal-700 h-full rounded-none transition-all duration-500" 
+                  <div
+                    className="bg-teal-700 h-full rounded-none transition-all duration-500"
                     style={{ width: `${pct}%` }}
                   />
                 </div>
@@ -116,7 +118,7 @@ const MarkdownTableRenderer: React.FC<MarkdownTableRendererProps> = ({ rawTable 
       {hasChart && (
         <div className="flex justify-between items-center bg-slate-50 px-3 py-1.5 border-b border-slate-200 select-none">
           <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Tabel Data</span>
-          <button 
+          <button
             onClick={() => setViewMode('chart')}
             className="px-2.5 py-1 text-[9px] font-bold uppercase tracking-wider border border-slate-300 hover:bg-slate-100 transition-colors rounded-none cursor-pointer"
           >
@@ -153,9 +155,9 @@ const MarkdownTableRenderer: React.FC<MarkdownTableRendererProps> = ({ rawTable 
   );
 };
 
-// --- SUB-KOMPONEN 2: PARSER & RENDERING MARKDOWN KLIEN ---
+// --- SUB-KOMPONEN 2: PARSER & RENDERING MARKDOWN KLIEN (DENGAN REVOLUSI SITASI BADGE) --- [1.1.2]
 
-const parseInlineStyles = (lineText: string): React.ReactNode[] => {
+const parseInlineStylesRaw = (lineText: string, activeDocIds: string[] = [], allDocs: any[] = []): React.ReactNode[] => {
   const parts: React.ReactNode[] = [];
   let keyIdx = 0;
 
@@ -176,14 +178,100 @@ const parseInlineStyles = (lineText: string): React.ReactNode[] => {
             {subPart}
           </code>,
         );
-      } else if (isBold) {
-        parts.push(
-          <strong key={keyIdx++} className="font-bold text-slate-900">
-            {subPart}
-          </strong>,
-        );
       } else {
-        parts.push(subPart);
+        // Integrasi Pencarian Pola Sitasi Dokumen Lokal/Scraped (RAG Anchor) [1.1.2]
+        const citationRegex = /\[([a-zA-Z0-9-]+):(\d+)\]/gi;
+        let lastIndex = 0;
+        let match;
+        const subParts: React.ReactNode[] = [];
+
+        while ((match = citationRegex.exec(subPart)) !== null) {
+          const matchIndex = match.index;
+
+          if (matchIndex > lastIndex) {
+            subParts.push(subPart.slice(lastIndex, matchIndex));
+          }
+
+          const docId = match[1];
+          const chunkIdx = match[2];
+
+          // Ambil detail metadata sitasi secara dinamis
+          const docMatch = docId.match(/^doc(\d+)$/i);
+          let targetDocId = docId;
+          if (docMatch && activeDocIds.length > 0) {
+            const idx = parseInt(docMatch[1], 10) - 1;
+            if (idx >= 0 && idx < activeDocIds.length) {
+              targetDocId = activeDocIds[idx];
+            }
+          }
+
+          const doc = allDocs.find(d => d.id === targetDocId || d.title.toLowerCase().includes(targetDocId.toLowerCase()));
+          const title = doc ? doc.title : `Dokumen Referensi (${docId})`;
+          const category = doc ? (doc.category || doc.metadata?.category) : 'Referensi Dokumen';
+
+          // Tentukan URL: Prioritaskan sourceUrl eksternal, jika tidak ada, arahkan ke endpoint stream file API backend
+          const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
+          const url = doc
+            ? (doc.metadata?.sourceUrl || (doc.id ? `${API_BASE_URL}/documents/${doc.id}/file` : null))
+            : null;
+
+          subParts.push(
+            <span key={keyIdx++} className="relative inline-block group">
+              {url ? (
+                <a
+                  href={url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-teal-50 hover:bg-teal-100 text-teal-850 border border-teal-200 text-[9px] font-bold font-mono rounded-none mx-0.5 cursor-pointer no-print transition-colors"
+                >
+                  <Globe size={9} className="text-teal-600 shrink-0" />
+                  <span>{`Sitasi:${chunkIdx}`}</span>
+                </a>
+              ) : (
+                <span
+                  className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 text-[9px] font-bold font-mono rounded-none mx-0.5 cursor-help no-print transition-colors"
+                >
+                  <Globe size={9} className="text-slate-500 shrink-0" />
+                  <span>{`Sitasi:${chunkIdx}`}</span>
+                </span>
+              )}
+
+              {/* Hover Reference Card (Rounded-None, Roboto, Sleek Dark Palette) */}
+              <span className="invisible group-hover:visible absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-3 bg-slate-900 text-white rounded-none border border-slate-700 shadow-xl z-50 flex flex-col gap-1.5 pointer-events-none transition-all duration-150 text-left font-roboto">
+                <span className="text-[9px] font-extrabold uppercase tracking-wider text-teal-400">
+                  {category || 'Dokumen Acuan'}
+                </span>
+                <span className="text-[11px] font-bold leading-normal text-slate-100 line-clamp-2">
+                  {title}
+                </span>
+                <span className="text-[9px] text-slate-400 font-medium">
+                  Rujukan Paragraf: #{chunkIdx}
+                </span>
+                {url && (
+                  <span className="text-[9px] font-bold text-teal-300 mt-0.5 flex items-center gap-1">
+                    <Sparkles size={8} /> Klik untuk membuka sumber referensi
+                  </span>
+                )}
+              </span>
+            </span>
+          );
+
+          lastIndex = citationRegex.lastIndex;
+        }
+
+        if (lastIndex < subPart.length) {
+          subParts.push(subPart.slice(lastIndex));
+        }
+
+        if (isBold) {
+          parts.push(
+            <strong key={keyIdx++} className="font-bold text-slate-900">
+              {subParts.length > 0 ? subParts : subPart}
+            </strong>,
+          );
+        } else {
+          subParts.forEach((sp) => parts.push(sp));
+        }
       }
     });
   });
@@ -193,10 +281,34 @@ const parseInlineStyles = (lineText: string): React.ReactNode[] => {
 
 export interface RichMessageRendererProps {
   text: string;
+  activeDocIds?: string[];
 }
 
-export const RichMessageRenderer: React.FC<RichMessageRendererProps> = ({ text }) => {
-  const lines = text.split('\n');
+export const RichMessageRenderer: React.FC<RichMessageRendererProps> = ({ text, activeDocIds = [] }) => {
+  const [allDocs, setAllDocs] = useState<any[]>([]);
+
+  useEffect(() => {
+    DocumentService.listDocuments()
+      .then((docs) => setAllDocs(docs || []))
+      .catch((err) => console.warn('Gagal memuat dokumen untuk rujukan sitasi:', err));
+  }, []);
+
+  const parseInlineStyles = (lineText: string) => {
+    return parseInlineStylesRaw(lineText, activeDocIds, allDocs);
+  };
+
+  // Pre-process and clean up raw HTML tags and escaped brackets to prevent raw render
+  const cleanedText = (text || '')
+    .replace(/<div[^>]*>/gi, '')
+    .replace(/<\/div>/gi, '')
+    .replace(/<span[^>]*>/gi, '')
+    .replace(/<\/span>/gi, '')
+    .replace(/<p[^>]*>/gi, '')
+    .replace(/<\/p>/gi, '')
+    .replace(/\\+\[/g, '[')
+    .replace(/\\+\]/g, ']');
+
+  const lines = cleanedText.split('\n');
   const elements: React.ReactNode[] = [];
 
   let tableBuffer: string[] = [];
@@ -307,22 +419,22 @@ interface SuggestionChipsProps {
 
 const normalizeSuggestions = (suggestions?: string[]): string[] => {
   if (!suggestions || suggestions.length === 0) return [];
-  
+
   if (suggestions.length === 1 && typeof suggestions[0] === 'string') {
     const raw = suggestions[0];
-    
+
     if (raw.includes('\n-') || raw.includes(' - ') || raw.includes('? -') || raw.includes('?* -')) {
       let cleaned = raw.replace(/^##\s*Opsi\s*Lanjutan\s*/i, '').trim();
-      
+
       const parts = cleaned
         .split(/(?:\r?\n)?-\s+/)
         .map(p => p.trim())
         .filter(p => p.length > 0);
-      
+
       if (parts.length > 1) {
         return parts;
       }
-      
+
       const inlineParts = cleaned
         .split(/\?\s+-\s+/)
         .map((p, idx, arr) => {
@@ -333,13 +445,13 @@ const normalizeSuggestions = (suggestions?: string[]): string[] => {
           return item;
         })
         .filter(p => p.length > 0);
-        
+
       if (inlineParts.length > 1) {
         return inlineParts;
       }
     }
   }
-  
+
   return suggestions
     .map(s => s.replace(/^##\s*Opsi\s*Lanjutan\s*/i, '').replace(/^-\s+/, '').trim())
     .filter(s => s.length > 0);
@@ -363,7 +475,7 @@ const SuggestionChips: React.FC<SuggestionChipsProps> = ({
           disabled={disabled}
           className="px-3 py-1.5 bg-teal-50 hover:bg-teal-100 disabled:opacity-50 text-teal-800 hover:text-teal-950 font-bold text-xs border border-teal-200 hover:border-teal-300 rounded-none shadow-2xs transition-colors cursor-pointer disabled:cursor-not-allowed inline-flex items-center gap-1.5"
         >
-          <span>{parseInlineStyles(s)}</span>
+          <span>{parseInlineStylesRaw(s)}</span>
           <ArrowRight size={11} className="text-teal-600 shrink-0 animate-pulse" />
         </button>
       ))}
@@ -453,7 +565,7 @@ const SystemFallbackCard: React.FC<SystemFallbackCardProps> = ({
   );
 };
 
-// --- SUB-KOMPONEN 5: MINI ANCHOR CARD (Pane Sync Indicator) [5] ---
+// --- SUB-KOMPONEN 5: MINI ANCHOR CARD (Pane Sync Indicator) ---
 
 interface MiniAnchorCardProps {
   title: string;
@@ -490,7 +602,7 @@ interface StagedAttachment {
   fileName: string;
   mimeType: string;
   classification?: 'BASELINE' | 'REALIZATION' | 'GENERAL_REFERENCE';
-  base64Data?: string; // Menyimpan pratinjau biner khusus tipe berkas gambar
+  base64Data?: string;
 }
 
 interface ChatMessage {
@@ -501,7 +613,7 @@ interface ChatMessage {
   errorType?: string;
   suggestions?: string[];
   timestamp: string;
-  updatedArticle?: { // Menyimpan snapshot naskah di dalam timeline obrolan
+  updatedArticle?: {
     title: string;
     draftMarkdown: string;
   };
@@ -523,10 +635,10 @@ interface ChatPanelProps {
   selectedDocumentIds?: string[];
   documentTitle?: string;
   documentTitles?: string[];
-  currentDraft?: string; // Draf aktif yang staged dari Pane Kanan [5]
+  currentDraft?: string;
   onArticleIntentDetected?: (promptText: string) => void;
   onLoadingChange?: (loading: boolean) => void;
-  onDraftUpdated?: (newDraft: string, title: string) => void; // Sinkronisasi otomatis ke lembar visual kanan [1, 5]
+  onDraftUpdated?: (newDraft: string, title: string) => void;
   initialSessionId?: string | null;
 }
 
@@ -569,15 +681,12 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const [sessionId, setSessionId] = useState<string | null>(initialSessionId || null);
   const [sessionError, setSessionError] = useState<string | null>(null);
 
-  // Cadangan memori kueri terakhir yang gagal dikirim
   const [lastFailedQuery, setLastFailedQuery] = useState<string | null>(null);
 
   const [qaSessions, setQaSessions] = useState<QaSessionItem[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState<boolean>(false);
   const [showHistorySidebar, setShowHistorySidebar] = useState<boolean>(true);
 
-
-  // Pengelolaan State Berkas Terlampir (Staged Attachments) [5]
   const [stagedAttachments, setStagedAttachments] = useState<StagedAttachment[]>([]);
   const [isUploadingAttachment, setIsUploadingAttachment] = useState(false);
 
@@ -600,6 +709,11 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     ? documentTitles
     : (documentTitle ? [documentTitle] : []);
 
+  // Memindai keberadaan URL secara reaktif dari input obrolan pengguna [1.1.2]
+  const URL_REGEX = /https?:\/\/[^\s]+/gi;
+  const containsUrl = useMemo(() => {
+    return URL_REGEX.test(inputQuery);
+  }, [inputQuery]);
 
   useEffect(() => {
     onLoadingChange?.(isLoading);
@@ -730,9 +844,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     return newSessionId;
   };
 
-  /**
-   * Mengunggah berkas penempelan keyboard (Ctrl+V) atau dari pemilih konvensional secara asinkron [5]
-   */
   const handleUploadStagedAsset = async (file: File) => {
     setIsUploadingAttachment(true);
     setSessionError(null);
@@ -777,9 +888,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     }
   };
 
-  /**
-   * Menangkap penempelan biner screenshot langsung dari clipboard (Ctrl+V) [5]
-   */
   const handlePaste = async (e: React.ClipboardEvent<HTMLInputElement>) => {
     const items = e.clipboardData.items;
     for (let i = 0; i < items.length; i++) {
@@ -787,7 +895,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         const file = items[i].getAsFile();
         if (file) {
           e.preventDefault();
-          // Cek batas maksimal ubin gambar (maksimal 3 per prompt) [5]
           const existingImagesCount = stagedAttachments.filter((att) => att.mimeType.startsWith('image/')).length;
           if (existingImagesCount >= 3) {
             setSessionError('Batas Terlampaui: Anda hanya dapat melampirkan maksimal 3 gambar per prompt.');
@@ -809,9 +916,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     setStagedAttachments((prev) => prev.filter((att) => att.fileId !== fileId));
   };
 
-  /**
-   * Pipa Pemrosesan Pengiriman Pesan Multimodal Utama [5]
-   */
   const executeSendMessage = async (queryText: string) => {
     if (!queryText.trim() && stagedAttachments.length === 0) return;
     if (isLoading) return;
@@ -832,7 +936,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     setIsLoading(true);
     setSessionError(null);
 
-    // Salin antrean lampiran aktif ke variabel lokal sebelum di-reset di UI [5]
     const attachmentsPayload = stagedAttachments.map((att) => ({
       fileId: att.fileId,
       classification: att.classification,
@@ -842,7 +945,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     try {
       const activeSessionId = await getOrCreateSession();
 
-      // Kirim kueri multimodal terpadu berisi instruksi + draf + daftar lampiran [5]
       const response = await AiAssistantService.sendQuery(
         activeSessionId,
         currentQuery,
@@ -855,7 +957,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       const responseSuggestions = response.data.suggestions || [];
       const updatedArticle = response.data.updatedArticle || undefined;
 
-      // Sinkronisasikan naskah draf terbarui langsung ke Pane Kanan secara dinamis (Two-Way Sync) [1, 5]
       if (updatedArticle && onDraftUpdated) {
         onDraftUpdated(updatedArticle.draftMarkdown, updatedArticle.title);
       }
@@ -866,7 +967,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         text: responseText,
         status: 'SUCCESS',
         suggestions: responseSuggestions,
-        updatedArticle, // Rekam snapshot artikel di dalam balon timeline
+        updatedArticle,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
 
@@ -1096,7 +1197,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                         />
                       ) : (
                         <>
-                          <RichMessageRenderer text={msg.text} />
+                          <RichMessageRenderer text={msg.text} activeDocIds={activeDocIds} />
                           {/* Merender Mini Anchor Card secara bersyarat jika draf diperbarui oleh AI [5] */}
                           {msg.updatedArticle && (
                             <MiniAnchorCard title={msg.updatedArticle.title} />
@@ -1117,9 +1218,13 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             ))
           )}
           {isLoading && (
-            <div className="flex gap-3 items-center text-slate-700 text-xs font-roboto font-bold p-5">
+            <div className="flex gap-3 items-center text-slate-700 text-xs font-roboto font-bold p-5 bg-teal-50/10 border-t border-slate-100 select-none">
               <Loader2 size={16} className="animate-spin text-teal-700" />
-              <span>Menganalisis dokumen berdasarkan konteks yang diunggah...</span>
+              {inputQuery.match(URL_REGEX) || messages[messages.length - 1]?.text?.match(URL_REGEX) ? (
+                <span>AI sedang mengunduh, men-sanitasi, dan menganalisis teks dari tautan eksternal secara paralel...</span>
+              ) : (
+                <span>Menganalisis dokumen lokal &amp; melakukan pengayaan data luar secara proaktif...</span>
+              )}
             </div>
           )}
           <div ref={messagesEndRef} />
@@ -1182,12 +1287,20 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         )}
 
         { }
+        {/* Banner Deteksi URL Responsif */}
+        {containsUrl && !isLoading && (
+          <div className="px-4 py-2 bg-teal-50 border-t border-slate-200 text-teal-800 text-[11px] font-bold uppercase tracking-wider flex items-center gap-2 select-none animate-in fade-in duration-150">
+            <span className="w-1.5 h-1.5 rounded-full bg-teal-600 animate-ping" />
+            <Globe size={12} className="text-teal-700" />
+            <span>Link Terdeteksi: AI akan melakukan scraping &amp; penyerapan data eksternal secara hibrida.</span>
+          </div>
+        )}
+
         {/* Input Diskusi Q&A */}
         <div className="p-3 border-t border-slate-300 bg-white no-print">
           <form onSubmit={handleFormSubmit} className="flex flex-col sm:flex-row gap-3">
             <div className="flex-1 flex items-center border border-slate-400 focus-within:border-teal-600 bg-slate-50 transition-colors">
 
-              {/* Tombol Klip Kertas Kustom */}
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
@@ -1214,7 +1327,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                 type="text"
                 value={inputQuery}
                 onChange={(e) => setInputQuery(e.target.value)}
-                onPaste={handlePaste} // Listener penempelan biner (Ctrl+V) [5]
+                onPaste={handlePaste}
                 placeholder="Ketik pertanyaan / draf revisi Anda di sini..."
                 disabled={isLoading || isUploadingAttachment}
                 className="flex-1 bg-transparent px-4 py-3 text-xs text-slate-900 font-semibold focus:outline-none disabled:opacity-50"
@@ -1270,7 +1383,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
             <div className="space-y-4">
               <p className="text-xs text-slate-600 leading-relaxed font-semibold text-justify">
-                AI Engine akan mengambil seluruh riwayat tanya-jawab dalam sesi diskusi ini secara kronologis, men-distilasi konsensus obrolan, kemudian melahirkan sesi draf artikel baru yang independen dengan mengamankan keterkaitan sitasi dokumen asal.
+                AI Engine akan mengambil seluruh riwayat tanya-jawab dalam sesi diskusi ini secara kronologis, men-distilasi konsensus obrolan, kemudian melahirkan sesi draf artikel baru yang indeksnya diikat ke dokumen asal.
               </p>
 
               <div className="space-y-1.5">
@@ -1360,7 +1473,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                 ) : (
                   <>
                     <PenTool size={13} />
-                    <span>Mulai Transisi Sesi</span>
+                    <span>Mulai Sesi Transisi</span>
                   </>
                 )}
               </button>
@@ -1373,5 +1486,3 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     </div>
   );
 };
-
-export default ChatPanel;

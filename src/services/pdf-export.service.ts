@@ -1,7 +1,29 @@
 import pdfMake from 'pdfmake/build/pdfmake';
-import pdfFonts from 'pdfmake/build/vfs_fonts';
 import htmlToPdfmake from 'html-to-pdfmake';
+// @ts-ignore
+import pdfFonts from 'pdfmake/build/vfs_fonts';
+import customVfs from '../assets/fonts/vfs_fonts';
 
+/**
+ * Ambil dict VFS Roboto asli dari pdfmake/build/vfs_fonts.
+ * pdfFonts adalah module object { pdfMake: { vfs: {...} } }, BUKAN dict langsung.
+ * Jangan assign di module level — selalu merge saat dipakai agar tidak ada race condition.
+ */
+const getRobotoVfs = (): Record<string, string> => {
+  // Handle dua bentuk export yang berbeda antar versi pdfmake
+  if (pdfFonts && (pdfFonts as any).pdfMake?.vfs) {
+    return (pdfFonts as any).pdfMake.vfs;
+  }
+  if (pdfFonts && typeof pdfFonts === 'object' && !Array.isArray(pdfFonts)) {
+    // Mungkin sudah di-unwrap oleh bundler
+    return pdfFonts as any;
+  }
+  return {};
+};
+
+/**
+ * Utilitas untuk membersihkan token sitasi RAG sebelum diekspor ke PDF
+ */
 const stripCitationTokens = (content?: string | null): string => {
   if (!content) return '';
 
@@ -16,22 +38,6 @@ const stripCitationTokens = (content?: string | null): string => {
     .trim();
 };
 
-// Inisialisasi VFS pdfMake dengan biner Roboto bawaan secara lokal
-const vfsFonts = (pdfFonts as any)?.pdfMake?.vfs || (pdfFonts as any)?.vfs || (pdfFonts as any);
-
-// Default font definitions untuk Roboto
-const defaultFonts = {
-  Roboto: {
-    normal: 'Roboto-Regular.ttf',
-    bold: 'Roboto-Medium.ttf',
-    italics: 'Roboto-Italic.ttf',
-    bolditalics: 'Roboto-MediumItalic.ttf',
-  }
-};
-
-// Cache biner font kustom di memori untuk menghindari HTTP fetch berulang
-const fontVfsCache: Record<string, string> = {};
-
 /**
  * Interface Konfigurasi Tata Letak Halaman PDF Dinamis (OCP)
  */
@@ -42,105 +48,54 @@ export interface PDFFormatConfig {
   marginCm: number;
 }
 
-/**
- * Mengunduh berkas biner font lokal secara asinkron dan mengonversinya ke Base64.
- * Menggunakan cache in-memory untuk mencegah HTTP round-trip ganda pada ekspor berulang.
- */
-async function fetchLocalFontToBase64(url: string): Promise<string> {
-  if (fontVfsCache[url]) return fontVfsCache[url];
-
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`Gagal memuat aset biner font dari jalur server lokal: ${url} (HTTP ${response.status})`);
-  }
-
-  // Proteksi SPA Fallback: Deteksi jika server mengembalikan HTML alih-alih berkas font asli (.ttf)
-  const contentType = response.headers.get('content-type') || '';
-  if (contentType.includes('text/html')) {
-    throw new Error(`Berkas font tidak ditemukan di server (respon berupa HTML/SPA Fallback): ${url}`);
-  }
-
-  const blob = await response.blob();
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const base64String = reader.result as string;
-      const base64Data = base64String.split(',')[1]; // Ambil data Base64 mentah
-      fontVfsCache[url] = base64Data; // Simpan ke cache
-      resolve(base64Data);
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
-  });
-}
-
 export const PdfExportService = {
   /**
-   * Mengambil draf HTML interaktif, menyuntikkan font kustom secara dinamis,
-   * dan mencetak dokumen PDF formal dengan format presisi (WYSIWYG).
+   * Mengambil draf HTML interaktif, mendaftarkan VFS luring statis,
+   * dan mencetak dokumen PDF formal dengan format WYSIWYG presisi.
    */
   async exportCustomFormattedArticlePdf(
     htmlText: string,
     config: PDFFormatConfig,
     filename: string,
   ): Promise<{ fallback: boolean }> {
-    const fontFileMap: Record<string, { normal: string; bold: string; italics: string; bolditalics: string }> = {
-      'Times New Roman': { normal: 'times.ttf', bold: 'timesbd.ttf', italics: 'timesi.ttf', bolditalics: 'timesbi.ttf' },
-      'Arial': { normal: 'arial.ttf', bold: 'arialbd.ttf', italics: 'ariali.ttf', bolditalics: 'arialbi.ttf' },
-      'Verdana': { normal: 'verdana.ttf', bold: 'verdanab.ttf', italics: 'verdanai.ttf', bolditalics: 'verdanaz.ttf' },
-      'Calibri': { normal: 'calibri.ttf', bold: 'calibrib.ttf', italics: 'calibrii.ttf', bolditalics: 'calibriz.ttf' },
+
+    // ── Pemetaan font ke berkas VFS kustom luring [1.1.2] ──────────────────
+    // Setiap entri map ke file .ttf yang sudah ada di customVfs / vfs_fonts.ts
+    type FontFileSet = { normal: string; bold: string; italics: string; bolditalics: string };
+
+    const fontFileMap: Record<string, FontFileSet> = {
+      'Calibri': {
+        normal: 'calibri.ttf',
+        bold: 'calibrib.ttf',
+        italics: 'calibrii.ttf',
+        bolditalics: 'calibriz.ttf',
+      },
+      'Times New Roman': {
+        normal: 'times.ttf',
+        bold: 'timesbd.ttf',
+        italics: 'timesi.ttf',
+        bolditalics: 'timesbi.ttf',
+      },
+      'Verdana': {
+        normal: 'verdana.ttf',
+        bold: 'verdanab.ttf',
+        italics: 'verdanai.ttf',
+        bolditalics: 'verdanaz.ttf',
+      },
+      'Arial': {
+        normal: 'arial.ttf',
+        bold: 'arialbd.ttf',
+        italics: 'ariali.ttf',
+        bolditalics: 'arialbi.ttf',
+      },
     };
 
-    const files = fontFileMap[config.fontFamily] || fontFileMap['Arial'];
-    const vfsPrefix = files.normal.replace('.ttf', '');
+    const selectedFontFiles = fontFileMap[config.fontFamily] ?? fontFileMap['Calibri'];
 
-    let vNormal = '', vBold = '', vItalics = '', vBoldItalics = '';
-    let useFallbackRoboto = false;
+    // Gunakan nama font tanpa spasi sebagai key pdfMake (pdfMake tidak support nama dengan spasi)
+    const pdfFontName = config.fontFamily.replace(/\s+/g, '');
 
-    try {
-      [vNormal, vBold, vItalics, vBoldItalics] = await Promise.all([
-        fetchLocalFontToBase64(`/fonts/${files.normal}`),
-        fetchLocalFontToBase64(`/fonts/${files.bold}`),
-        fetchLocalFontToBase64(`/fonts/${files.italics}`),
-        fetchLocalFontToBase64(`/fonts/${files.bolditalics}`),
-      ]);
-
-      if (vNormal.length < 13000 || vBold.length < 13000 || vItalics.length < 13000 || vBoldItalics.length < 13000) {
-        throw new Error('Aset font terunduh terlalu kecil.');
-      }
-    } catch (err: any) {
-      console.warn(`[PdfExportService] Gagal memuat font kustom ${config.fontFamily}. Otomatis beralih ke Roboto:`, err);
-      useFallbackRoboto = true;
-    }
-
-    const customVfs = useFallbackRoboto ? {} : {
-      [`${vfsPrefix}-Regular.ttf`]: vNormal,
-      [`${vfsPrefix}-Bold.ttf`]: vBold,
-      [`${vfsPrefix}-Italic.ttf`]: vItalics,
-      [`${vfsPrefix}-BoldItalic.ttf`]: vBoldItalics,
-    };
-
-    const marginPoints = Math.round(config.marginCm * 28.3465);
-
-    let sanitizedHtml = htmlText.trim();
-    const trailingEmptyRegex = /(?:<p>\s*<\/p>|<p>\s*<br\s*\/?>\s*<\/p>|<p>&nbsp;<\/p>|<br\s*\/?>)+$/i;
-    sanitizedHtml = sanitizedHtml.replace(trailingEmptyRegex, '').trim();
-
-    const pdfContent = htmlToPdfmake(sanitizedHtml, {
-      window: window,
-      ignoreStyles: ['font-family'],
-      removeExtraBlanks: true,
-      customStyles: {
-        'p': { margin: [0, 0, 0, 8], alignment: 'justify' },
-        'ul': { margin: [10, 4, 0, 8] },
-        'ol': { margin: [10, 4, 0, 8] },
-        'li': { margin: [0, 2, 0, 2], lineHeight: config.lineSpacing },
-        'h1': { margin: [0, 12, 0, 6], bold: true },
-        'h2': { margin: [0, 10, 0, 4], bold: true },
-        'h3': { margin: [0, 8, 0, 4], bold: true },
-      }
-    });
-
+    // Pendaftaran font definitions — wajib ada Roboto sebagai fallback sistem pdfMake
     const fontDefinitions: any = {
       Roboto: {
         normal: 'Roboto-Regular.ttf',
@@ -148,38 +103,46 @@ export const PdfExportService = {
         italics: 'Roboto-Italic.ttf',
         bolditalics: 'Roboto-MediumItalic.ttf',
       },
-      CustomFont: {
-        normal: useFallbackRoboto ? 'Roboto-Regular.ttf' : `${vfsPrefix}-Regular.ttf`,
-        bold: useFallbackRoboto ? 'Roboto-Medium.ttf' : `${vfsPrefix}-Bold.ttf`,
-        italics: useFallbackRoboto ? 'Roboto-Italic.ttf' : `${vfsPrefix}-Italic.ttf`,
-        bolditalics: useFallbackRoboto ? 'Roboto-MediumItalic.ttf' : `${vfsPrefix}-BoldItalic.ttf`,
-      },
+      [pdfFontName]: selectedFontFiles,
     };
+
+    // Konversi Margin cm ke Satuan Poin pdfMake (1 cm = 28.3465 pt)
+    const marginPoints = Math.round(config.marginCm * 28.3465);
+
+    // Bersihkan spasi kosong berlebih di akhir dokumen
+    let sanitizedHtml = htmlText.trim();
+    const trailingEmptyRegex = /(?:<p>\s*<\/p>|<p>\s*<br\s*\/?>\s*<\/p>|<p>&nbsp;<\/p>|<br\s*\/?>)+$/i;
+    sanitizedHtml = sanitizedHtml.replace(trailingEmptyRegex, '').trim();
+
+    // Konversi HTML ke objek pdfMake
+    // CATATAN: ignoreStyles['font-family'] DIHAPUS agar inline style font dari Tiptap terbawa
+    const pdfContent = htmlToPdfmake(sanitizedHtml, {
+      window: window,
+      removeExtraBlanks: true,
+      customStyles: {
+        'p': { margin: [0, 0, 0, 12], alignment: 'justify' },
+        'ul': { margin: [10, 4, 0, 12] },
+        'ol': { margin: [10, 4, 0, 12] },
+        'li': { margin: [0, 2, 0, 2], lineHeight: config.lineSpacing },
+      }
+    });
 
     const docDefinition: any = {
       pageSize: 'A4',
       pageMargins: [marginPoints, marginPoints, marginPoints, marginPoints],
       defaultStyle: {
-        font: 'CustomFont',
+        font: pdfFontName, // Font yang dipilih user, bukan hardcoded
         fontSize: config.fontSize,
         lineHeight: config.lineSpacing,
         alignment: 'justify',
       },
       styles: {
-        'html-ul': { margin: [10, 2, 0, 6] },
-        'html-ol': { margin: [10, 2, 0, 6] },
+        'html-ul': { margin: [10, 2, 0, 12] },
+        'html-ol': { margin: [10, 2, 0, 12] },
         'html-li': { lineHeight: config.lineSpacing, margin: [0, 1, 0, 1] }
-      },
-      header: {
-        text: 'Geo Analisis ANALYSIS',
-        alignment: 'right',
-        fontSize: 8,
-        color: '#94a3b8',
-        margin: [marginPoints, 30, marginPoints, 0],
       },
       footer: (currentPage: number, pageCount: number) => ({
         columns: [
-          { text: 'Naskah Publikasi Resmi', fontSize: 8, color: '#94a3b8' },
           { text: `Halaman ${currentPage} dari ${pageCount}`, alignment: 'right', fontSize: 8, color: '#94a3b8' },
         ],
         margin: [marginPoints, 10, marginPoints, 0],
@@ -188,23 +151,22 @@ export const PdfExportService = {
     };
 
     const targetFilename = filename.toLowerCase().endsWith('.pdf') ? filename : `${filename}.pdf`;
-    const combinedVfs = {
-      ...(vfsFonts || {}),
-      ...customVfs
-    };
 
-    // SINKRONISASI ARSITEKTUR PDFMAKE 0.3.x: Gunakan API resmi asinkron/ESM untuk registrasi VFS dan Fonts kustom
-    (pdfMake as any).addVirtualFileSystem(combinedVfs);
-    (pdfMake as any).addFonts(fontDefinitions);
+    // Set VFS: gabungkan Roboto asli + custom fonts kita.
+    // Ini dilakukan di sini (bukan module level) agar getRobotoVfs() sudah fully loaded.
+    (pdfMake as any).vfs = { ...getRobotoVfs(), ...customVfs };
 
-    // Jalankan kompilasi dokumen
+    // Daftarkan font definitions ke pdfMake
+    (pdfMake as any).fonts = fontDefinitions;
+
+    // Eksekusi kompilasi dan unduh berkas
     (pdfMake as any).createPdf(docDefinition).download(targetFilename);
 
-    return { fallback: useFallbackRoboto };
+    return { fallback: false };
   },
 
   /**
-   * Export Diagnostik Deviasi Indikator ke PDF Vector Pristine (pdfMake)
+   * Export Diagnostik Deviasi Indikator ke PDF Vector Pristine
    */
   exportAnalyticsPdf(indicator: any, filename?: string): void {
     const docDefinition: any = {
@@ -321,22 +283,18 @@ export const PdfExportService = {
 
     const targetFilename = filename || `Analisis_Deviasi_${indicator.id.toUpperCase()}_Mimika.pdf`;
 
-    // SINKRONISASI ARSITEKTUR PDFMAKE 0.3.x: Gunakan API resmi asinkron/ESM untuk registrasi VFS dan Fonts kustom
-    (pdfMake as any).addVirtualFileSystem(vfsFonts);
-    (pdfMake as any).addFonts(defaultFonts);
-
     (pdfMake as any).createPdf(docDefinition).download(targetFilename);
   },
 
   /**
-   * Export Naskah Resmi Nota Dinas Bupati ke PDF Vector Pristine (pdfMake)
+   * Export Naskah Resmi Nota Dinas Bupati ke PDF Vector Pristine
    */
   exportBupatiReportPdf(report: any): void {
     const docDefinition: any = {
       pageSize: 'A4',
       pageMargins: [50, 90, 50, 45],
       defaultStyle: {
-        font: 'Roboto',
+        font: 'CustomFont',
         fontSize: 10,
         lineHeight: 1.45,
         alignment: 'justify',
@@ -351,8 +309,8 @@ export const PdfExportService = {
       content: [
         // ── Kop Surat ──────────────────────────────────────────────────────────
         { text: 'DOKUMEN REKOMENDASI KEBIJAKAN', fontSize: 13, bold: true, alignment: 'center', color: '#0f172a' },
-        { text: 'ANALISIS Geo Analisis', fontSize: 11, bold: true, alignment: 'center', color: '#0d9488', margin: [0, 3, 0, 3] },
-        { text: 'Sistem Informasi dan Dashboard Kebijakan Terintegrasi', fontSize: 8.5, alignment: 'center', color: '#565c63', margin: [0, 0, 0, 10] },
+        { text: 'ANALISIS KEBAN KANAN KEBIJAKAN DAERAH MIMIKA', fontSize: 11, bold: true, alignment: 'center', color: '#0d9488', margin: [0, 3, 0, 3] },
+        { text: 'Badan Riset dan Inovasi Daerah (BRIDA) Kabupaten Mimika', fontSize: 8.5, alignment: 'center', color: '#565c63', margin: [0, 0, 0, 10] },
         { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 495, y2: 0, lineWidth: 2, lineColor: '#0f172a' }], margin: [0, 0, 0, 14] },
         // ── Judul Nota ─────────────────────────────────────────────────────────
         { text: report.title, fontSize: 13, bold: true, alignment: 'left', color: '#0f172a', margin: [0, 0, 0, 14] },
@@ -361,7 +319,10 @@ export const PdfExportService = {
           table: {
             widths: [85, 6, '*'],
             body: [
-              [{ text: 'PERIODE', bold: true, fontSize: 9, alignment: 'left' }, ':', { text: `${report.date}`, fontSize: 9, alignment: 'left' }],
+              [{ text: 'PERIODE', bold: true, fontSize: 9, alignment: 'left' }, ':', { text: `${report.period}`, fontSize: 9, alignment: 'left' }],
+              [{ text: 'PENERIMA', bold: true, fontSize: 9, alignment: 'left' }, ':', { text: `${report.recipient}`, fontSize: 9, alignment: 'left' }],
+              [{ text: 'PENGIRIM', bold: true, fontSize: 9, alignment: 'left' }, ':', { text: `${report.sender}`, fontSize: 9, alignment: 'left' }],
+              [{ text: 'TANGGAL RILIS', bold: true, fontSize: 9, alignment: 'left' }, ':', { text: `${report.date}`, fontSize: 9, alignment: 'left' }],
             ],
           },
           layout: 'noBorders',
@@ -395,8 +356,8 @@ export const PdfExportService = {
             body: [
               [
                 { text: 'Indikator Pembangunan', style: 'tableHeader' },
-                { text: 'Baseline', style: 'tableHeader' },
-                { text: 'Realisasi', style: 'tableHeader' },
+                { text: 'Baseline Target', style: 'tableHeader' },
+                { text: 'Realisasi Aktual', style: 'tableHeader' },
                 { text: 'Status Deviasi', style: 'tableHeader' },
               ],
               ...report.deviations.map((d: any) => [
@@ -442,9 +403,9 @@ export const PdfExportService = {
             {
               width: 200,
               stack: [
-                { text: 'Tim Analis Kebijakan,', fontSize: 9, alignment: 'center' },
+                { text: 'Kepala Badan Riset & Inovasi,', fontSize: 9, alignment: 'center' },
                 { text: '\n\n\n', fontSize: 9 },
-                { text: 'Analis Kebijakan Utama', fontSize: 9.5, bold: true, alignment: 'center' },
+                { text: 'Darius Sabon Rain, S.E., M.Ec.Dev.', fontSize: 9.5, bold: true, alignment: 'center' },
                 { text: 'NIP. 19780412 200312 1 002', fontSize: 8.5, alignment: 'center', color: '#475569', margin: [0, 2, 0, 0] },
               ],
             },
@@ -469,9 +430,18 @@ export const PdfExportService = {
       },
     };
 
-    // SINKRONISASI ARSITEKTUR PDFMAKE 0.3.x: Gunakan API resmi asinkron/ESM untuk registrasi VFS dan Fonts kustom
-    (pdfMake as any).addVirtualFileSystem(vfsFonts);
-    (pdfMake as any).addFonts(defaultFonts);
+    const fontDefinitions: any = {
+      CustomFont: {
+        normal: 'Roboto-Regular.ttf',
+        bold: 'Roboto-Medium.ttf',
+        italics: 'Roboto-Italic.ttf',
+        bolditalics: 'Roboto-MediumItalic.ttf',
+      },
+    };
+
+    // Set VFS (konsisten dengan exportCustomFormattedArticlePdf)
+    (pdfMake as any).vfs = { ...getRobotoVfs(), ...customVfs };
+    (pdfMake as any).fonts = fontDefinitions;
 
     (pdfMake as any).createPdf(docDefinition).download('Nota_Dinas_Resmi_Bupati_Mimika_Maret_2026.pdf');
   },
@@ -491,7 +461,7 @@ export const PdfExportService = {
         deviationText: '-22.7% (KRITIS)',
         causalFactors: [
           { label: 'Evaluasi & Verifikasi Administratif Proyek', percentage: 45 },
-          { text: 'Eskalasi Biaya & Logistik Wilayah', percentage: 35 },
+          { factor: 'Eskalasi Biaya & Logistik Wilayah', percentage: 35 },
           { label: 'Faktor Hambatan Cuaca Ekstrem', percentage: 20 },
         ],
         priorityRecommendations: [
@@ -516,12 +486,12 @@ export const PdfExportService = {
       realization: compareResult.math?.realizationText || '0%',
       deviationText,
       causalFactors: (compareResult.causal?.causalFactors || []).map((f: any) => ({
-        text: f.factor,
-        percentage: f.weightPercentage,
+        factor: f.factor,
+        weightPercentage: f.weightPercentage,
       })),
       priorityRecommendations: (compareResult.causal?.recommendations || []).map((rec: any) => ({
         priority: rec.priority,
-        title: rec.actionTitle,
+        actionTitle: rec.actionTitle,
         pic: rec.pic,
         deadline: rec.deadline,
       })),

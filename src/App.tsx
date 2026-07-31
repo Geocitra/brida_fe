@@ -41,7 +41,13 @@ export function App() {
   });
 
   const [initialArticlePrompt, setInitialArticlePrompt] = useState<string | undefined>(undefined);
-  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(() => {
+    try {
+      return sessionStorage.getItem('brida_active_session_id');
+    } catch {
+      return null;
+    }
+  });
 
   // State untuk menampilkan modal/tampilan login interseptor
   const [showLoginModal, setShowLoginModal] = useState<boolean>(false);
@@ -77,6 +83,19 @@ export function App() {
       console.warn('[SessionStorage] Gagal menyimpan rute aktif:', err);
     }
   }, [activeRoute]);
+
+  // Simpan activeSessionId ke sessionStorage agar bertahan saat reload
+  useEffect(() => {
+    try {
+      if (activeSessionId) {
+        sessionStorage.setItem('brida_active_session_id', activeSessionId);
+      } else {
+        sessionStorage.removeItem('brida_active_session_id');
+      }
+    } catch (err) {
+      console.warn('[SessionStorage] Gagal menyimpan sesi aktif:', err);
+    }
+  }, [activeSessionId]);
 
 
   const pageTitles: Record<string, string> = {

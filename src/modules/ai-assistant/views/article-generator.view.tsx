@@ -306,12 +306,16 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
       const session = await AiAssistantService.getArticleSession(sessionId);
       setActiveSessionId(session.id);
 
-      // Jaminan: State disinkronkan dalam bentuk Markdown bersih
+      // Jaminan: State disinkronkan dalam bentuk draf Markdown bersih
       setCurrentDraft(session.fullArticleText || '');
       setArticleTitle(session.articleTitle || session.title);
 
       if (session.sources && session.sources.length > 0) {
-        setSelectedDocIds(session.sources.map((s: any) => s.id));
+        const sourceIds = session.sources.map((s: any) => s.id);
+        setSelectedDocIds(sourceIds);
+
+        // Pemicu Sinkronisasi: Muat ulang dokumen agar dokumen virtual hasil scrap langsung masuk ke selector
+        await loadDocuments();
       }
 
       // Format riwayat pesan dari database ke struktur UI
@@ -398,7 +402,7 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
     const userMsg: ChatMessage = {
       id: Date.now().toString(),
       sender: 'user',
-      text: queryText || 'Mengirim berkas lampiran...',
+      text: queryText || 'Mengirim berkas terlampir...',
       status: 'SUCCESS',
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     };
@@ -439,9 +443,15 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
           selectedLength,
         );
 
-        const responseText = response.data.answer || response.data.fullArticleText || JSON.stringify(response.data);
+        const responseText = response.data.answer || response.data.fullArticleText || 'Maaf, asisten AI gagal memformulasikan jawaban teks yang valid.';
         const responseSuggestions = response.data.suggestions || [];
         const updatedArticle = response.data.updatedArticle || undefined;
+
+        // Pemicu Sinkronisasi: Jika scraping proaktif mendeteksi dokumen virtual baru, perbarui centang dokumen acuan aktif [1.1.2]
+        if (response.documentIds && response.documentIds.length > 0) {
+          setSelectedDocIds(response.documentIds);
+          await loadDocuments(); // Reload untuk merender ubin dokumen virtual baru di selector
+        }
 
         if (updatedArticle) {
           // AI mengembalikan drafMarkdown bersih (Markdown format)
@@ -497,7 +507,6 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
     showToast('📋 Teks naskah berhasil disalin ke papan klip.');
   };
 
-
   return (
     <div className="flex flex-col w-full bg-slate-100/70 p-6 space-y-6 font-roboto">
       {/* Toast Notification Banner */}
@@ -545,7 +554,7 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
         />
       </div>
 
-      {/* SECTION 2. DUAL-PANE COOPERATIVE WORKSPACE AREA */}
+      {/* SECTION 2. DUAL-PANE COOPERATIVE WORKSPACE AREA (100% Full-Width Workspace) [1.1.2] */}
       <div className="flex flex-row gap-0 w-full h-[850px] overflow-hidden">
 
         {/* Sub-Sidebar: Riwayat Sesi Kolaboratif (Chat History) */}
@@ -618,9 +627,9 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
           </div>
         )}
 
-        {/* Kolom Utama Chat Workspace */}
-        <div className="flex-1 h-full flex flex-col min-h-0 bg-white border border-slate-300 border-r-0 shadow-xs overflow-hidden">
-          {/* Header: Sidebar Toggle Button & Section Title */}
+        {/* Kolom Utama Chat Workspace (Tampil Penuh 100% Tanpa Split-Screen Pratinjau) [1.1.2] */}
+        <div className="flex-1 h-full flex flex-col min-h-0 bg-white border border-slate-300 shadow-xs overflow-hidden">
+          {/* Header: Toggle Sidebar & Dynamic Manual Editor Redirection [1.1.2] */}
           <div className="p-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between gap-3 shrink-0 font-roboto text-left">
             <div className="flex items-center gap-2">
               <button
@@ -688,7 +697,7 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
                           />
                         ) : (
                           <div className="space-y-2">
-                            <RichMessageRenderer text={msg.text} />
+                            <RichMessageRenderer text={msg.text} activeDocIds={selectedDocIds} />
 
                             {/* Render secara terintegrasi Mini Anchor Card jika ada draf terbarui */}
                             {msg.updatedArticle && (
@@ -720,90 +729,9 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
               initialPrompt={initialPrompt}
               onSendMessage={handleSendMessage}
               onUploadAttachment={handleUploadStagedAsset}
+              activeSessionId={activeSessionId}
+              onNavigateToEditor={onNavigateToEditor}
             />
-          </div>
-        </div>
-
-        {/* PANEL KANAN (50% Lebar): Fluid Draft Document Canvas [High-Fidelity WYSIWYG] */}
-        <div className="w-1/2 h-full flex flex-col min-h-0 bg-white border border-slate-300 shadow-xs overflow-hidden relative">
-
-          {isGenerating && (
-            <div className="absolute inset-0 z-30 bg-slate-900/15 backdrop-blur-md flex flex-col items-center justify-center text-teal-900 font-bold space-y-3 no-print animate-in fade-in duration-200">
-              <Loader2 size={32} className="animate-spin text-teal-700" />
-              <span className="text-xs uppercase tracking-wider bg-white border border-slate-300 px-4 py-2 shadow-sm font-roboto font-extrabold rounded-none">
-                AI sedang menyusun naskah...
-              </span>
-            </div>
-          )}
-
-          {/* Header Panel Live Draft Preview */}
-          <div className="p-3 bg-slate-50 border-b border-slate-200 shrink-0 font-roboto text-left">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xs font-bold uppercase text-slate-800 tracking-wider flex items-center gap-1.5">
-                <FileText size={16} className="text-teal-700" />
-                <span className="text-[13px]">Pratinjau Draf Naskah</span>
-              </h3>
-            </div>
-          </div>
-
-          {/* WYSIWYG Fluid Canvas Live Rendering */}
-          <div className="flex-1 overflow-y-auto bg-slate-200/40 p-4 flex flex-col items-center justify-start gap-6 no-print relative select-text">
-
-            {currentDraft ? (
-              <>
-                <div
-                  className="w-full max-w-3xl bg-white shadow-sm border border-slate-300 text-slate-800 text-justify prose prose-slate prose-xs focus:outline-none p-6 lg:p-8 font-sans h-fit"
-                >
-                  {/* Judul Dokumen Terjangkar di Atas Kanvas */}
-                  <h1 className="text-center font-bold uppercase border-b-2 border-slate-900 pb-2 mb-6 tracking-wide text-xs">
-                    {articleTitle || 'Draf Naskah Kebijakan AKLS'}
-                  </h1>
-
-                  {/* 
-                     SYSTEM ANALYST DESIGN NOTE [High Fidelity Preview]:
-                     Alih-alih menggunakan RichMessageRenderer yang memiliki keterbatasan parser linear,
-                     kita mengonversi currentDraft (Markdown murni) menjadi HTML semantik secara real-time.
-                     Ini menjamin bahwa list berbutir, list berangka, dan perataan paragraf (alignments)
-                     hasil suntingan manual tampil dengan akurasi 100% pada lembar kerja pratinjau.
-                  */}
-                  <div
-                    className="text-xs text-slate-800 font-sans leading-relaxed text-justify max-w-none prose prose-slate prose-xs focus:outline-none"
-                    dangerouslySetInnerHTML={{ __html: MarkupConverter.toHTML(currentDraft) }}
-                  />
-                </div>
-
-                {/* Baris Tombol Aksi di bawah Kertas/Canvas */}
-                <div className="flex items-center justify-center gap-4 py-2 shrink-0">
-                  <button
-                    onClick={handleCopyText}
-                    className="px-4 py-2 bg-white hover:bg-slate-50 text-slate-800 text-xs font-bold uppercase tracking-wider rounded-none border border-slate-300 shadow-2xs inline-flex items-center gap-2 transition-colors cursor-pointer"
-                    title="Salin isi naskah lengkap ke clipboard"
-                  >
-                    <Copy size={13} className="text-slate-650" />
-                    <span>Salin Teks</span>
-                  </button>
-
-                  {activeSessionId && (
-                    <button
-                      onClick={() => onNavigateToEditor(activeSessionId)}
-                      className="px-4 py-2 bg-teal-700 hover:bg-teal-800 text-white text-xs font-bold uppercase tracking-wider rounded-none border border-teal-800 shadow-2xs inline-flex items-center gap-2 transition-colors cursor-pointer"
-                      title="Masuk ke halaman penyuntingan manual penuh dan layouting PDF"
-                    >
-                      <PenTool size={13} />
-                      <span>Sunting Manual</span>
-                    </button>
-                  )}
-                </div>
-              </>
-            ) : (
-              <div className="h-full w-full flex flex-col items-center justify-center text-slate-400 text-center p-6 space-y-2">
-                <FileText size={36} className="opacity-60" />
-                <span className="text-xs font-bold uppercase tracking-wider">Lembar Kanvas Kosong</span>
-                <p className="text-[11px] text-slate-500 max-w-xs leading-relaxed">
-                  Gunakan obrolan AI di sebelah kiri untuk mulai menghasilkan draf artikel publikasi secara terpadu.
-                </p>
-              </div>
-            )}
           </div>
         </div>
 

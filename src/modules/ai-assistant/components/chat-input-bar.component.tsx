@@ -1,10 +1,13 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
     Send,
     X,
     Loader2,
     Paperclip,
     AlertCircle,
+    Globe,
+    Sparkles,
+    PenTool,
 } from 'lucide-react';
 
 export interface StagedAttachment {
@@ -27,6 +30,8 @@ interface ChatInputBarProps {
     onUploadAttachment: (            // Delegasi pengunggahan berkas transien ke parent [5]
         file: File
     ) => Promise<{ tempFileId: string; fileName: string; mimeType: string; tempPath: string }>;
+    activeSessionId?: string | null;
+    onNavigateToEditor?: (sessionId: string) => void;
 }
 
 export const ChatInputBar: React.FC<ChatInputBarProps> = ({
@@ -34,6 +39,8 @@ export const ChatInputBar: React.FC<ChatInputBarProps> = ({
     initialPrompt,
     onSendMessage,
     onUploadAttachment,
+    activeSessionId,
+    onNavigateToEditor,
 }) => {
     const [inputQuery, setInputQuery] = useState('');
     const [tone, setTone] = useState<string>('solutif');
@@ -51,6 +58,24 @@ export const ChatInputBar: React.FC<ChatInputBarProps> = ({
     const [localError, setLocalError] = useState<string | null>(null);
 
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const textareaRef = useRef<HTMLTextAreaElement>(null); // Ref dedikatif untuk Auto-Resizing Textarea [1.1.2]
+
+    // --- RESPONSIVE URL DETECTION (on-keystroke) --- [1.1.2]
+    const URL_REGEX = /https?:\/\/[^\s]+/gi;
+    const containsUrl = useMemo(() => {
+        return URL_REGEX.test(inputQuery);
+    }, [inputQuery]);
+
+    // --- AUTO-RESIZING HEIGHT ENGINE --- [1.1.2]
+    useEffect(() => {
+        const textarea = textareaRef.current;
+        if (textarea) {
+            textarea.style.height = 'auto'; // Reset tinggi untuk mendeteksi penyusutan teks
+            const scrollHeight = textarea.scrollHeight;
+            // Batasi tinggi maksimum textarea di 144px (setara ~6 baris), setelah itu tampilkan scrollbar
+            textarea.style.height = `${Math.max(64, Math.min(144, scrollHeight))}px`;
+        }
+    }, [inputQuery]);
 
     /**
      * Mengolah file biner (gambar / dokumen) yang diunggah secara asinkron ke server [5]
@@ -111,7 +136,7 @@ export const ChatInputBar: React.FC<ChatInputBarProps> = ({
     /**
      * Menangkap penempelan gambar biner screenshot dari clipboard keyboard (Ctrl+V) [5]
      */
-    const handlePaste = async (e: React.ClipboardEvent<HTMLInputElement>) => {
+    const handlePaste = async (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
         const items = e.clipboardData.items;
         for (let i = 0; i < items.length; i++) {
             if (items[i].type.indexOf('image') !== -1) {
@@ -141,13 +166,15 @@ export const ChatInputBar: React.FC<ChatInputBarProps> = ({
         setStagedAttachments((prev) => prev.filter((att) => att.fileId !== fileId));
     };
 
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
+    /**
+     * Fungsi Terpadu untuk Pengiriman Form
+     */
+    const handleSubmitForm = () => {
         if (!inputQuery.trim() && stagedAttachments.length === 0) return;
         if (isLoading || isUploading) return;
 
-        // Trigger callback pengiriman pesan ke kontainer induk
-        onSendMessage(inputQuery, stagedAttachments, tone, targetLength);
+        // Kirim kueri multimodal terpadu (mempertahankan karakter newline \n secara utuh) [1.1.2]
+        onSendMessage(inputQuery.trim(), stagedAttachments, tone, targetLength);
 
         // Bersihkan state input area lokal secara instan [Optimistic UI]
         setInputQuery('');
@@ -155,16 +182,33 @@ export const ChatInputBar: React.FC<ChatInputBarProps> = ({
         setLocalError(null);
     };
 
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        handleSubmitForm();
+    };
+
+    /**
+     * Pencegat Peristiwa Tombol Keyboard (Keyboard Event Interceptor) [1.1.2]
+     * - Enter (Saja): Memicu pengiriman pesan secara langsung (Submit)
+     * - Shift + Enter: Mengabaikan submit dan menyisipkan baris baru (\n) ke bawah
+     */
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault(); // Cegah karakter baris baru disisipkan secara tidak sengaja
+            handleSubmitForm();
+        }
+    };
+
     return (
-        <div className="p-4 border-t border-slate-300 bg-white no-print space-y-3 font-roboto">
+        <div className="p-4 border-t border-slate-300 bg-white no-print space-y-4 font-roboto w-full">
             {/* Penampil Pesan Galat Lokalisasi */}
             {localError && (
-                <div className="p-2.5 bg-red-50 border border-red-200 text-red-800 text-xs font-semibold flex items-center gap-2">
+                <div className="p-3 bg-red-50 border border-red-200 text-red-800 text-xs font-semibold flex items-center gap-2 rounded-none">
                     <AlertCircle size={14} className="shrink-0 text-red-650" />
-                    <span>{localError}</span>
+                    <span className="flex-1 text-left">{localError}</span>
                     <button
                         onClick={() => setLocalError(null)}
-                        className="ml-auto text-red-500 hover:text-red-800 font-bold"
+                        className="text-red-500 hover:text-red-800 font-bold ml-2 cursor-pointer"
                     >
                         [Tutup]
                     </button>
@@ -173,21 +217,21 @@ export const ChatInputBar: React.FC<ChatInputBarProps> = ({
 
             {/* Tampilan Antrean Berkas Lampiran & Screenshot [5] */}
             {stagedAttachments.length > 0 && (
-                <div className="py-1 flex flex-wrap gap-2.5">
+                <div className="flex flex-wrap gap-2.5 p-3 bg-slate-50 border border-slate-200 rounded-none">
                     {stagedAttachments.map((att) => (
                         <div
                             key={att.fileId}
-                            className="p-1.5 bg-white border border-slate-300 flex items-center gap-2.5 shadow-2xs"
+                            className="p-1.5 bg-white border border-slate-300 flex items-center gap-2.5 shadow-2xs rounded-none"
                         >
                             {/* Thumbnail Gambar vs Icon Dokumen */}
                             {att.base64Data ? (
                                 <img
                                     src={`data:${att.mimeType};base64,${att.base64Data}`}
                                     alt={att.fileName}
-                                    className="w-8 h-8 object-cover border border-slate-200"
+                                    className="w-8 h-8 object-cover border border-slate-200 rounded-none"
                                 />
                             ) : (
-                                <div className="w-8 h-8 bg-slate-100 border border-slate-200 flex items-center justify-center text-teal-800 font-extrabold text-[10px]">
+                                <div className="w-8 h-8 bg-slate-100 border border-slate-200 flex items-center justify-center text-teal-800 font-extrabold text-[10px] rounded-none">
                                     DOC
                                 </div>
                             )}
@@ -204,7 +248,7 @@ export const ChatInputBar: React.FC<ChatInputBarProps> = ({
                                         <select
                                             value={att.classification}
                                             onChange={(e) => handleUpdateClassification(att.fileId, e.target.value as any)}
-                                            className="text-[9px] bg-slate-100 border border-slate-300 text-slate-700 font-bold focus:outline-none focus:border-teal-700 px-1 py-0.5"
+                                            className="text-[9px] bg-slate-100 border border-slate-300 text-slate-700 font-bold focus:outline-none focus:border-teal-700 px-1 py-0.5 rounded-none"
                                         >
                                             <option value="BASELINE">1. Target</option>
                                             <option value="REALIZATION">2. Realisasi</option>
@@ -217,7 +261,7 @@ export const ChatInputBar: React.FC<ChatInputBarProps> = ({
                             <button
                                 type="button"
                                 onClick={() => handleRemoveAttachment(att.fileId)}
-                                className="p-0.5 text-slate-400 hover:text-red-600 transition-colors cursor-pointer ml-1"
+                                className="p-0.5 text-slate-400 hover:text-red-650 transition-colors cursor-pointer ml-1"
                                 title="Batalkan lampiran"
                             >
                                 <X size={12} />
@@ -227,88 +271,136 @@ export const ChatInputBar: React.FC<ChatInputBarProps> = ({
                 </div>
             )}
 
-            {/* Baris Atas (Row 1): Pemilihan Parameter Gaya Bahasa & Panjang Artikel */}
-            <div className="flex flex-wrap items-center gap-4 bg-slate-50 border border-slate-200 p-2.5">
-                <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">Gaya Bahasa:</span>
-                    <select
-                        value={tone}
-                        onChange={(e) => setTone(e.target.value)}
-                        disabled={isLoading || isUploading}
-                        className="text-xs bg-white border border-slate-300 text-slate-800 font-bold focus:outline-none focus:border-teal-700 px-2.5 py-1"
-                    >
-                        <option value="solutif">SOLUTIF (Bupati)</option>
-                        <option value="kritis">KRITIS (OPD)</option>
-                        <option value="akademis">AKADEMIS (Media)</option>
-                        <option value="populer">POPULER (Publik)</option>
-                    </select>
+            {/* --- RESPONSIVE TELEMETRY INDICATORS (on-keystroke / on-processing) --- [1.1.2] */}
+            {containsUrl && !isLoading && (
+                <div className="p-2.5 bg-teal-50 border border-teal-200 text-teal-900 text-[10px] font-bold uppercase tracking-wider flex items-center gap-2 select-none rounded-none animate-in fade-in duration-200">
+                    <span className="w-2 h-2 bg-teal-600 animate-ping" />
+                    <Globe size={13} className="text-teal-700" />
+                    <span>Tautan Web Terdeteksi: AI akan melakukan ekstraksi teks &amp; penyerapan konten secara proaktif.</span>
+                </div>
+            )}
+
+            {isLoading && (
+                <div className="p-2.5 bg-slate-100 border border-slate-200 text-slate-700 text-[10px] font-bold uppercase tracking-wider flex items-center gap-2.5 select-none rounded-none animate-in fade-in duration-200">
+                    <Loader2 size={13} className="animate-spin text-teal-700" />
+                    {containsUrl ? (
+                        <span>Mesin Kognitif Aktif: Mengunduh teks web &amp; merakit sinkronisasi data daerah...</span>
+                    ) : (
+                        <span>Mesin Kognitif Aktif: Mensintesis rujukan lokal &amp; melakukan pengayaan data nasional...</span>
+                    )}
+                </div>
+            )}
+
+            {/* Baris Tengah (Row 1): Pemilihan Parameter Gaya Bahasa & Panjang Artikel */}
+            <div className="flex flex-wrap items-center justify-between gap-4 bg-slate-50 border border-slate-200 px-4 py-3 rounded-none">
+                <div className="flex flex-wrap items-center gap-5">
+                    <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">Gaya Bahasa:</span>
+                        <select
+                            value={tone}
+                            onChange={(e) => setTone(e.target.value)}
+                            disabled={isLoading || isUploading}
+                            className="text-xs bg-white border border-slate-300 text-slate-800 font-bold focus:outline-none focus:border-teal-700 px-2.5 py-1.5 rounded-none cursor-pointer hover:border-slate-400 transition-colors"
+                        >
+                            <option value="solutif">SOLUTIF (Bupati)</option>
+                            <option value="kritis">KRITIS (OPD)</option>
+                            <option value="akademis">AKADEMIS (Media)</option>
+                            <option value="populer">POPULER (Publik)</option>
+                        </select>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">Panjang Teks:</span>
+                        <select
+                            value={targetLength}
+                            onChange={(e) => setTargetLength(e.target.value as any)}
+                            disabled={isLoading || isUploading}
+                            className="text-xs bg-white border border-slate-300 text-slate-800 font-bold focus:outline-none focus:border-teal-700 px-2.5 py-1.5 rounded-none cursor-pointer hover:border-slate-400 transition-colors"
+                        >
+                            <option value="SHORT">Ringkas (~700 Kata)</option>
+                            <option value="MEDIUM">Sedang (~1000 Kata)</option>
+                            <option value="LONG">Mendalam (~1500 Kata)</option>
+                        </select>
+                    </div>
                 </div>
 
-                <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">Panjang Teks:</span>
-                    <select
-                        value={targetLength}
-                        onChange={(e) => setTargetLength(e.target.value as any)}
-                        disabled={isLoading || isUploading}
-                        className="text-xs bg-white border border-slate-300 text-slate-800 font-bold focus:outline-none focus:border-teal-700 px-2.5 py-1"
+                {activeSessionId && onNavigateToEditor && (
+                    <button
+                        type="button"
+                        onClick={() => onNavigateToEditor(activeSessionId)}
+                        className="px-3 py-1.5 text-teal-700 hover:text-teal-800 font-bold text-[10px] uppercase tracking-wider rounded-none inline-flex items-center gap-1.5 cursor-pointer transition-colors bg-transparent border-none"
+                        title="Alihkan langsung ke lembar kerja A4 Word WYSIWYG untuk sunting manual penuh"
                     >
-                        <option value="SHORT">Ringkas (~700 Kata)</option>
-                        <option value="MEDIUM">Sedang (~1000 Kata)</option>
-                        <option value="LONG">Mendalam (~1500 Kata)</option>
-                    </select>
-                </div>
-
-                <span className="text-slate-300 hidden sm:inline">|</span>
-
-                <span className="text-[10px] font-bold text-slate-500 hidden sm:inline">
-                </span>
+                        <PenTool size={12} className="shrink-0" />
+                        <span>Sunting Manual</span>
+                    </button>
+                )}
             </div>
 
             {/* Baris Bawah (Row 2): Kolom Masukan & Unggah Berkas */}
-            <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-3">
-                <div className="flex-1 flex items-center border border-slate-400 focus-within:border-teal-600 bg-slate-50 transition-colors">
-
-                    {/* Tombol Klip Kertas */}
-                    <button
-                        type="button"
-                        onClick={() => fileInputRef.current?.click()}
-                        disabled={isLoading || isUploading}
-                        className="p-3 text-slate-500 hover:text-teal-700 disabled:opacity-40 cursor-pointer border-r border-slate-200"
-                        title="Unggah berkas acuan atau screenshot (.pdf, .docx, .png, .jpg)"
-                    >
-                        {isUploading ? (
-                            <Loader2 size={16} className="animate-spin text-teal-600" />
-                        ) : (
-                            <Paperclip size={16} />
-                        )}
-                    </button>
-
-                    <input
-                        type="file"
-                        ref={fileInputRef}
-                        onChange={handleFileChange}
-                        accept=".pdf,.docx,.txt,image/*"
-                        className="hidden"
-                    />
-
-                    <input
-                        type="text"
+            <form onSubmit={handleSubmit} className="w-full">
+                <div className="flex flex-col border border-slate-350 focus-within:border-teal-600 bg-white transition-colors w-full rounded-none">
+                    
+                    {/* Textarea Area */}
+                    <textarea
+                        ref={textareaRef}
+                        rows={2}
                         value={inputQuery}
                         onChange={(e) => setInputQuery(e.target.value)}
-                        onPaste={handlePaste} // Listener penempelan keyboard (Ctrl+V) [5]
-                        placeholder="Ketik pertanyaan / draf revisi naskah Anda di sini..."
+                        onKeyDown={handleKeyDown}
+                        onPaste={handlePaste}
+                        placeholder="Ketik pertanyaan / draf revisi naskah Anda di sini... (Tekan Enter untuk mengirim, Shift+Enter untuk baris baru)"
                         disabled={isLoading || isUploading}
-                        className="flex-1 bg-transparent px-4 py-3 text-xs text-slate-900 font-semibold focus:outline-none disabled:opacity-50"
+                        className="w-full bg-transparent px-4 py-3.5 text-xs text-slate-900 font-semibold focus:outline-none disabled:opacity-50 resize-none overflow-y-auto min-h-[64px] max-h-[144px] leading-relaxed"
+                        style={{ height: '64px' }}
                     />
 
-                    <button
-                        type="submit"
-                        disabled={(!inputQuery.trim() && stagedAttachments.length === 0) || isLoading || isUploading}
-                        className="px-5 py-3 bg-teal-700 hover:bg-teal-800 disabled:bg-slate-50 text-white disabled:text-slate-500 font-bold text-xs uppercase transition-colors flex items-center gap-2 cursor-pointer disabled:cursor-not-allowed shrink-0 h-full"
-                    >
-                        <span>Kirim</span>
-                        <Send size={14} className="shrink-0" />
-                    </button>
+                    {/* Action Bar / Toolbar at the Bottom of Textarea Container */}
+                    <div className="flex items-center justify-between px-3 py-1.5 bg-slate-50 border-t border-slate-200/80">
+                        {/* Left Side: Upload Attachment */}
+                        <div className="flex items-center">
+                            <button
+                                type="button"
+                                onClick={() => fileInputRef.current?.click()}
+                                disabled={isLoading || isUploading}
+                                className="p-2 text-slate-500 hover:text-teal-700 hover:bg-slate-200/40 disabled:opacity-40 cursor-pointer rounded-none transition-colors flex items-center justify-center gap-1.5 bg-transparent border-none"
+                                title="Unggah berkas acuan atau screenshot (.pdf, .docx, .png, .jpg)"
+                            >
+                                {isUploading ? (
+                                    <Loader2 size={15} className="animate-spin text-teal-600" />
+                                ) : (
+                                    <Paperclip size={15} />
+                                )}
+                                <span className="text-[10px] font-bold uppercase tracking-wider hidden sm:inline">Lampirkan Berkas</span>
+                            </button>
+                            <input
+                                type="file"
+                                ref={fileInputRef}
+                                onChange={handleFileChange}
+                                accept=".pdf,.docx,.txt,image/*"
+                                className="hidden"
+                            />
+                        </div>
+
+                        {/* Right Side: Send Button (Clean, transparent background-less style) */}
+                        <button
+                            type="submit"
+                            disabled={(!inputQuery.trim() && stagedAttachments.length === 0) || isLoading || isUploading}
+                            className="p-2 text-teal-700 hover:text-teal-800 disabled:text-slate-400 disabled:opacity-50 font-bold text-xs uppercase tracking-wider transition-colors flex items-center gap-1.5 cursor-pointer disabled:cursor-not-allowed rounded-none bg-transparent border-none"
+                        >
+                            {isLoading ? (
+                                <>
+                                    <span className="text-[10px] font-bold uppercase tracking-wider">Proses</span>
+                                    <Loader2 size={13} className="animate-spin text-teal-600 shrink-0" />
+                                </>
+                            ) : (
+                                <>
+                                    <span className="text-[10px] font-bold uppercase tracking-wider">Kirim</span>
+                                    <Send size={13} className="shrink-0" />
+                                </>
+                            )}
+                        </button>
+                    </div>
                 </div>
             </form>
         </div>
