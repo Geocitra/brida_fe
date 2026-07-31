@@ -14,6 +14,9 @@ import { ArticlePreviewEditorView } from './modules/ai-assistant/views/article-p
 import GisExplorerView from './modules/dashboard/views/gis-explorer.view';
 import { LandingView } from './modules/dashboard/views/landing.view';
 
+// [INTEGRASI BARU]: Memanggil Store untuk keperluan pembersihan memori saat Logout
+import { useEditorStore } from './modules/ai-assistant/store/useEditorStore';
+
 const SESSION_FORWARD_DOCS_KEY = 'brida_forward_doc_ids';
 const AUTH_SESSION_KEY = 'brida_is_authenticated';
 const PENDING_ROUTE_KEY = 'brida_pending_route';
@@ -145,6 +148,9 @@ export function App() {
     setActiveRoute('landing');
     setActiveSessionId(null);
     setSharedDocIds(undefined);
+
+    // [TINDAKAN KRITIS]: Bersihkan Zustand Store agar data naskah rahasia tidak "bocor" ke sesi login berikutnya
+    useEditorStore.getState().clearSession();
   };
 
   // Inactivity timeout guard (15 minutes automatic logout)
@@ -199,7 +205,6 @@ export function App() {
   const handleNavigationAttempt = (route: string, sessionId?: string | null) => {
     // Daftar rute publik yang bebas diakses tanpa login (Hanya landing page)
     const publicRoutes = ['landing'];
-
 
     if (!publicRoutes.includes(route) && !isAuthenticated) {
       // Jika belum login dan mencoba akses modul privat, simpan tujuan & tampilkan login
