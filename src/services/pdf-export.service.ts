@@ -217,7 +217,8 @@ export const PdfExportService = {
     };
 
     // EKSEKUSI PROTECTED VARIATION: Teruskan vfs & fonts lokal langsung untuk mengabaikan proteksi global ESM Vite [5]
-    (pdfMake as any).createPdf(docDefinition, null, fontDefinitions, combinedVfs).download(targetFilename);
+    // Parameter kedua diubah dari null menjadi {} untuk mematuhi aturan strict-type dari pdfMake modern.
+    (pdfMake as any).createPdf(docDefinition, {}, fontDefinitions, combinedVfs).download(targetFilename);
     return { fallback: useFallbackRoboto };
   },
 
@@ -393,9 +394,10 @@ export const PdfExportService = {
     };
 
     const targetFilename = filename || `Analisis_Deviasi_${indicator.id.toUpperCase()}_Mimika.pdf`;
-    
+
     // EKSEKUSI PROTECTED VARIATION: Gunakan injeksi lokal secara deterministik untuk parameter ke-3 (fonts) dan ke-4 (vfs) [5]
-    (pdfMake as any).createPdf(docDefinition, null, defaultFonts, vfsFonts).download(targetFilename);
+    // Parameter kedua diubah dari null menjadi {} untuk mematuhi aturan strict-type dari pdfMake modern.
+    (pdfMake as any).createPdf(docDefinition, {}, defaultFonts, vfsFonts).download(targetFilename);
   },
 
   /**
@@ -543,7 +545,8 @@ export const PdfExportService = {
     };
 
     // EKSEKUSI PROTECTED VARIATION: Gunakan injeksi lokal secara deterministik untuk parameter ke-3 (fonts) dan ke-4 (vfs) [5]
-    (pdfMake as any).createPdf(docDefinition, null, defaultFonts, vfsFonts).download('Nota_Dinas_Resmi_Bupati_Mimika_Maret_2026.pdf');
+    // Parameter kedua diubah dari null menjadi {} untuk mematuhi aturan strict-type dari pdfMake modern.
+    (pdfMake as any).createPdf(docDefinition, {}, defaultFonts, vfsFonts).download('Nota_Dinas_Resmi_Bupati_Mimika_Maret_2026.pdf');
   },
 
   /**
@@ -560,7 +563,7 @@ export const PdfExportService = {
         realization: 'Rp 85 M',
         deviationText: '-22.7% (KRITIS)',
         causalFactors: [
-          { label: 'Evaluasi & Verifikasi Administrasi Proyek', percentage: 45 },
+          { label: 'Evaluasi & Verifikasi Administratif Proyek', percentage: 45 },
           { label: 'Eskalasi Biaya & Logistik Wilayah', percentage: 35 },
           { label: 'Faktor Hambatan Cuaca Ekstrem', percentage: 20 },
         ],
@@ -586,7 +589,7 @@ export const PdfExportService = {
       realization: compareResult.math?.realizationText || '0%',
       deviationText,
       causalFactors: (compareResult.causal?.causalFactors || []).map((f: any) => ({
-        label: f.factor,
+        text: f.factor,
         percentage: f.weightPercentage,
       })),
       priorityRecommendations: (compareResult.causal?.recommendations || []).map((rec: any) => ({

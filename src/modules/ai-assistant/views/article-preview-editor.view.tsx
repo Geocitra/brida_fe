@@ -41,6 +41,22 @@ const fontStyles: Record<string, string> = {
   'Arial': 'font-sans tracking-tight',
 };
 
+// DEKLARASI STATIS EKSTENSI TIPTAP (Static Module Scope)
+// Menjamin referensi memori tetap sama untuk mencegah registrasi ganda oleh Tiptap saat re-render
+const TIPTAP_EXTENSIONS = [
+  StarterKit.configure({
+    heading: {
+      levels: [1, 2, 3],
+    },
+  }),
+  UnderlineExtension.configure(),
+  TextAlign.configure({
+    types: ['heading', 'paragraph'],
+    alignments: ['left', 'center', 'right', 'justify'],
+    defaultAlignment: 'justify',
+  }),
+];
+
 const InteractivePaperSheet: React.FC<{
   htmlContent: string;
   fontFamily: 'Calibri' | 'Times New Roman' | 'Verdana' | 'Arial';
@@ -89,21 +105,9 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
     setTimeout(() => setToastMessage(null), 4000);
   };
 
-  // Inisialisasi TipTap WYSIWYG Editor
+  // Inisialisasi TipTap WYSIWYG Editor menggunakan referensi ekstensi statis
   const editor = useEditor({
-    extensions: [
-      StarterKit.configure({
-        heading: {
-          levels: [1, 2, 3],
-        },
-      }),
-      UnderlineExtension.configure(),
-      TextAlign.configure({
-        types: ['heading', 'paragraph'],
-        alignments: ['left', 'center', 'right', 'justify'],
-        defaultAlignment: 'justify',
-      }),
-    ],
+    extensions: TIPTAP_EXTENSIONS,
     editorProps: {
       attributes: {
         class: 'prose prose-xs focus:outline-none max-w-none min-h-[450px] outline-none h-full text-slate-900 leading-relaxed font-sans text-xs p-4 selection:bg-teal-700 selection:text-white',
