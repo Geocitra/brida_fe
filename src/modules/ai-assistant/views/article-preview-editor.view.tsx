@@ -362,8 +362,8 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
       const updatedSession = await executeSilentAutosave();
       setActiveSession(updatedSession);
 
-      // Langkah 2: Sukses save, langsung konversi HTML editor aktif ke PDF formal luring
-      showToast('🖨️ Mengonversi dan merakit dokumen PDF resmi...');
+      // Langkah 2: Sukses save, kirim HTML editor aktif ke PDF engine server
+      showToast('🖨️ Merakit dokumen PDF resmi di server (True WYSIWYG)...');
       const targetFontSize = parseFloat(fontSize);
 
       await PdfExportService.exportCustomFormattedArticlePdf(

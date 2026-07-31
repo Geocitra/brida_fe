@@ -142,7 +142,7 @@ export class MarkupConverter {
                 (_, align, content) => {
                     const paragraphs = content.split(/\r?\n\s*\r?\n/);
                     return paragraphs
-                        .map(p => {
+                        .map((p: string) => {
                             const trimmed = p.trim();
                             if (!trimmed) return '';
                             // Jika sudah berwujud tag HTML block, biarkan

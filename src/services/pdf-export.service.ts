@@ -4,6 +4,8 @@ import htmlToPdfmake from 'html-to-pdfmake';
 import pdfFonts from 'pdfmake/build/vfs_fonts';
 import customVfs from '../assets/fonts/vfs_fonts';
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
+
 /**
  * Ambil dict VFS Roboto asli dari pdfmake/build/vfs_fonts.
  * pdfFonts adalah module object { pdfMake: { vfs: {...} } }, BUKAN dict langsung.
@@ -58,109 +60,40 @@ export const PdfExportService = {
     config: PDFFormatConfig,
     filename: string,
   ): Promise<{ fallback: boolean }> {
-
-    // ── Pemetaan font ke berkas VFS kustom luring [1.1.2] ──────────────────
-    // Setiap entri map ke file .ttf yang sudah ada di customVfs / vfs_fonts.ts
-    type FontFileSet = { normal: string; bold: string; italics: string; bolditalics: string };
-
-    const fontFileMap: Record<string, FontFileSet> = {
-      'Calibri': {
-        normal: 'calibri.ttf',
-        bold: 'calibrib.ttf',
-        italics: 'calibrii.ttf',
-        bolditalics: 'calibriz.ttf',
+    const response = await fetch(`${API_BASE_URL}/pdf/generate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
       },
-      'Times New Roman': {
-        normal: 'times.ttf',
-        bold: 'timesbd.ttf',
-        italics: 'timesi.ttf',
-        bolditalics: 'timesbi.ttf',
-      },
-      'Verdana': {
-        normal: 'verdana.ttf',
-        bold: 'verdanab.ttf',
-        italics: 'verdanai.ttf',
-        bolditalics: 'verdanaz.ttf',
-      },
-      'Arial': {
-        normal: 'arial.ttf',
-        bold: 'arialbd.ttf',
-        italics: 'ariali.ttf',
-        bolditalics: 'arialbi.ttf',
-      },
-    };
-
-    const selectedFontFiles = fontFileMap[config.fontFamily] ?? fontFileMap['Calibri'];
-
-    // Gunakan nama font tanpa spasi sebagai key pdfMake (pdfMake tidak support nama dengan spasi)
-    const pdfFontName = config.fontFamily.replace(/\s+/g, '');
-
-    // Pendaftaran font definitions — wajib ada Roboto sebagai fallback sistem pdfMake
-    const fontDefinitions: any = {
-      Roboto: {
-        normal: 'Roboto-Regular.ttf',
-        bold: 'Roboto-Medium.ttf',
-        italics: 'Roboto-Italic.ttf',
-        bolditalics: 'Roboto-MediumItalic.ttf',
-      },
-      [pdfFontName]: selectedFontFiles,
-    };
-
-    // Konversi Margin cm ke Satuan Poin pdfMake (1 cm = 28.3465 pt)
-    const marginPoints = Math.round(config.marginCm * 28.3465);
-
-    // Bersihkan spasi kosong berlebih di akhir dokumen
-    let sanitizedHtml = htmlText.trim();
-    const trailingEmptyRegex = /(?:<p>\s*<\/p>|<p>\s*<br\s*\/?>\s*<\/p>|<p>&nbsp;<\/p>|<br\s*\/?>)+$/i;
-    sanitizedHtml = sanitizedHtml.replace(trailingEmptyRegex, '').trim();
-
-    // Konversi HTML ke objek pdfMake
-    // CATATAN: ignoreStyles['font-family'] DIHAPUS agar inline style font dari Tiptap terbawa
-    const pdfContent = htmlToPdfmake(sanitizedHtml, {
-      window: window,
-      removeExtraBlanks: true,
-      customStyles: {
-        'p': { margin: [0, 0, 0, 12], alignment: 'justify' },
-        'ul': { margin: [10, 4, 0, 12] },
-        'ol': { margin: [10, 4, 0, 12] },
-        'li': { margin: [0, 2, 0, 2], lineHeight: config.lineSpacing },
-      }
+      body: JSON.stringify({
+        htmlContent: htmlText,
+        fontFamily: config.fontFamily,
+        fontSize: config.fontSize,
+        lineSpacing: config.lineSpacing,
+        marginCm: config.marginCm,
+        filename: filename,
+      }),
     });
 
-    const docDefinition: any = {
-      pageSize: 'A4',
-      pageMargins: [marginPoints, marginPoints, marginPoints, marginPoints],
-      defaultStyle: {
-        font: pdfFontName, // Font yang dipilih user, bukan hardcoded
-        fontSize: config.fontSize,
-        lineHeight: config.lineSpacing,
-        alignment: 'justify',
-      },
-      styles: {
-        'html-ul': { margin: [10, 2, 0, 12] },
-        'html-ol': { margin: [10, 2, 0, 12] },
-        'html-li': { lineHeight: config.lineSpacing, margin: [0, 1, 0, 1] }
-      },
-      footer: (currentPage: number, pageCount: number) => ({
-        columns: [
-          { text: `Halaman ${currentPage} dari ${pageCount}`, alignment: 'right', fontSize: 8, color: '#94a3b8' },
-        ],
-        margin: [marginPoints, 10, marginPoints, 0],
-      }),
-      content: pdfContent,
-    };
+    if (!response.ok) {
+      const errorText = await response.text();
+      let errorMsg = 'Gagal mengekspor PDF';
+      try {
+        const errorJson = JSON.parse(errorText);
+        errorMsg = errorJson.message || errorMsg;
+      } catch {}
+      throw new Error(errorMsg);
+    }
 
-    const targetFilename = filename.toLowerCase().endsWith('.pdf') ? filename : `${filename}.pdf`;
-
-    // Set VFS: gabungkan Roboto asli + custom fonts kita.
-    // Ini dilakukan di sini (bukan module level) agar getRobotoVfs() sudah fully loaded.
-    (pdfMake as any).vfs = { ...getRobotoVfs(), ...customVfs };
-
-    // Daftarkan font definitions ke pdfMake
-    (pdfMake as any).fonts = fontDefinitions;
-
-    // Eksekusi kompilasi dan unduh berkas
-    (pdfMake as any).createPdf(docDefinition).download(targetFilename);
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename.toLowerCase().endsWith('.pdf') ? filename : `${filename}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
 
     return { fallback: false };
   },
