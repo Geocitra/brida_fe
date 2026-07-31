@@ -512,20 +512,7 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
               </select>
             </div>
 
-            <div className="h-4 w-px bg-slate-300" />
-
-            <div className="flex items-center gap-1.5">
-              <span className="text-[9px] font-black text-slate-500 uppercase tracking-wider">Margin:</span>
-              <select
-                value={marginCm}
-                onChange={(e) => setFormatting({ marginCm: parseFloat(e.target.value) })}
-                disabled={isSaving || isPrinting}
-                className="bg-white border border-slate-300 text-[10px] font-bold px-2 py-1 focus:outline-none focus:border-teal-600 rounded-none cursor-pointer"
-              >
-                <option value="2.5">2.5 cm (Normal)</option>
-                <option value="3.0">3.0 cm (Longgar)</option>
-              </select>
-            </div>
+            
           </div>
 
           <div className="hidden md:block h-5 w-px bg-slate-300" />
