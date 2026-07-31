@@ -16,7 +16,7 @@ const stripCitationTokens = (content?: string | null): string => {
     .trim();
 };
 
-// Inisialisasi VFS pdfMake dengan biner Roboto bawaan
+// Inisialisasi VFS pdfMake dengan biner Roboto bawaan secara lokal
 const vfsFonts = (pdfFonts as any)?.pdfMake?.vfs || (pdfFonts as any)?.vfs || (pdfFonts as any);
 
 // Default font definitions untuk Roboto
@@ -209,16 +209,15 @@ export const PdfExportService = {
       content: pdfContent,
     };
 
-    // 7. Render PDF: Daftarkan VFS dan Font secara global pada objek pdfMake
+    // 7. Render PDF: Hubungkan data VFS dan Font secara lokal langsung ke parameter pembuat pdfMake
     const targetFilename = filename.toLowerCase().endsWith('.pdf') ? filename : `${filename}.pdf`;
     const combinedVfs = {
       ...(vfsFonts || {}),
       ...customVfs
     };
-    (pdfMake as any).fonts = fontDefinitions;
-    (pdfMake as any).vfs = combinedVfs;
 
-    (pdfMake as any).createPdf(docDefinition).download(targetFilename);
+    // EKSEKUSI PROTECTED VARIATION: Teruskan vfs & fonts lokal langsung untuk mengabaikan proteksi global ESM Vite [5]
+    (pdfMake as any).createPdf(docDefinition, null, fontDefinitions, combinedVfs).download(targetFilename);
     return { fallback: useFallbackRoboto };
   },
 
@@ -393,10 +392,10 @@ export const PdfExportService = {
       },
     };
 
-    (pdfMake as any).fonts = defaultFonts;
-    (pdfMake as any).vfs = vfsFonts;
     const targetFilename = filename || `Analisis_Deviasi_${indicator.id.toUpperCase()}_Mimika.pdf`;
-    (pdfMake as any).createPdf(docDefinition).download(targetFilename);
+
+    // EKSEKUSI PROTECTED VARIATION: Gunakan injeksi lokal secara deterministik untuk parameter ke-3 (fonts) dan ke-4 (vfs) [5]
+    (pdfMake as any).createPdf(docDefinition, null, defaultFonts, vfsFonts).download(targetFilename);
   },
 
   /**
@@ -543,9 +542,8 @@ export const PdfExportService = {
       },
     };
 
-    (pdfMake as any).fonts = defaultFonts;
-    (pdfMake as any).vfs = vfsFonts;
-    (pdfMake as any).createPdf(docDefinition).download('Nota_Dinas_Resmi_Bupati_Mimika_Maret_2026.pdf');
+    // EKSEKUSI PROTECTED VARIATION: Gunakan injeksi lokal secara deterministik untuk parameter ke-3 (fonts) dan ke-4 (vfs) [5]
+    (pdfMake as any).createPdf(docDefinition, null, defaultFonts, vfsFonts).download('Nota_Dinas_Resmi_Bupati_Mimika_Maret_2026.pdf');
   },
 
   /**
