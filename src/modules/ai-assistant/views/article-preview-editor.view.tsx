@@ -250,7 +250,7 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
       showToast('🖨️ Mengonversi dan merakit dokumen PDF resmi...');
       const fontSize = fontFamily === 'Times New Roman' ? 11 : fontFamily === 'Verdana' ? 10 : 11;
 
-      await PdfExportService.exportCustomFormattedArticlePdf(
+      const result = await PdfExportService.exportCustomFormattedArticlePdf(
         exportHtmlContent,
         {
           fontFamily,
@@ -261,7 +261,11 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
         exportTitle || 'Draf_Artikel_AKLS_Mimika'
       );
 
-      showToast('✅ Dokumen PDF resmi berhasil diunduh!');
+      if (result && result.fallback) {
+        showToast('⚠️ Font kustom tidak ditemukan di server. Dokumen berhasil dicetak menggunakan font default (Roboto).');
+      } else {
+        showToast('✅ Dokumen PDF resmi berhasil diunduh!');
+      }
     } catch (err: any) {
       const displayMsg = err.rawMessage || err.message || 'Gagal melakukan ekspor.';
       console.error('[ArticlePreviewEditor] Gagal generate PDF:', err);

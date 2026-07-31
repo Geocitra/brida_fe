@@ -87,7 +87,7 @@ export const PdfExportService = {
     htmlText: string,
     config: PDFFormatConfig,
     filename: string,
-  ): Promise<void> {
+  ): Promise<{ fallback: boolean }> {
     const fontFileMap: Record<string, { normal: string; bold: string; italics: string; bolditalics: string }> = {
       'Times New Roman': { normal: 'times.ttf', bold: 'timesbd.ttf', italics: 'timesi.ttf', bolditalics: 'timesbi.ttf' },
       'Arial': { normal: 'arial.ttf', bold: 'arialbd.ttf', italics: 'ariali.ttf', bolditalics: 'arialbi.ttf' },
@@ -100,15 +100,28 @@ export const PdfExportService = {
     const vfsPrefix = files.normal.replace('.ttf', '');
 
     // 1. Ambil berkas font .ttf secara paralel dari /public/fonts/ dengan dukungan cache
-    const [vNormal, vBold, vItalics, vBoldItalics] = await Promise.all([
-      fetchLocalFontToBase64(`/fonts/${files.normal}`),
-      fetchLocalFontToBase64(`/fonts/${files.bold}`),
-      fetchLocalFontToBase64(`/fonts/${files.italics}`),
-      fetchLocalFontToBase64(`/fonts/${files.bolditalics}`),
-    ]);
+    let vNormal = '', vBold = '', vItalics = '', vBoldItalics = '';
+    let useFallbackRoboto = false;
+
+    try {
+      [vNormal, vBold, vItalics, vBoldItalics] = await Promise.all([
+        fetchLocalFontToBase64(`/fonts/${files.normal}`),
+        fetchLocalFontToBase64(`/fonts/${files.bold}`),
+        fetchLocalFontToBase64(`/fonts/${files.italics}`),
+        fetchLocalFontToBase64(`/fonts/${files.bolditalics}`),
+      ]);
+
+      // Validasi: Berkas font TTF yang valid setidaknya berukuran > 10KB (Base64 length > ~13KB)
+      if (vNormal.length < 13000 || vBold.length < 13000 || vItalics.length < 13000 || vBoldItalics.length < 13000) {
+        throw new Error('Aset font terunduh terlalu kecil (rute teralihkan ke SPA fallback atau kosong).');
+      }
+    } catch (err: any) {
+      console.warn(`[PdfExportService] Gagal memuat font kustom ${config.fontFamily}. Otomatis beralih ke Roboto:`, err);
+      useFallbackRoboto = true;
+    }
 
     // 2. Biner font kustom disimpan secara lokal untuk dilewatkan ke pembuat dokumen kustom
-    const customVfs = {
+    const customVfs = useFallbackRoboto ? {} : {
       [`${vfsPrefix}-Regular.ttf`]: vNormal,
       [`${vfsPrefix}-Bold.ttf`]: vBold,
       [`${vfsPrefix}-Italic.ttf`]: vItalics,
@@ -150,10 +163,10 @@ export const PdfExportService = {
         bolditalics: 'Roboto-MediumItalic.ttf',
       },
       CustomFont: {
-        normal: `${vfsPrefix}-Regular.ttf`,
-        bold: `${vfsPrefix}-Bold.ttf`,
-        italics: `${vfsPrefix}-Italic.ttf`,
-        bolditalics: `${vfsPrefix}-BoldItalic.ttf`,
+        normal: useFallbackRoboto ? 'Roboto-Regular.ttf' : `${vfsPrefix}-Regular.ttf`,
+        bold: useFallbackRoboto ? 'Roboto-Medium.ttf' : `${vfsPrefix}-Bold.ttf`,
+        italics: useFallbackRoboto ? 'Roboto-Italic.ttf' : `${vfsPrefix}-Italic.ttf`,
+        bolditalics: useFallbackRoboto ? 'Roboto-MediumItalic.ttf' : `${vfsPrefix}-BoldItalic.ttf`,
       },
     };
 
@@ -206,6 +219,7 @@ export const PdfExportService = {
     (pdfMake as any).vfs = combinedVfs;
 
     (pdfMake as any).createPdf(docDefinition).download(targetFilename);
+    return { fallback: useFallbackRoboto };
   },
 
   /**
