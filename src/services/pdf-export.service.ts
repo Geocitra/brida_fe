@@ -78,10 +78,6 @@ export const PdfExportService = {
   /**
    * Mengambil draf HTML interaktif, menyuntikkan font kustom secara dinamis,
    * dan mencetak dokumen PDF formal dengan format presisi (WYSIWYG).
-   *
-   * DESAIN ARSITEKTUR: Font kustom didaftarkan melalui parameter createPdf,
-   * BUKAN melalui mutasi properti global `pdfMake.fonts`, untuk mencegah polusi
-   * state global yang merusak operasi ekspor PDF lain (Bupati Report, Analytics).
    */
   async exportCustomFormattedArticlePdf(
     htmlText: string,
@@ -96,10 +92,8 @@ export const PdfExportService = {
     };
 
     const files = fontFileMap[config.fontFamily] || fontFileMap['Arial'];
-    // Nama key VFS deterministik berdasarkan nama asli berkas agar tidak menabrak kunci lain
     const vfsPrefix = files.normal.replace('.ttf', '');
 
-    // 1. Ambil berkas font .ttf secara paralel dari /public/fonts/ dengan dukungan cache
     let vNormal = '', vBold = '', vItalics = '', vBoldItalics = '';
     let useFallbackRoboto = false;
 
@@ -111,16 +105,14 @@ export const PdfExportService = {
         fetchLocalFontToBase64(`/fonts/${files.bolditalics}`),
       ]);
 
-      // Validasi: Berkas font TTF yang valid setidaknya berukuran > 10KB (Base64 length > ~13KB)
       if (vNormal.length < 13000 || vBold.length < 13000 || vItalics.length < 13000 || vBoldItalics.length < 13000) {
-        throw new Error('Aset font terunduh terlalu kecil (rute teralihkan ke SPA fallback atau kosong).');
+        throw new Error('Aset font terunduh terlalu kecil.');
       }
     } catch (err: any) {
       console.warn(`[PdfExportService] Gagal memuat font kustom ${config.fontFamily}. Otomatis beralih ke Roboto:`, err);
       useFallbackRoboto = true;
     }
 
-    // 2. Biner font kustom disimpan secara lokal untuk dilewatkan ke pembuat dokumen kustom
     const customVfs = useFallbackRoboto ? {} : {
       [`${vfsPrefix}-Regular.ttf`]: vNormal,
       [`${vfsPrefix}-Bold.ttf`]: vBold,
@@ -128,23 +120,18 @@ export const PdfExportService = {
       [`${vfsPrefix}-BoldItalic.ttf`]: vBoldItalics,
     };
 
-    // 3. Konversi satuan margin kertas dari Sentimeter ke Satuan Point (1 cm = ~28.3465 pt)
     const marginPoints = Math.round(config.marginCm * 28.3465);
 
-    // 4. Terjemahkan draf HTML menjadi representasi JSON AST pdfMake
-    // Bersihkan whitespace dan tag kosong di akhir konten HTML untuk mencegah halaman kosong tambahan di akhir PDF
     let sanitizedHtml = htmlText.trim();
     const trailingEmptyRegex = /(?:<p>\s*<\/p>|<p>\s*<br\s*\/?>\s*<\/p>|<p>&nbsp;<\/p>|<br\s*\/?>)+$/i;
     sanitizedHtml = sanitizedHtml.replace(trailingEmptyRegex, '').trim();
 
-    // Abaikan style font-family bawaan agar tidak memicu error pencarian font di pdfMake VFS
-    // Daftarkan customStyles untuk menjamin standardisasi rendering tag semantik HTML
     const pdfContent = htmlToPdfmake(sanitizedHtml, {
       window: window,
       ignoreStyles: ['font-family'],
       removeExtraBlanks: true,
       customStyles: {
-        'p': { margin: [0, 0, 0, 8], alignment: 'justify' }, // Gunakan justify sebagai layout default paragraf
+        'p': { margin: [0, 0, 0, 8], alignment: 'justify' },
         'ul': { margin: [10, 4, 0, 8] },
         'ol': { margin: [10, 4, 0, 8] },
         'li': { margin: [0, 2, 0, 2], lineHeight: config.lineSpacing },
@@ -154,7 +141,6 @@ export const PdfExportService = {
       }
     });
 
-    // 5. Susun font definitions — WAJIB dikirim sebagai argumen ke-3 createPdf(), BUKAN di dalam docDefinition.
     const fontDefinitions: any = {
       Roboto: {
         normal: 'Roboto-Regular.ttf',
@@ -170,7 +156,6 @@ export const PdfExportService = {
       },
     };
 
-    // 6. Susun docDefinition — mendaftarkan class khusus html-to-pdfmake untuk menjaga margin list
     const docDefinition: any = {
       pageSize: 'A4',
       pageMargins: [marginPoints, marginPoints, marginPoints, marginPoints],
@@ -178,19 +163,12 @@ export const PdfExportService = {
         font: 'CustomFont',
         fontSize: config.fontSize,
         lineHeight: config.lineSpacing,
-        alignment: 'justify', // Default alignment jika paragraph tidak memiliki align kustom
+        alignment: 'justify',
       },
       styles: {
-        'html-ul': {
-          margin: [10, 2, 0, 6] // Indentasi margin kiri aman untuk bullet list standar
-        },
-        'html-ol': {
-          margin: [10, 2, 0, 6] // Indentasi margin kiri aman untuk numbered list standar
-        },
-        'html-li': {
-          lineHeight: config.lineSpacing,
-          margin: [0, 1, 0, 1]
-        }
+        'html-ul': { margin: [10, 2, 0, 6] },
+        'html-ol': { margin: [10, 2, 0, 6] },
+        'html-li': { lineHeight: config.lineSpacing, margin: [0, 1, 0, 1] }
       },
       header: {
         text: 'Geo Analisis ANALYSIS',
@@ -209,16 +187,19 @@ export const PdfExportService = {
       content: pdfContent,
     };
 
-    // 7. Render PDF: Hubungkan data VFS dan Font secara lokal langsung ke parameter pembuat pdfMake
     const targetFilename = filename.toLowerCase().endsWith('.pdf') ? filename : `${filename}.pdf`;
     const combinedVfs = {
       ...(vfsFonts || {}),
       ...customVfs
     };
 
-    // EKSEKUSI PROTECTED VARIATION: Teruskan vfs & fonts lokal langsung untuk mengabaikan proteksi global ESM Vite [5]
-    // Parameter kedua diubah dari null menjadi {} untuk mematuhi aturan strict-type dari pdfMake modern.
-    (pdfMake as any).createPdf(docDefinition, {}, fontDefinitions, combinedVfs).download(targetFilename);
+    // SINKRONISASI ARSITEKTUR PDFMAKE 0.3.x: Gunakan API resmi asinkron/ESM untuk registrasi VFS dan Fonts kustom
+    (pdfMake as any).addVirtualFileSystem(combinedVfs);
+    (pdfMake as any).addFonts(fontDefinitions);
+
+    // Jalankan kompilasi dokumen
+    (pdfMake as any).createPdf(docDefinition).download(targetFilename);
+
     return { fallback: useFallbackRoboto };
   },
 
@@ -244,35 +225,13 @@ export const PdfExportService = {
         margin: [45, 12, 45, 0],
       }),
       content: [
-        // ── Judul Laporan ──────────────────────────────────────────────────────
-        {
-          text: 'LEMBAR DIAGNOSTIK & DEVIASI INDIKATOR',
-          fontSize: 15,
-          bold: true,
-          color: '#0f172a',
-          alignment: 'center',
-          margin: [0, 0, 0, 4],
-        },
-        {
-          text: `${indicator.name}  ·  ${indicator.sector}  ·  ${indicator.period}`,
-          fontSize: 9,
-          color: '#0d9488',
-          bold: true,
-          alignment: 'center',
-          margin: [0, 0, 0, 12],
-        },
-        {
-          canvas: [{ type: 'line', x1: 0, y1: 0, x2: 505, y2: 0, lineWidth: 1.5, lineColor: '#0f172a' }],
-          margin: [0, 0, 0, 18],
-        },
-        // ── Seksi 1 ────────────────────────────────────────────────────────────
+        { text: 'LEMBAR DIAGNOSTIK & DEVIASI INDIKATOR', fontSize: 15, bold: true, color: '#0f172a', alignment: 'center', margin: [0, 0, 0, 4] },
+        { text: `${indicator.name}  ·  ${indicator.sector}  ·  ${indicator.period}`, fontSize: 9, color: '#0d9488', bold: true, alignment: 'center', margin: [0, 0, 0, 12] },
+        { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 505, y2: 0, lineWidth: 1.5, lineColor: '#0f172a' }], margin: [0, 0, 0, 18] },
         {
           keepTogether: true,
           stack: [
-            {
-              text: '1. RINGKASAN DEVIASI CAPAIAN',
-              style: 'sectionHeader',
-            },
+            { text: '1. RINGKASAN DEVIASI CAPAIAN', style: 'sectionHeader' },
             {
               table: {
                 widths: ['*', '*', '*'],
@@ -294,32 +253,17 @@ export const PdfExportService = {
             },
           ],
         },
-        // ── Seksi 2 ────────────────────────────────────────────────────────────
         {
           keepTogether: true,
           stack: [
-            {
-              text: '2. RINGKASAN EKSEKUTIF ANALISIS (AI-SYNTHESIS)',
-              style: 'sectionHeader',
-            },
-            {
-              text: stripCitationTokens(indicator.summary) || 'Hasil analisis deskriptif AI belum tersedia.',
-              fontSize: 10,
-              lineHeight: 1.55,
-              alignment: 'justify',
-              color: '#1e293b',
-              margin: [0, 0, 0, 18],
-            },
+            { text: '2. RINGKASAN EKSEKUTIF ANALISIS (AI-SYNTHESIS)', style: 'sectionHeader' },
+            { text: stripCitationTokens(indicator.summary) || 'Hasil analisis deskriptif AI belum tersedia.', fontSize: 10, lineHeight: 1.55, alignment: 'justify', color: '#1e293b', margin: [0, 0, 0, 18] },
           ]
         },
-        // ── Seksi 3 ────────────────────────────────────────────────────────────
         {
           keepTogether: true,
           stack: [
-            {
-              text: '3. ANALISIS FAKTOR PENYEBAB (AI — Causal Inference)',
-              style: 'sectionHeader',
-            },
+            { text: '3. ANALISIS FAKTOR PENYEBAB (AI — Causal Inference)', style: 'sectionHeader' },
             {
               table: {
                 widths: ['*', 65],
@@ -339,18 +283,12 @@ export const PdfExportService = {
             },
           ]
         },
-        // ── Seksi 4 ────────────────────────────────────────────────────────────
         {
           id: 'section4',
           keepTogether: true,
-          pageBreakBefore: function (currentNode: any) {
-            return currentNode.id === 'section4';
-          },
+          pageBreakBefore: function (currentNode: any) { return currentNode.id === 'section4'; },
           stack: [
-            {
-              text: '4. MATRIKS REKOMENDASI RESPON (ACTION PLAN)',
-              style: 'sectionHeader',
-            },
+            { text: '4. MATRIKS REKOMENDASI RESPON (ACTION PLAN)', style: 'sectionHeader' },
             {
               table: {
                 widths: [85, '*', 90, 75],
@@ -376,28 +314,18 @@ export const PdfExportService = {
         },
       ],
       styles: {
-        sectionHeader: {
-          fontSize: 11,
-          bold: true,
-          color: '#0f172a',
-          alignment: 'left',
-          margin: [0, 4, 0, 8],
-        },
-        tableHeader: {
-          bold: true,
-          fontSize: 9,
-          color: '#0f172a',
-          fillColor: '#f1f5f9',
-          alignment: 'center',
-        },
+        sectionHeader: { fontSize: 11, bold: true, color: '#0f172a', alignment: 'left', margin: [0, 4, 0, 8] },
+        tableHeader: { bold: true, fontSize: 9, color: '#0f172a', fillColor: '#f1f5f9', alignment: 'center' },
       },
     };
 
     const targetFilename = filename || `Analisis_Deviasi_${indicator.id.toUpperCase()}_Mimika.pdf`;
 
-    // EKSEKUSI PROTECTED VARIATION: Gunakan injeksi lokal secara deterministik untuk parameter ke-3 (fonts) dan ke-4 (vfs) [5]
-    // Parameter kedua diubah dari null menjadi {} untuk mematuhi aturan strict-type dari pdfMake modern.
-    (pdfMake as any).createPdf(docDefinition, {}, defaultFonts, vfsFonts).download(targetFilename);
+    // SINKRONISASI ARSITEKTUR PDFMAKE 0.3.x: Gunakan API resmi asinkron/ESM untuk registrasi VFS dan Fonts kustom
+    (pdfMake as any).addVirtualFileSystem(vfsFonts);
+    (pdfMake as any).addFonts(defaultFonts);
+
+    (pdfMake as any).createPdf(docDefinition).download(targetFilename);
   },
 
   /**
@@ -425,10 +353,7 @@ export const PdfExportService = {
         { text: 'DOKUMEN REKOMENDASI KEBIJAKAN', fontSize: 13, bold: true, alignment: 'center', color: '#0f172a' },
         { text: 'ANALISIS Geo Analisis', fontSize: 11, bold: true, alignment: 'center', color: '#0d9488', margin: [0, 3, 0, 3] },
         { text: 'Sistem Informasi dan Dashboard Kebijakan Terintegrasi', fontSize: 8.5, alignment: 'center', color: '#565c63', margin: [0, 0, 0, 10] },
-        {
-          canvas: [{ type: 'line', x1: 0, y1: 0, x2: 495, y2: 0, lineWidth: 2, lineColor: '#0f172a' }],
-          margin: [0, 0, 0, 14],
-        },
+        { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 495, y2: 0, lineWidth: 2, lineColor: '#0f172a' }], margin: [0, 0, 0, 14] },
         // ── Judul Nota ─────────────────────────────────────────────────────────
         { text: report.title, fontSize: 13, bold: true, alignment: 'left', color: '#0f172a', margin: [0, 0, 0, 14] },
         // ── Metadata Nota ──────────────────────────────────────────────────────
@@ -544,9 +469,11 @@ export const PdfExportService = {
       },
     };
 
-    // EKSEKUSI PROTECTED VARIATION: Gunakan injeksi lokal secara deterministik untuk parameter ke-3 (fonts) dan ke-4 (vfs) [5]
-    // Parameter kedua diubah dari null menjadi {} untuk mematuhi aturan strict-type dari pdfMake modern.
-    (pdfMake as any).createPdf(docDefinition, {}, defaultFonts, vfsFonts).download('Nota_Dinas_Resmi_Bupati_Mimika_Maret_2026.pdf');
+    // SINKRONISASI ARSITEKTUR PDFMAKE 0.3.x: Gunakan API resmi asinkron/ESM untuk registrasi VFS dan Fonts kustom
+    (pdfMake as any).addVirtualFileSystem(vfsFonts);
+    (pdfMake as any).addFonts(defaultFonts);
+
+    (pdfMake as any).createPdf(docDefinition).download('Nota_Dinas_Resmi_Bupati_Mimika_Maret_2026.pdf');
   },
 
   /**
@@ -564,7 +491,7 @@ export const PdfExportService = {
         deviationText: '-22.7% (KRITIS)',
         causalFactors: [
           { label: 'Evaluasi & Verifikasi Administratif Proyek', percentage: 45 },
-          { label: 'Eskalasi Biaya & Logistik Wilayah', percentage: 35 },
+          { text: 'Eskalasi Biaya & Logistik Wilayah', percentage: 35 },
           { label: 'Faktor Hambatan Cuaca Ekstrem', percentage: 20 },
         ],
         priorityRecommendations: [
