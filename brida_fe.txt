@@ -464,7 +464,19 @@ export function App() {
     }
   });
 
-  const [activeRoute, setActiveRoute] = useState<string>('landing');
+  const [activeRoute, setActiveRoute] = useState<string>(() => {
+    try {
+      const isAuth = sessionStorage.getItem(AUTH_SESSION_KEY) === 'true';
+      const savedRoute = sessionStorage.getItem('brida_active_route');
+      if (isAuth) {
+        return savedRoute && savedRoute !== 'landing' ? savedRoute : 'dashboard';
+      }
+      return 'landing';
+    } catch {
+      return 'landing';
+    }
+  });
+
   const [initialArticlePrompt, setInitialArticlePrompt] = useState<string | undefined>(undefined);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
 
@@ -485,6 +497,14 @@ export function App() {
       window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
     } catch (err) {
       window.scrollTo(0, 0);
+    }
+  }, [activeRoute]);
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem('brida_active_route', activeRoute);
+    } catch (err) {
+      console.warn('[SessionStorage] Gagal menyimpan rute aktif:', err);
     }
   }, [activeRoute]);
 
@@ -525,6 +545,8 @@ export function App() {
       sessionStorage.removeItem(AUTH_SESSION_KEY);
       sessionStorage.removeItem(SESSION_FORWARD_DOCS_KEY);
       sessionStorage.removeItem(PENDING_ROUTE_KEY);
+      sessionStorage.removeItem('brida_active_route');
+      sessionStorage.removeItem('brida_last_activity');
     } catch (err) {
       console.warn('[Auth] Gagal membersihkan session saat logout:', err);
     }
@@ -534,9 +556,55 @@ export function App() {
     setSharedDocIds(undefined);
   };
 
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    const INACTIVITY_TIMEOUT = 15 * 60 * 1000;
+    const LAST_ACTIVITY_KEY = 'brida_last_activity';
+
+    const updateActivity = () => {
+      try {
+        sessionStorage.setItem(LAST_ACTIVITY_KEY, Date.now().toString());
+      } catch (err) {
+
+      }
+    };
+
+    updateActivity();
+
+    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'];
+    const handleEvent = () => updateActivity();
+
+    events.forEach(event => {
+      window.addEventListener(event, handleEvent);
+    });
+
+    const interval = setInterval(() => {
+      try {
+        const lastActivity = sessionStorage.getItem(LAST_ACTIVITY_KEY);
+        if (lastActivity) {
+          const timeDiff = Date.now() - parseInt(lastActivity, 10);
+          if (timeDiff > INACTIVITY_TIMEOUT) {
+            console.log('[Auth] Sesi berakhir karena tidak ada aktivitas selama 15 menit.');
+            handleLogout();
+          }
+        }
+      } catch (err) {
+
+      }
+    }, 10000);
+
+    return () => {
+      events.forEach(event => {
+        window.removeEventListener(event, handleEvent);
+      });
+      clearInterval(interval);
+    };
+  }, [isAuthenticated]);
+
   const handleNavigationAttempt = (route: string, sessionId?: string | null) => {
 
-    const publicRoutes = ['landing', 'gis-explorer'];
+    const publicRoutes = ['landing'];
 
     if (!publicRoutes.includes(route) && !isAuthenticated) {
 
@@ -617,6 +685,8 @@ export function App() {
         return (
           <LandingView
             onNavigate={handleNavigationAttempt}
+            isAuthenticated={isAuthenticated}
+            onLogout={handleLogout}
           />
         );
       case 'dashboard':
@@ -645,6 +715,7 @@ export function App() {
             initialSelectedDocIds={sharedDocIds}
             onClearSharedDocIds={handleClearSharedDocIds}
             onNavigateToGenerator={(prompt) => handleForwardAction(sharedDocIds || [], 'generator', prompt)}
+            onNavigate={handleNavigationAttempt}
           />
         );
       case 'reports':
@@ -654,6 +725,7 @@ export function App() {
             onClearSharedDocIds={handleClearSharedDocIds}
             onNavigateToGenerator={(prompt) => handleForwardAction(sharedDocIds || [], 'generator', prompt)}
             onNavigateToDashboard={() => handleNavigationAttempt('dashboard')}
+            onNavigate={handleNavigationAttempt}
           />
         );
       case 'ai-request':
@@ -690,6 +762,8 @@ export function App() {
         return (
           <LandingView
             onNavigate={handleNavigationAttempt}
+            isAuthenticated={isAuthenticated}
+            onLogout={handleLogout}
           />
         );
     }
@@ -1013,7 +1087,10 @@ import {
   AlertCircle,
   Plus,
   FileText,
+  Database,
+  FolderOpen,
 } from 'lucide-react';
+import { EmptyState } from './empty-state.component';
 
 interface CategorizedDocumentSelectorProps {
   documents: DocumentRecord[];
@@ -1023,6 +1100,7 @@ interface CategorizedDocumentSelectorProps {
   onClearAll: () => void;
   isLoading?: boolean;
   onUploadNew?: () => void;
+  onNavigate?: (route: string) => void;
   title?: string;
   isLocked?: boolean;
 }
@@ -1035,6 +1113,7 @@ export const CategorizedDocumentSelector: React.FC<CategorizedDocumentSelectorPr
   onClearAll,
   isLoading = false,
   onUploadNew,
+  onNavigate,
   title = 'Pilih Dokumen Acuan Berdasarkan Kategori',
   isLocked = false,
 }) => {
@@ -1130,11 +1209,11 @@ export const CategorizedDocumentSelector: React.FC<CategorizedDocumentSelectorPr
             type="button"
             onClick={onSelectAll}
             disabled={isLocked}
-            className={`text-xs font-bold text-teal-700 ${isLocked ? 'opacity-40 cursor-not-allowed' : 'hover:underline cursor-pointer'}`}
+            className={`text-xs font-bold ${isLocked ? 'opacity-40 cursor-not-allowed' : 'text-teal-700 hover:text-teal-900 cursor-pointer'}`}
           >
             Pilih Semua
           </button>
-          <span className="text-slate-300 text-xs">&bull;</span>
+          <span className="text-slate-300">|</span>
           <button
             type="button"
             onClick={onClearAll}
@@ -1152,23 +1231,34 @@ export const CategorizedDocumentSelector: React.FC<CategorizedDocumentSelectorPr
           <span>Memuat daftar dokumen dari database...</span>
         </div>
       ) : documents.length === 0 ? (
-        <div className="p-6 bg-slate-50 border border-slate-200 text-center space-y-2">
-          <AlertCircle size={24} className="mx-auto text-slate-400" />
-          <p className="text-xs font-semibold text-slate-700">
-            Belum ada dokumen terindeks di Repositori database.
-          </p>
-          {onUploadNew && (
-            <button
-              type="button"
-              onClick={onUploadNew}
-              disabled={isLocked}
-              className="px-3 py-1.5 bg-teal-700 text-white text-xs font-bold uppercase rounded-none inline-flex items-center gap-1.5 cursor-pointer disabled:bg-slate-300"
-            >
-              <Plus size={13} />
-              <span>Unggah Dokumen Acuan Pertama</span>
-            </button>
-          )}
-        </div>
+        <EmptyState
+          icon={Database}
+          title="Repositori Dokumen Kosong"
+          description="Belum ada dokumen terindeks di Repositori database."
+          actionButton={
+            onUploadNew ? (
+              <button
+                type="button"
+                onClick={onUploadNew}
+                disabled={isLocked}
+                className="px-4 py-2 bg-teal-700 hover:bg-teal-800 text-white text-xs font-bold uppercase rounded-none inline-flex items-center gap-1.5 cursor-pointer disabled:bg-slate-300"
+              >
+                <Plus size={13} />
+                <span>Unggah Dokumen Acuan Pertama</span>
+              </button>
+            ) : onNavigate ? (
+              <button
+                type="button"
+                onClick={() => onNavigate('knowledge-hub')}
+                disabled={isLocked}
+                className="px-4 py-2 bg-[#0070c0] hover:bg-blue-700 text-white text-xs font-bold uppercase rounded-none inline-flex items-center gap-1.5 cursor-pointer disabled:bg-slate-300"
+              >
+                <FolderOpen size={13} />
+                <span>Unggah & Kelola Dokumen di Repositori</span>
+              </button>
+            ) : null
+          }
+        />
       ) : (
 
         <div className={`grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-slate-200 border-slate-200 py-1 font-roboto ${isLocked ? 'opacity-50 pointer-events-none' : ''}`}>
@@ -1326,6 +1416,42 @@ export const CategorizedDocumentSelector: React.FC<CategorizedDocumentSelectorPr
           </div>
         </div>
       )}
+    </div>
+  );
+};
+
+--- FILE: src\components\common\empty-state.component.tsx ---
+import React from 'react';
+import { type LucideIcon, FileText } from 'lucide-react';
+
+interface EmptyStateProps {
+  icon?: LucideIcon;
+  title: string;
+  description?: string;
+  actionButton?: React.ReactNode;
+}
+
+export const EmptyState: React.FC<EmptyStateProps> = ({
+  icon: Icon = FileText,
+  title,
+  description,
+  actionButton,
+}) => {
+  return (
+    <div className="flex flex-col items-center justify-center p-8 border border-dashed border-slate-300 bg-slate-50/30 rounded-none text-center select-none space-y-3 w-full">
+      <Icon size={32} className="text-slate-400 shrink-0" />
+
+      <div className="space-y-1 max-w-md">
+        <h3 className="text-xs font-black uppercase tracking-wider text-slate-800 font-roboto">
+          {title}
+        </h3>
+        {description && (
+          <p className="text-[11px] text-slate-500 leading-relaxed font-medium font-roboto">
+            {description}
+          </p>
+        )}
+      </div>
+      {actionButton && <div className="pt-1">{actionButton}</div>}
     </div>
   );
 };
@@ -1517,7 +1643,6 @@ export const TopHeader: React.FC<TopHeaderProps> = ({ activeRoute, onNavigate, o
 
         {}
         <div className="flex items-center gap-3 shrink-0">
-          <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse" title="System Online" />
 
           {onLogout && (
             <button
@@ -1553,14 +1678,16 @@ export default function ImageCarousel({
 }: ImageCarouselProps) {
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const [activeIndex, setActiveIndex] = useState(0);
-
     const { openGallery } = useExplorerStore();
+
+    const containerClasses = "w-full aspect-[16/10] bg-slate-950 border-b border-slate-200 shrink-0 select-none overflow-hidden relative group rounded-none";
+    const imageClasses = "w-full h-full object-cover object-center transform-gpu scale-100 hover:scale-103 transition-transform duration-500 ease-out will-change-transform";
 
     if (!images || images.length === 0) {
         return (
-            <div className="w-full aspect-video bg-slate-100 flex flex-col items-center justify-center border-b border-slate-200 shrink-0 select-none">
-                <Layers size={24} className="text-slate-300 mb-2" />
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+            <div className={`${containerClasses} flex flex-col items-center justify-center bg-slate-100`}>
+                <Layers size={22} className="text-slate-300 mb-1.5 animate-pulse" />
+                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
                     Tidak Ada Visualisasi Foto
                 </span>
             </div>
@@ -1570,21 +1697,23 @@ export default function ImageCarousel({
     if (images.length === 1) {
         return (
             <button
+                type="button"
                 onClick={() => openGallery(images, 0, altText)}
-                className="relative w-full aspect-video border-b border-slate-200 bg-slate-100 shrink-0 group block cursor-pointer overflow-hidden rounded-none"
+                className={`${containerClasses} block cursor-pointer border-none p-0`}
             >
                 <img
                     src={images[0]}
                     alt={altText}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+                    className={imageClasses}
+                    loading="lazy"
                     draggable={false}
                 />
-                <div className="absolute inset-0 bg-slate-900/0 group-hover:bg-slate-900/20 transition-colors pointer-events-none" />
+                <div className="absolute inset-0 bg-slate-950/0 group-hover:bg-slate-950/20 transition-colors duration-300 pointer-events-none" />
 
                 {}
-                <div className="absolute bottom-2 right-2 bg-slate-900/80 backdrop-blur-md px-2.5 py-1.5 flex items-center gap-1.5 text-white opacity-0 group-hover:opacity-100 transition-opacity border border-white/20 select-none">
-                    <Maximize2 size={12} strokeWidth={2.5} />
-                    <span className="text-[9px] font-bold uppercase tracking-widest">Perbesar</span>
+                <div className="absolute bottom-3.5 right-3.5 bg-slate-900/90 backdrop-blur-md px-3 py-2 flex items-center gap-1.5 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-300 border border-white/10 shadow-lg pointer-events-none">
+                    <Maximize2 size={11} strokeWidth={2.5} />
+                    <span className="text-[8px] font-black uppercase tracking-widest">Perbesar</span>
                 </div>
             </button>
         );
@@ -1594,61 +1723,63 @@ export default function ImageCarousel({
         if (!scrollContainerRef.current) return;
         const scrollPosition = scrollContainerRef.current.scrollLeft;
         const width = scrollContainerRef.current.clientWidth;
-        const newIndex = Math.round(scrollPosition / width);
-        setActiveIndex(newIndex);
+        if (width > 0) {
+            const newIndex = Math.round(scrollPosition / width);
+            setActiveIndex(newIndex);
+        }
     };
 
     return (
-        <div className="relative w-full aspect-video border-b border-slate-200 bg-slate-900 shrink-0 group">
-
+        <div className={containerClasses}>
             {}
             <div
                 ref={scrollContainerRef}
                 onScroll={handleScroll}
-                className="flex w-full h-full overflow-x-auto snap-x snap-mandatory [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+                className="flex w-full h-full overflow-x-auto snap-x snap-mandatory scroll-smooth [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
             >
                 {images.map((src, idx) => (
                     <button
                         key={idx}
+                        type="button"
                         onClick={() => openGallery(images, idx, altText)}
                         className="w-full h-full shrink-0 snap-center relative block cursor-pointer rounded-none border-none p-0"
                     >
                         <img
                             src={src}
                             alt={`${altText} - Foto ke-${idx + 1}`}
-                            className="w-full h-full object-cover hover:scale-105 transition-transform duration-700"
+                            className={imageClasses}
+                            loading="lazy"
                             draggable={false}
                         />
-                        {}
-                        <div className="absolute inset-0 bg-gradient-to-t from-slate-900/70 via-transparent to-transparent pointer-events-none" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-slate-950/60 via-transparent to-transparent pointer-events-none" />
                     </button>
                 ))}
             </div>
 
             {}
             <button
+                type="button"
                 onClick={() => openGallery(images, activeIndex, altText)}
-                className="absolute bottom-2 right-2 z-10 bg-slate-900/80 hover:bg-teal-600 backdrop-blur-md px-2.5 py-1.5 flex items-center gap-1.5 text-white transition-all border border-white/20 shadow-md group-hover:scale-105 cursor-pointer rounded-none"
+                className="absolute bottom-3 right-3 z-10 bg-slate-900/90 hover:bg-teal-700 backdrop-blur-md px-3 py-2 flex items-center gap-1.5 text-white transition-all duration-300 border border-white/10 shadow-lg cursor-pointer rounded-none hover:scale-102"
             >
-                <Maximize2 size={12} strokeWidth={2.5} />
-                <span className="text-[9px] font-black uppercase tracking-widest select-none">
+                <Maximize2 size={11} strokeWidth={2.5} />
+                <span className="text-[8px] font-black uppercase tracking-widest select-none">
                     Lihat {images.length} Foto
                 </span>
             </button>
 
             {}
-            <div className="absolute bottom-3 left-3 flex items-center gap-1.5 z-10 pointer-events-none select-none">
+            <div className="absolute bottom-4 left-4 flex items-center gap-1.5 z-10 pointer-events-none select-none">
                 {images.map((_, idx) => (
                     <div
                         key={idx}
-                        className={`transition-all duration-300 rounded-none ${idx === activeIndex
-                            ? "w-4 h-1.5 bg-teal-400 shadow-[0_0_8px_rgba(45,212,191,0.8)]"
-                            : "w-1.5 h-1.5 bg-white/40"
+                        className={`transition-all duration-300 h-1 rounded-none ${idx === activeIndex
+                            ? "w-5 bg-teal-400 shadow-[0_0_8px_rgba(20,184,166,0.8)]"
+                            : "w-1.5 bg-white/40"
                             }`}
                     />
                 ))}
             </div>
-
         </div>
     );
 }
@@ -2069,6 +2200,7 @@ import {
 } from 'lucide-react';
 import { AiAssistantService, AiServiceException } from '../../../services/ai-assistant.service';
 import { AiErrorMapper } from '../utils/error-mapper.util';
+import { EmptyState } from '../../../components/common/empty-state.component';
 
 interface MarkdownTableRendererProps {
   rawTable: string;
@@ -2993,10 +3125,12 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                 <span>Memuat riwayat...</span>
               </div>
             ) : qaSessions.length === 0 ? (
-              <div className="py-8 text-center text-slate-400 text-xs px-3 space-y-1">
-                <MessageSquare size={24} className="mx-auto opacity-50" />
-                <p className="font-semibold">Belum ada riwayat chat.</p>
-                <p className="text-[11px]">Kirim pertanyaan untuk membuat sesi pertama.</p>
+              <div className="p-4">
+                <EmptyState
+                  icon={MessageSquare}
+                  title="Chat Kosong"
+                  description="Kirim pertanyaan untuk membuat sesi pertama."
+                />
               </div>
             ) : (
               qaSessions.map((s) => {
@@ -3106,7 +3240,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
                     <span className="text-xs font-bold text-slate-800 uppercase tracking-wide font-roboto">
-                      {msg.sender === 'user' ? 'User' : 'BRIDA AI Assistant'}
+                      {msg.sender === 'user' ? 'User' : 'AKLS AI Assistant'}
                     </span>
                     <span className="text-[10px] text-slate-400 font-medium">{msg.timestamp}</span>
                   </div>
@@ -3759,7 +3893,7 @@ export const AiErrorMapper = {
             case 'CONNECTION_FAILURE':
                 return {
                     title: 'Hambatan Koneksi Server',
-                    description: 'Sistem mengalami kegagalan transmisi data sementara dengan server BRIDA Mimika. Silakan pastikan perangkat Anda terhubung ke internet dan coba kirim kembali pesan Anda.',
+                    description: 'Sistem mengalami kegagalan transmisi data sementara dengan server AKLS. Silakan pastikan perangkat Anda terhubung ke internet dan coba kirim kembali pesan Anda.',
                     iconName: 'WifiOff',
                     actionType: 'RETRY',
                 };
@@ -3838,7 +3972,7 @@ export const AiErrorMapper = {
         if (statusCode >= 500 && statusCode < 600) {
             return {
                 title: 'Kendala Sistem Internal',
-                description: 'Sistem BRIDA sedang mengalami kendala teknis internal saat mengolah data. Tim analis telah diberi tahu untuk melakukan perbaikan. Mohon coba beberapa saat lagi.',
+                description: 'Sistem AKLS sedang mengalami kendala teknis internal saat mengolah data. Tim analis telah diberi tahu untuk melakukan perbaikan. Mohon coba beberapa saat lagi.',
                 iconName: 'AlertCircle',
                 actionType: 'RETRY',
             };
@@ -4158,6 +4292,7 @@ import type { DocumentRecord } from '../../../services/document.service';
 import { AiAssistantService, AiServiceException } from '../../../services/ai-assistant.service';
 import type { ArticleSessionDetail } from '../../../services/ai-assistant.service';
 import { CategorizedDocumentSelector } from '../../../components/common/categorized-document-selector.component';
+import { EmptyState } from '../../../components/common/empty-state.component';
 import { ChatInputBar } from '../components/chat-input-bar.component';
 import type { StagedAttachment } from '../components/chat-input-bar.component';
 import { RichMessageRenderer } from '../components/chat-panel.component';
@@ -4628,7 +4763,7 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
   };
 
   return (
-    <div className="flex flex-col w-full h-250 min-h-0 bg-slate-100/70 p-4 space-y-4 font-roboto overflow-hidden">
+    <div className="flex flex-col w-full h-[calc(100vh-180px)] min-h-[600px] bg-slate-100/70 p-4 space-y-4 font-roboto overflow-hidden">
       {}
       {toastMessage && (
         <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-5 py-3 border border-slate-700 shadow-xl flex items-center gap-3 rounded-none animate-in fade-in duration-200">
@@ -4709,7 +4844,13 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
                   <span>Memuat...</span>
                 </div>
               ) : filteredArticleSessions.length === 0 ? (
-                <p className="text-[10px] text-slate-400 py-8 px-3 italic">Belum ada riwayat naskah.</p>
+                <div className="p-4">
+                  <EmptyState
+                    icon={History}
+                    title="Naskah Kosong"
+                    description="Belum ada riwayat naskah dibuat."
+                  />
+                </div>
               ) : (
                 filteredArticleSessions.map((sess) => {
                   const isActive = activeSessionId === sess.id;
@@ -4795,7 +4936,7 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <span className="text-xs font-bold text-slate-800 uppercase tracking-wide">
-                        {msg.sender === 'user' ? 'Editor BRIDA' : 'BRIDA AI Writer'}
+                        {msg.sender === 'user' ? 'Editor AKLS' : 'AKLS AI Writer'}
                       </span>
                       <span className="text-[10px] text-slate-400">{msg.timestamp}</span>
                     </div>
@@ -4851,7 +4992,7 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
         <div className="w-1/2 h-full flex flex-col min-h-0 bg-white border border-slate-300 shadow-xs overflow-hidden relative">
 
           {isGenerating && (
-            <div className="absolute inset-0 z-40 bg-slate-900/15 backdrop-blur-md flex flex-col items-center justify-center text-teal-900 font-bold space-y-3 no-print animate-in fade-in duration-200">
+            <div className="absolute inset-0 z-30 bg-slate-900/15 backdrop-blur-md flex flex-col items-center justify-center text-teal-900 font-bold space-y-3 no-print animate-in fade-in duration-200">
               <Loader2 size={32} className="animate-spin text-teal-700" />
               <span className="text-xs uppercase tracking-wider bg-white border border-slate-300 px-4 py-2 shadow-sm font-roboto font-extrabold rounded-none">
                 AI sedang menyusun naskah...
@@ -4879,7 +5020,7 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
                 >
                   {}
                   <h1 className="text-center font-bold uppercase border-b-2 border-slate-900 pb-2 mb-6 tracking-wide text-xs">
-                    {articleTitle || 'Draf Naskah Kebijakan BRIDA'}
+                    {articleTitle || 'Draf Naskah Kebijakan AKLS'}
                   </h1>
 
                   {}
@@ -5092,7 +5233,7 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
       setEditableText(htmlContent);
       editor.commands.setContent(htmlContent);
 
-      showToast('💾 Perubahan naskah Anda berhasil disimpan permanen ke database BRIDA!');
+      showToast('💾 Perubahan naskah Anda berhasil disimpan permanen ke database AKLS!');
     } catch (err: any) {
       const displayMsg = err.rawMessage || err.message || 'Gagal menyinkronkan data.';
       showToast(`Gagal menyimpan ke database: ${displayMsg}`);
@@ -5179,7 +5320,7 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
           lineSpacing,
           marginCm,
         },
-        exportTitle || 'Draf_Artikel_BRIDA_Mimika'
+        exportTitle || 'Draf_Artikel_AKLS_Mimika'
       );
 
       showToast('✅ Dokumen PDF resmi berhasil diunduh!');
@@ -5902,6 +6043,7 @@ import {
 import { PdfExportService } from '../../../services/pdf-export.service';
 import { DocumentService, type DocumentRecord } from '../../../services/document.service';
 import { ReportService, type CheckCacheResponse } from '../../../services/report.service';
+import { EmptyState } from '../../../components/common/empty-state.component';
 import {
   Download,
   Send,
@@ -5938,12 +6080,14 @@ interface AnalyticsViewProps {
   onNavigateToGenerator?: (initialPrompt?: string) => void;
   initialSelectedDocIds?: string[]; // Prop baru hasil forward [3]
   onClearSharedDocIds?: () => void;  // Callback pembersihan [3]
+  onNavigate?: (route: string) => void;
 }
 
 export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
   onNavigateToGenerator,
   initialSelectedDocIds,
   onClearSharedDocIds,
+  onNavigate,
 }) => {
   const [compareResult, setCompareResult] = useState<DeviationCompareResult | null>(null);
 
@@ -6405,12 +6549,19 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
                 <span>Memuat daftar dokumen dari database...</span>
               </div>
             ) : documents.length === 0 ? (
-              <div className="p-6 bg-slate-50 border border-slate-200 text-center space-y-2">
-                <AlertCircle size={24} className="mx-auto text-slate-400" />
-                <p className="text-xs font-semibold text-slate-700">
-                  Belum ada dokumen diunggah di Repositori.
-                </p>
-              </div>
+              <EmptyState
+                icon={Database}
+                title="Repositori Dokumen Kosong"
+                description="Belum ada dokumen diunggah di Repositori."
+                actionButton={onNavigate && (
+                  <button
+                    onClick={() => onNavigate('knowledge-hub')}
+                    className="px-4 py-2 bg-[#0070c0] hover:bg-blue-700 text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <span>Kelola & Unggah Dokumen Repositori</span>
+                  </button>
+                )}
+              />
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-slate-200 border-y border-slate-200 py-1">
                 {/* Group 1: Target (Baseline) */}
@@ -6711,11 +6862,11 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
           </div>
 
           {filteredSavedSessions.length === 0 ? (
-            <div className="p-8 text-center text-slate-500 space-y-2">
-              <AlertCircle size={28} className="mx-auto text-slate-400" />
-              <p className="text-xs font-bold">Tidak ada riwayat sesi analisis yang ditemukan.</p>
-              <p className="text-[11px] text-slate-400">Silakan sesuaikan filter pencarian atau jalankan analisis kebijakan baru pada tab aktif.</p>
-            </div>
+            <EmptyState
+              icon={Database}
+              title="Sesi Analisis Tidak Ditemukan"
+              description="Tidak ada riwayat sesi analisis yang ditemukan. Silakan sesuaikan filter pencarian atau jalankan analisis kebijakan baru."
+            />
           ) : (
             <div className="divide-y divide-slate-200">
               {filteredSavedSessions.map((session) => (
@@ -9245,10 +9396,7 @@ export const TokenBudgetGuard: React.FC<TokenBudgetGuardProps> = ({ budget, isLo
       {}
       <div className="flex-1 space-y-3.5 text-left">
         <div className="flex flex-wrap items-center gap-2.5 select-none">
-          <span className="relative flex h-2 w-2">
-            <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${currentConfig.pulse}`} />
-            <span className={`relative inline-flex h-2 w-2 rounded-full ${currentConfig.pulse}`} />
-          </span>
+
           <span className="text-[10px] font-black tracking-widest text-slate-400 uppercase">
             PEMANTAUAN KUOTA AI BULANAN
           </span>
@@ -9281,13 +9429,21 @@ export const TokenBudgetGuard: React.FC<TokenBudgetGuardProps> = ({ budget, isLo
         <div className="flex flex-col justify-center pr-6">
           <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5 mb-1.5 select-none">
             <Coins size={11} className="text-teal-700 shrink-0" />
+            <span>Total Kredit</span>
+          </span>
+          <span className="text-lg font-black text-slate-900 tracking-tight font-mono">
+            Rp {maxMonthlyPaguIdr.toLocaleString('id-ID')}
+          </span>
+        </div>
+
+        {}
+        <div className="flex flex-col justify-center px-6">
+          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5 mb-1.5 select-none">
+            <Coins size={11} className="text-teal-700 shrink-0" />
             <span>Sisa Saldo</span>
           </span>
           <span className="text-lg font-black text-slate-900 tracking-tight font-mono">
             Rp {remainingCostIdr.toLocaleString('id-ID')}
-          </span>
-          <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-1 select-none">
-            Kredit: Rp {maxMonthlyPaguIdr.toLocaleString('id-ID')}
           </span>
         </div>
 
@@ -9299,9 +9455,6 @@ export const TokenBudgetGuard: React.FC<TokenBudgetGuardProps> = ({ budget, isLo
           </span>
           <span className="text-lg font-black text-slate-900 tracking-tight font-mono">
             {remainingTokens.toLocaleString('id-ID')}
-          </span>
-          <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-1 select-none">
-            Tersedia dari Pagu
           </span>
         </div>
       </div>
@@ -9351,7 +9504,7 @@ export const WelcomeHeader: React.FC = () => {
                         <span>{today}</span>
                     </span>
                     <span className="text-[10px] text-emerald-700 font-extrabold flex items-center gap-1.5">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+
                         Otorisasi Executive Aktif
                     </span>
                 </div>
@@ -11962,7 +12115,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               {
                 id: 'sess-art-001',
                 title: 'Rilis Pers: Strategi Penurunan Kemiskinan Ekstrem Mimika',
-                snippet: 'BRIDA Mimika merumuskan 3 rekomendasi taktis akselerasi alokasi dana bantuan sosial pasca penyesuaian tarif BBM daerah...',
+                snippet: 'Tim Analis AKLS merumuskan 3 rekomendasi taktis akselerasi alokasi dana bantuan sosial pasca penyesuaian tarif BBM daerah...',
                 updatedAt: new Date(Date.now() - 1800000).toISOString(),
                 sourcesCount: 3,
                 sources: ['Laporan Kebijakan Pembangunan Mimika 2026', 'Dokumen RTRW & Infrastruktur Wilayah', 'Audit Investigasi Pengadaan Jalan Agimuga'],
@@ -12217,9 +12370,11 @@ import { MOCK_DATA } from '../../../services/mock-data.service';
 
 interface LandingViewProps {
   onNavigate: (route: string) => void;
+  isAuthenticated: boolean;
+  onLogout: () => void;
 }
 
-export const LandingView: React.FC<LandingViewProps> = ({ onNavigate }) => {
+export const LandingView: React.FC<LandingViewProps> = ({ onNavigate, isAuthenticated, onLogout }) => {
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
 
   useEffect(() => {
@@ -12333,13 +12488,33 @@ export const LandingView: React.FC<LandingViewProps> = ({ onNavigate }) => {
         </div>
 
         {}
-        <div className="flex items-center gap-8">
-          <button
-            onClick={() => onNavigate('generator')}
-            className="bg-[#0070c0] hover:bg-blue-700 text-white font-extrabold text-xs uppercase tracking-widest px-6 py-2.5 border-none cursor-pointer transition-colors rounded-none"
-          >
-            MASUK
-          </button>
+        <div className="flex items-center gap-4">
+          {isAuthenticated ? (
+            <>
+              <span className="text-xs font-bold text-slate-650 font-mono hidden sm:inline">
+                {sessionStorage.getItem('brida_executive_name') || 'Eksekutif'}
+              </span>
+              <button
+                onClick={() => onNavigate('dashboard')}
+                className="bg-[#0070c0] hover:bg-blue-700 text-white font-extrabold text-xs uppercase tracking-widest px-5 py-2.5 border border-blue-800 cursor-pointer transition-colors rounded-none"
+              >
+                PLATFORM
+              </button>
+              <button
+                onClick={onLogout}
+                className="bg-red-650 hover:bg-red-700 text-white font-extrabold text-xs uppercase tracking-widest px-5 py-2.5 border border-red-800 cursor-pointer transition-colors rounded-none"
+              >
+                KELUAR
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={() => onNavigate('dashboard')}
+              className="bg-[#0070c0] hover:bg-blue-700 text-white font-extrabold text-xs uppercase tracking-widest px-6 py-2.5 border border-blue-800 cursor-pointer transition-colors rounded-none"
+            >
+              MASUK
+            </button>
+          )}
         </div>
       </header>
 
@@ -12930,7 +13105,7 @@ export const DocumentDetailModal: React.FC<DocumentDetailModalProps> = ({ docume
 
                   <div>
                     <dt className="text-slate-500 mb-0.5">Pengunggah</dt>
-                    <dd className="font-bold text-slate-900 text-sm">{currentDoc.metadata?.uploadedBy || 'Kepala BRIDA'}</dd>
+                    <dd className="font-bold text-slate-900 text-sm">{currentDoc.metadata?.uploadedBy || 'Tim Analis AKLS'}</dd>
                   </div>
                 </dl>
               </div>
@@ -12982,8 +13157,9 @@ export const DocumentDetailModal: React.FC<DocumentDetailModalProps> = ({ docume
 
 --- FILE: src\modules\knowledge-hub\components\document-table.tsx ---
 import React from 'react';
-import { FileText, Eye, Download, Trash2, Clock } from 'lucide-react';
+import { FileText, Eye, Download, Trash2, Clock, Database } from 'lucide-react';
 import type { DocumentRecord } from '../../../services/document.service';
+import { EmptyState } from '../../../components/common/empty-state.component';
 
 interface DocumentTableProps {
   documents: DocumentRecord[];
@@ -13003,9 +13179,11 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
 
   if (documents.length === 0) {
     return (
-      <div className="bg-white border border-slate-200 p-8 text-center rounded-none shadow-sm">
-        <p className="text-body text-slate-500">Belum ada dokumen laporan yang diunggah ke dalam sistem.</p>
-      </div>
+      <EmptyState
+        icon={Database}
+        title="Repositori Dokumen Kosong"
+        description="Belum ada dokumen laporan yang diunggah ke dalam sistem. Silakan klik tombol Unggah Dokumen Baru untuk menambahkan berkas acuan."
+      />
     );
   }
 
@@ -13610,7 +13788,7 @@ export const KnowledgeHubView: React.FC<KnowledgeHubViewProps> = ({ onForward })
             Repositori Dokumen
           </h1>
           <p className="text-xs text-slate-500 font-normal mt-1">
-            Repositori pengumpulan dan pengelolaan dokumen acuan makro, laporan realisasi fisik, serta referensi pengetahuan BRIDA.
+            Repositori pengumpulan dan pengelolaan dokumen acuan makro, laporan realisasi fisik, serta referensi pengetahuan AKLS.
           </p>
         </div>
 
@@ -13730,6 +13908,7 @@ import type { DocumentRecord } from '../../../services/document.service';
 import { ReportService } from '../../../services/report.service';
 import type { GeneratedReportDetail } from '../../../services/report.service';
 import { CategorizedDocumentSelector } from '../../../components/common/categorized-document-selector.component';
+import { EmptyState } from '../../../components/common/empty-state.component';
 import {
   ArrowLeft,
   Download,
@@ -13759,6 +13938,7 @@ interface ReportsViewProps {
   onNavigateToDashboard?: () => void;
   initialSelectedDocIds?: string[];
   onClearSharedDocIds?: () => void;
+  onNavigate?: (route: string) => void;
 }
 
 const stripCitationTokens = (content?: string | null): string => {
@@ -13810,6 +13990,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
   onNavigateToDashboard,
   initialSelectedDocIds,
   onClearSharedDocIds,
+  onNavigate,
 }) => {
   // State for available source documents
   const [documents, setDocuments] = useState<DocumentRecord[]>([]);
@@ -14183,6 +14364,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
           onClearAll={handleClearAll}
           isLoading={isLoadingDocs}
           onUploadNew={() => setIsUploadModalOpen(true)}
+          onNavigate={onNavigate}
           title="Pilihan Dokumen Acuan Laporan"
         />
 
@@ -14527,11 +14709,11 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
               <span>Memuat riwayat laporan tersimpan...</span>
             </div>
           ) : filteredSavedReports.length === 0 ? (
-            <div className="py-12 text-center text-slate-500 space-y-2">
-              <Database size={32} className="mx-auto text-slate-400" />
-              <p className="text-sm font-semibold">Tidak ditemukan laporan yang cocok dengan filter.</p>
-              <p className="text-xs text-slate-400">Coba ubah tanggal kalender atau kata kunci pencarian Anda.</p>
-            </div>
+            <EmptyState
+              icon={Database}
+              title="Laporan Tidak Ditemukan"
+              description="Tidak ditemukan laporan yang cocok dengan filter. Coba ubah tanggal kalender atau kata kunci pencarian Anda."
+            />
           ) : (
             <div className="divide-y divide-slate-200 border border-slate-200">
               {filteredSavedReports.map((report) => (
@@ -15505,7 +15687,10 @@ const stripCitationTokens = (content?: string | null): string => {
 // Inisialisasi VFS pdfMake dengan biner Roboto bawaan — JANGAN pernah dioverwrite seluruhnya
 const vfsFonts = (pdfFonts as any)?.pdfMake?.vfs || (pdfFonts as any)?.vfs || (pdfFonts as any);
 if (vfsFonts) {
-  (pdfMake as any).addVirtualFileSystem(vfsFonts);
+  if (!(pdfMake as any).vfs) {
+    (pdfMake as any).vfs = {};
+  }
+  Object.assign((pdfMake as any).vfs, vfsFonts);
 }
 
 // Default font definitions untuk Roboto
@@ -15597,11 +15782,10 @@ export const PdfExportService = {
       [`${vfsPrefix}-BoldItalic.ttf`]: vBoldItalics,
     };
 
-    const currentVfs = (pdfMake as any).vfs || {};
-    (pdfMake as any).vfs = {
-      ...currentVfs, // Pertahankan Roboto bawaan agar html-to-pdfmake tidak crash
-      ...customVfs,
-    };
+    if (!(pdfMake as any).vfs) {
+      (pdfMake as any).vfs = {};
+    }
+    Object.assign((pdfMake as any).vfs, customVfs);
 
     // 3. Konversi satuan margin kertas dari Sentimeter ke Satuan Point (1 cm = ~28.3465 pt)
     const marginPoints = Math.round(config.marginCm * 28.3465);
