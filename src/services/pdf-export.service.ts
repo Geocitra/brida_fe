@@ -53,6 +53,13 @@ async function fetchLocalFontToBase64(url: string): Promise<string> {
   if (!response.ok) {
     throw new Error(`Gagal memuat aset biner font dari jalur server lokal: ${url} (HTTP ${response.status})`);
   }
+
+  // Proteksi SPA Fallback: Deteksi jika server mengembalikan HTML alih-alih berkas font asli (.ttf)
+  const contentType = response.headers.get('content-type') || '';
+  if (contentType.includes('text/html')) {
+    throw new Error(`Berkas font tidak ditemukan di server (respon berupa HTML/SPA Fallback): ${url}`);
+  }
+
   const blob = await response.blob();
   return new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
@@ -189,13 +196,16 @@ export const PdfExportService = {
       content: pdfContent,
     };
 
-    // 7. Render PDF: Kirim font dan VFS lokal secara terisolasi ke createPdf agar terhindar dari batasan ESM Vite
+    // 7. Render PDF: Daftarkan VFS dan Font secara global pada objek pdfMake
     const targetFilename = filename.toLowerCase().endsWith('.pdf') ? filename : `${filename}.pdf`;
     const combinedVfs = {
       ...(vfsFonts || {}),
       ...customVfs
     };
-    (pdfMake as any).createPdf(docDefinition, undefined, fontDefinitions, combinedVfs).download(targetFilename);
+    (pdfMake as any).fonts = fontDefinitions;
+    (pdfMake as any).vfs = combinedVfs;
+
+    (pdfMake as any).createPdf(docDefinition).download(targetFilename);
   },
 
   /**
@@ -369,8 +379,10 @@ export const PdfExportService = {
       },
     };
 
+    (pdfMake as any).fonts = defaultFonts;
+    (pdfMake as any).vfs = vfsFonts;
     const targetFilename = filename || `Analisis_Deviasi_${indicator.id.toUpperCase()}_Mimika.pdf`;
-    (pdfMake as any).createPdf(docDefinition, undefined, defaultFonts, vfsFonts).download(targetFilename);
+    (pdfMake as any).createPdf(docDefinition).download(targetFilename);
   },
 
   /**
@@ -517,7 +529,9 @@ export const PdfExportService = {
       },
     };
 
-    (pdfMake as any).createPdf(docDefinition, undefined, defaultFonts, vfsFonts).download('Nota_Dinas_Resmi_Bupati_Mimika_Maret_2026.pdf');
+    (pdfMake as any).fonts = defaultFonts;
+    (pdfMake as any).vfs = vfsFonts;
+    (pdfMake as any).createPdf(docDefinition).download('Nota_Dinas_Resmi_Bupati_Mimika_Maret_2026.pdf');
   },
 
   /**

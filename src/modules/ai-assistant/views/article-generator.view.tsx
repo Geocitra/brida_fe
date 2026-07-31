@@ -499,7 +499,7 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
 
 
   return (
-    <div className="flex flex-col w-full h-[calc(100vh-180px)] min-h-[600px] bg-slate-100/70 p-4 space-y-4 font-roboto overflow-hidden">
+    <div className="flex flex-col w-full h-[calc(100vh-120px)] min-h-[950px] bg-slate-100/70 p-4 space-y-4 font-roboto overflow-hidden">
       {/* Toast Notification Banner */}
       {toastMessage && (
         <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-5 py-3 border border-slate-700 shadow-xl flex items-center gap-3 rounded-none animate-in fade-in duration-200">
