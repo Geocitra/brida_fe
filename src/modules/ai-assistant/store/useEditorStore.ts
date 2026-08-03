@@ -37,7 +37,7 @@ const initialState = {
     fontFamily: 'Calibri' as FontFamilyKey,
     fontSize: '11',
     lineSpacing: 1.18,
-    marginCm: 2.5,
+    marginCm: 2.5, // LOCKED AT 2.5 CM
 };
 
 /**
@@ -65,7 +65,7 @@ export const useEditorStore = create<EditorState>()(
                     articleTitle: title,
                     draftContent: content,
                     isDirty: false,
-                    // Catatan: Opsi formatting (margin, dll) tidak di-reset agar preferensi pengguna persisten lintas sesi
+                    marginCm: 2.5, // Paksa reset margin ke 2.5cm setiap kali inisialisasi sesi
                 });
             },
 
@@ -102,8 +102,7 @@ export const useEditorStore = create<EditorState>()(
         {
             name: 'brida-editor-storage', // Kunci penyimpanan di LocalStorage
             storage: createJSONStorage(() => localStorage),
-            // Kita mengecualikan beberapa data sementara agar tidak memenuhi localStorage jika tidak perlu, 
-            // namun menyimpan draft dan formatting adalah prioritas.
+
             partialize: (state) => ({
                 sessionId: state.sessionId,
                 articleTitle: state.articleTitle,
@@ -112,7 +111,9 @@ export const useEditorStore = create<EditorState>()(
                 fontFamily: state.fontFamily,
                 fontSize: state.fontSize,
                 lineSpacing: state.lineSpacing,
-                marginCm: state.marginCm,
+                // KUNCI MUTLAK: Jangan memasukkan marginCm ke localStorage. 
+                // Dengan begini, saat direload, Zustand tidak akan memuat cache margin lama 
+                // dan akan selalu fallback ke initialState (2.5).
             }),
         }
     )

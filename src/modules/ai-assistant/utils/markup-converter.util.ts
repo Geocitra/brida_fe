@@ -40,9 +40,14 @@ export class MarkupConverter {
                 const hasStyleAlign = node.getAttribute('style')?.includes('text-align') || false;
                 const hasAlignAttr = node.hasAttribute('align');
 
+                // HANYA proses elemen blok jika mereka memiliki penanda alignment eksplisit
+                // DAN mereka BUKAN bagian dari tabel atau list, agar format Turndown asli tidak rusak.
+                const isInsideListOrTable = node.closest('li, td, th') !== null;
+
                 return (
                     ['p', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'].includes(tagName) &&
-                    (hasStyleAlign || hasAlignAttr)
+                    (hasStyleAlign || hasAlignAttr) &&
+                    !isInsideListOrTable // Jangan ganggu paragraf di dalam bullet/tabel
                 );
             },
             replacement: (content: string, node: Node) => {
@@ -60,9 +65,10 @@ export class MarkupConverter {
                     }
                 }
 
-                // Jika perataan teks adalah default kiri (left), kembalikan sebagai paragraf polos
+                // Jika perataan teks adalah default kiri (left), kembalikan teksnya saja
+                // agar Turndown bisa memproses blockquote, heading, paragraf secara native.
                 if (alignment === 'left') {
-                    return `\n\n${content}\n\n`;
+                    return content;
                 }
 
                 // Bungkus konten paragraf dengan tag div pembatas alignment yang CommonMark-compliant
@@ -112,6 +118,63 @@ export class MarkupConverter {
                     // Kembalikan sebagai span inline murni agar aman terekam dalam format draf Markdown DB
                     return `<span style="font-size: ${size}">${content}</span>`;
                 }
+                return content;
+            }
+        });
+
+        /**
+         * ATURAN KUSTOM 4: Konversi Tabel HTML ke Markdown (GFM Compliant)
+         */
+        service.addRule('tableCellRule', {
+            filter: ['th', 'td'],
+            replacement: (content: string) => {
+                const cleanContent = content.replace(/\|/g, '\\|').trim().replace(/\s+/g, ' ');
+                return `${cleanContent} | `;
+            }
+        });
+
+        service.addRule('tableRowRule', {
+            filter: ['tr'],
+            replacement: (content: string, node: Node) => {
+                const element = node as HTMLElement;
+                const parent = element.parentElement;
+                
+                const isHeader = element.querySelector('th') !== null || 
+                                 parent?.nodeName.toLowerCase() === 'thead' ||
+                                 (parent?.nodeName.toLowerCase() === 'tbody' && parent.firstElementChild === element && !parent.previousElementSibling);
+                
+                const trimmedContent = content.trim();
+                if (!trimmedContent) return '';
+                
+                let separator = '';
+                if (isHeader) {
+                    const cellCount = element.querySelectorAll('th, td').length;
+                    const sepCells = Array(cellCount).fill('---');
+                    separator = `\n| ${sepCells.join(' | ')} |`;
+                }
+                
+                return `\n| ${trimmedContent}${separator}`;
+            }
+        });
+
+        service.addRule('tableRule', {
+            filter: ['table'],
+            replacement: (content: string, node: Node) => {
+                const element = node as HTMLElement;
+                const widthsAttr = element.getAttribute('data-widths');
+                
+                let widthsComment = '';
+                if (widthsAttr) {
+                    widthsComment = `<!-- table-widths: ${widthsAttr} -->\n`;
+                }
+                
+                return `\n\n${widthsComment}${content.trim()}\n\n`;
+            }
+        });
+
+        service.addRule('tableSectionRule', {
+            filter: ['thead', 'tbody', 'tfoot'],
+            replacement: (content: string) => {
                 return content;
             }
         });
@@ -170,7 +233,62 @@ export class MarkupConverter {
                 gfm: true,    // Mengaktifkan GitHub Flavored Markdown
             }) as string;
 
-            return rawHtml.trim();
+            // Pasca-proses untuk menyuntikkan lebar kolom berdasarkan komentar
+            try {
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(rawHtml, 'text/html');
+                
+                const iterator = doc.createNodeIterator(doc.body, NodeFilter.SHOW_COMMENT);
+                let commentNode;
+                
+                while ((commentNode = iterator.nextNode())) {
+                    const commentText = commentNode.nodeValue || '';
+                    const match = commentText.match(/table-widths:\s*(\[[\d,\s]+\])/i);
+                    if (match) {
+                        try {
+                            const widths = JSON.parse(match[1]) as number[];
+                            let sibling = commentNode.nextSibling;
+                            let foundTable: HTMLTableElement | null = null;
+                            
+                            while (sibling) {
+                                if (sibling.nodeName.toLowerCase() === 'table') {
+                                    foundTable = sibling as HTMLTableElement;
+                                    break;
+                                }
+                                if (sibling.nodeType === Node.ELEMENT_NODE) {
+                                    foundTable = (sibling as HTMLElement).querySelector('table');
+                                    if (foundTable) break;
+                                }
+                                sibling = sibling.nextSibling;
+                            }
+                            
+                            if (foundTable) {
+                                let colgroup = foundTable.querySelector('colgroup');
+                                if (!colgroup) {
+                                    colgroup = doc.createElement('colgroup');
+                                    foundTable.insertBefore(colgroup, foundTable.firstChild);
+                                } else {
+                                    colgroup.innerHTML = '';
+                                }
+                                
+                                widths.forEach((w) => {
+                                    const col = doc.createElement('col');
+                                    if (w > 0) {
+                                        col.setAttribute('style', `width: ${w}px`);
+                                    }
+                                    colgroup!.appendChild(col);
+                                });
+                            }
+                        } catch (jsonErr) {
+                            console.warn('[MarkupConverter] Gagal melakukan parse JSON untuk lebar kolom:', jsonErr);
+                        }
+                    }
+                }
+                return doc.body.innerHTML.trim();
+            } catch (domErr) {
+                console.warn('[MarkupConverter] DOMParser gagal menyuntikkan lebar tabel:', domErr);
+                return rawHtml.trim();
+            }
         } catch (err: any) {
             console.error('[MarkupConverter ERROR] Gagal mengonversi Markdown ke HTML:', err.message);
             // Fallback aman: kembalikan teks polos yang aman jika parsing fatal
@@ -191,8 +309,52 @@ export class MarkupConverter {
         }
 
         try {
+            // Pindai HTML menggunakan DOMParser untuk mengekstrak lebar kolom tabel
+            let processedHtml = html;
+            try {
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                const tables = doc.querySelectorAll('table');
+                
+                tables.forEach((table) => {
+                    const colgroup = table.querySelector('colgroup');
+                    const colWidths: number[] = [];
+                    if (colgroup) {
+                        const cols = colgroup.querySelectorAll('col');
+                        cols.forEach((col) => {
+                            const styleAttr = col.getAttribute('style') || '';
+                            const match = styleAttr.match(/width:\s*([\d.]+)px/i);
+                            if (match) {
+                                colWidths.push(Math.round(parseFloat(match[1])));
+                            } else {
+                                colWidths.push(0);
+                            }
+                        });
+                    } else {
+                        const firstRowCells = table.querySelectorAll('tr:first-child th, tr:first-child td');
+                        firstRowCells.forEach((cell) => {
+                            const styleAttr = (cell as HTMLElement).getAttribute('style') || '';
+                            const match = styleAttr.match(/width:\s*([\d.]+)px/i);
+                            if (match) {
+                                colWidths.push(Math.round(parseFloat(match[1])));
+                            } else {
+                                colWidths.push(0);
+                            }
+                        });
+                    }
+                    
+                    const hasCustomWidths = colWidths.some(w => w > 0);
+                    if (hasCustomWidths) {
+                        table.setAttribute('data-widths', JSON.stringify(colWidths));
+                    }
+                });
+                processedHtml = doc.body.innerHTML;
+            } catch (domErr) {
+                console.warn('[MarkupConverter] DOMParser gagal mengekstrak lebar kolom tabel:', domErr);
+            }
+
             const turndown = this.getTurndownInstance();
-            const rawMarkdown = turndown.turndown(html);
+            const rawMarkdown = turndown.turndown(processedHtml);
 
             // Tahap Normalisasi Akhir: Bersihkan tumpukan baris kosong berlebih (maksimal 2 baris kosong berurutan)
             const sanitizedMarkdown = rawMarkdown

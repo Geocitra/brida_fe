@@ -5,6 +5,13 @@ import StarterKit from '@tiptap/starter-kit';
 import TextAlign from '@tiptap/extension-text-align';
 import { TextStyle } from '@tiptap/extension-text-style';
 import { FontFamily } from '@tiptap/extension-font-family';
+
+// --- Ekstensi Tabel Baru ---
+import { Table } from '@tiptap/extension-table';
+import { TableRow } from '@tiptap/extension-table-row';
+import { TableHeader } from '@tiptap/extension-table-header';
+import { TableCell } from '@tiptap/extension-table-cell';
+
 // @ts-ignore
 import { PaginationPlus } from 'tiptap-pagination-plus';
 
@@ -13,7 +20,6 @@ import type { ArticleSessionDetail } from '../../../services/ai-assistant.servic
 import { PdfExportService } from '../../../services/pdf-export.service';
 import { MarkupConverter } from '../utils/markup-converter.util';
 
-// [PERBAIKAN TYPE-IMPORT]: Memisahkan import state dan import tipe data
 import { useEditorStore } from '../store/useEditorStore';
 import type { FontFamilyKey, EditorFormatting } from '../store/useEditorStore';
 
@@ -42,7 +48,6 @@ interface ArticlePreviewEditorViewProps {
   onBack: () => void;
 }
 
-// Pemetaan nama font ke CSS font-family string yang tepat
 const FONT_FAMILY_MAP: Record<string, string> = {
   'Calibri': "'Calibri', 'Gill Sans', 'Trebuchet MS', sans-serif",
   'Times New Roman': "'Times New Roman', Times, serif",
@@ -50,16 +55,12 @@ const FONT_FAMILY_MAP: Record<string, string> = {
   'Arial': "'Arial', 'Helvetica Neue', Helvetica, sans-serif",
 };
 
-// Kebalikan: CSS string -> nama font pilihan user (untuk sinkronisasi toolbar dari kursor)
 const CSS_TO_FONT_NAME: Record<string, FontFamilyKey> = Object.fromEntries(
   Object.entries(FONT_FAMILY_MAP).map(([name, css]) => [css, name as FontFamilyKey])
 );
 
 const FONT_SIZE_PRESETS = [8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 36, 48, 72];
 
-// ==========================================
-// KUSTOM EKSTENSI TIPTAP: FONT SIZE
-// ==========================================
 const FontSizeExtension = Extension.create({
   name: 'fontSize',
   addOptions() {
@@ -119,6 +120,26 @@ const PageBreakExtension = Node.create({
   },
 });
 
+const TabKeyExtension = Extension.create({
+  name: 'tabKey',
+  addKeyboardShortcuts() {
+    return {
+      Tab: () => {
+        // Jika kursor berada di dalam tabel, daftar berbutir, atau daftar berangka,
+        // biarkan aksi default (navigasi sel atau indentasi daftar) berjalan normal.
+        if (
+          this.editor.isActive('table') ||
+          this.editor.isActive('bulletList') ||
+          this.editor.isActive('orderedList')
+        ) {
+          return false;
+        }
+        return this.editor.commands.insertContent('\t');
+      },
+    };
+  },
+});
+
 const TIPTAP_EXTENSIONS = [
   StarterKit.configure({
     heading: { levels: [1, 2, 3] },
@@ -134,12 +155,23 @@ const TIPTAP_EXTENSIONS = [
   }),
   FontSizeExtension,
   PageBreakExtension,
+  // --- Injeksi Ekstensi Tabel ---
+  Table.configure({
+    resizable: true,
+    cellMinWidth: 80,
+    handleWidth: 10,
+  }),
+  TableRow,
+  TableHeader,
+  TableCell,
+  // --- Injeksi Ekstensi Tab Key ---
+  TabKeyExtension,
+  // ------------------------------
   PaginationPlus.configure({
     pageHeight: 1123,
     pageWidth: 794,
     pageGap: 24,
     pageBreakBackground: '#f1f5f9',
-    // Basis margin awal (akan dioverride dinamis melalui CSS Variables)
     marginTop: 94,
     marginBottom: 94,
     marginLeft: 94,
@@ -151,7 +183,6 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
   sessionId,
   onBack,
 }) => {
-  // Bind ke Zustand Persist Store (Information Expert)
   const {
     sessionId: storeSessionId,
     articleTitle,
@@ -173,29 +204,77 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
   const [isPrinting, setIsPrinting] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // Navigasi & Halaman Visual (MS Word Mode)
   const [totalPages, setTotalPages] = useState<number>(1);
   const [activePage, setActivePage] = useState<number>(0);
+
+  const rulerRef = React.useRef<HTMLDivElement>(null);
+
+  const handleStartDrag = (e: React.MouseEvent, type: 'left' | 'right') => {
+    e.preventDefault();
+    if (!rulerRef.current) return;
+
+    const startX = e.clientX;
+    const initialMarginCm = marginCm;
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const deltaX = moveEvent.clientX - startX;
+      let newMarginCm = initialMarginCm;
+
+      if (type === 'left') {
+        const newPx = Math.round(initialMarginCm * (96 / 2.54) + deltaX);
+        newMarginCm = newPx * (2.54 / 96);
+      } else {
+        const newPx = Math.round(initialMarginCm * (96 / 2.54) - deltaX);
+        newMarginCm = newPx * (2.54 / 96);
+      }
+
+      // Batasi margin dalam rentang aman 1.0 cm s.d 5.0 cm
+      const constrainedMarginCm = Math.max(1.0, Math.min(5.0, Math.round(newMarginCm * 10) / 10));
+      useEditorStore.getState().setFormatting({ marginCm: constrainedMarginCm });
+    };
+
+    const handleMouseUp = () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+  };
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 4000);
   };
 
-  // Inisialisasi TipTap WYSIWYG Editor
   const editor = useEditor({
     extensions: TIPTAP_EXTENSIONS,
     editorProps: {
       attributes: {
         class: 'focus:outline-none max-w-none min-h-[500px] outline-none h-full text-slate-900 leading-relaxed text-xs focus:bg-white selection:bg-teal-700 selection:text-white',
       },
+      handleDOMEvents: {
+        mousedown: (view, event) => {
+          const target = event.target as HTMLElement;
+          const isTableClick = target.closest('table') !== null;
+          const isResizeHandle = target.classList.contains('column-resize-handle') ||
+                                 target.classList.contains('column-resize-handle-active');
+          
+          if (isTableClick || isResizeHandle) {
+            try {
+              (view as any).editor.commands.disablePagination();
+            } catch (e) {
+              console.warn('[Pagination Freeze] Gagal menonaktifkan pagination:', e);
+            }
+          }
+          return false;
+        }
+      }
     },
     onUpdate: ({ editor: ed }) => {
-      // Sinkronisasi real-time ke Zustand (Menjaga Dirty State)
       setContent(ed.getHTML());
     },
     onSelectionUpdate: ({ editor: ed }) => {
-      // Sinkronisasi toolbar dari posisi kursor pengguna di dalam teks
       const attrs = ed.getAttributes('textStyle');
       const cssFont: string = attrs.fontFamily || '';
       const matched = CSS_TO_FONT_NAME[cssFont];
@@ -213,13 +292,11 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
       }
 
       if (Object.keys(updates).length > 0) {
-        // Jangan panggil setFormatting destructure di sini untuk menghindari re-render loop
         useEditorStore.getState().setFormatting(updates);
       }
     },
   });
 
-  // Pemantau Jumlah Halaman Terpisah Secara Real-time via ResizeObserver
   useEffect(() => {
     const el = document.getElementById('virtual-a4-page');
     if (!el) return;
@@ -234,15 +311,60 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
     return () => observer.disconnect();
   }, [editor, isLoading]);
 
-  // Handler Scroll untuk Mengubah Halaman Aktif di Sidebar Navigasi
+  useEffect(() => {
+    const handleGlobalMouseUp = () => {
+      if (editor && !editor.isDestroyed) {
+        try {
+          editor.commands.enablePagination();
+        } catch (e) {
+          // Abaikan jika command belum siap
+        }
+      }
+    };
+
+    window.addEventListener('mouseup', handleGlobalMouseUp);
+    return () => {
+      window.removeEventListener('mouseup', handleGlobalMouseUp);
+    };
+  }, [editor]);
+
+  // =================================================================
+  // PERBAIKAN MARGIN: SINKRONISASI TIPTAP (ANTI INFINITE LOOP)
+  // =================================================================
+  useEffect(() => {
+    if (editor && !editor.isDestroyed) {
+      try {
+        const px = Math.round(marginCm * (96 / 2.54));
+
+        // 1. Mutasi ke opsi plugin internal agar algoritma matematika pagination sinkron dengan CSS
+        const paginationExt = editor.extensionManager.extensions.find(e => e.name === 'pagination');
+        if (paginationExt) {
+          paginationExt.options.marginTop = px;
+          paginationExt.options.marginBottom = px;
+          paginationExt.options.marginLeft = px;
+          paginationExt.options.marginRight = px;
+        }
+
+        // 2. Pancing reflow ProseMirror secara natural tanpa setMeta yang memicu infinite loop
+        setTimeout(() => {
+          if (editor && !editor.isDestroyed) {
+            // Ini akan memicu evaluasi ulang batas halaman secara aman
+            editor.view.dispatch(editor.state.tr);
+          }
+        }, 50);
+      } catch (err) {
+        console.error('Gagal memperbarui margin Tiptap:', err);
+      }
+    }
+  }, [editor, marginCm]);
+
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const scrollTop = e.currentTarget.scrollTop;
-    const computedPageHeight = 1122; // A4 Height at 96DPI
+    const computedPageHeight = 1122;
     const currentPage = Math.floor((scrollTop + computedPageHeight / 2) / computedPageHeight);
     setActivePage(Math.min(totalPages - 1, Math.max(0, currentPage)));
   };
 
-  // Handler Gulir Halus ke Halaman Pilihan dari Navigasi Sidebar
   const handleScrollToPage = (pageIdx: number) => {
     const scrollContainer = document.getElementById('editor-scroll-container');
     if (scrollContainer) {
@@ -255,7 +377,6 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
     }
   };
 
-  // Lifecycle: Memuat Data dari API & Sinkronisasi Store
   useEffect(() => {
     if (!sessionId) {
       setIsLoading(false);
@@ -270,8 +391,6 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
         setActiveSession(session);
 
         const htmlContent = MarkupConverter.toHTML(session.fullArticleText || '');
-
-        // initSession akan memblokir overwrite jika store mendeteksi adanya state lokal yang belum tersimpan (Crash Recovery)
         initSession(sessionId, session.articleTitle || session.title || '', htmlContent);
       } catch (err: any) {
         console.error('Gagal memuat sesi artikel:', err);
@@ -284,7 +403,6 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
     loadSession();
   }, [sessionId, initSession, onBack]);
 
-  // Sinkronisasi data awal ke TipTap saat editor dan state siap
   useEffect(() => {
     if (editor && draftContent && editor.isEmpty) {
       editor.commands.setContent(draftContent);
@@ -296,13 +414,9 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
     }
   }, [editor, draftContent]);
 
-  // =================================================================
-  // FUNGSI PENYIMPANAN YANG AMAN (ANTI DATA-LOSS)
-  // =================================================================
   const handleSaveAndBack = async () => {
     if (!sessionId || !editor || isSaving) return;
 
-    // Jika tidak ada perubahan, langsung kembali
     if (!isDirty) {
       onBack();
       return;
@@ -313,10 +427,9 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
     try {
       const markdownContent = MarkupConverter.toMarkdown(editor.getHTML());
       await AiAssistantService.updateArticleSessionContent(sessionId, articleTitle, markdownContent);
-      markSaved(); // Tandai bersih
-      onBack();    // Boleh navigasi keluar
+      markSaved();
+      onBack();
     } catch (err: any) {
-      // FATAL GUARD: Jangan panggil onBack()! Biarkan user tetap di halaman beserta draft-nya.
       showToast(`⚠️ Sinkronisasi gagal: ${err.message}. Draft tetap aman di penyimpanan lokal (Offline Safe).`);
     } finally {
       setIsSaving(false);
@@ -330,7 +443,6 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
     }
     setIsPrinting(true);
 
-    // Amankan perubahan terakhir sebelum mencetak
     if (isDirty && sessionId) {
       showToast('⏳ Menyimpan draf ke database sebelum mencetak...');
       try {
@@ -365,9 +477,6 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
     }
   };
 
-  // =================================================================
-  // HANDLERS UNTUK TOOLBAR TIPTAP
-  // =================================================================
   const handleApplyFontSize = useCallback((size: string) => {
     setFormatting({ fontSize: size });
     if (editor && !editor.isDestroyed) {
@@ -431,7 +540,7 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
   }
 
   return (
-    <div className="w-full h-screen flex flex-col bg-slate-100 overflow-hidden relative font-roboto select-none">
+    <div className="w-full h-screen flex flex-col bg-slate-100 overflow-hidden relative font-roboto">
       {toastMessage && (
         <div className="fixed top-5 right-5 z-50 bg-slate-900 text-teal-400 border border-slate-700 px-4 py-2 text-xs font-bold uppercase tracking-wider flex items-center gap-2 shadow-xl animate-in fade-in duration-200">
           <CheckCircle2 size={14} />
@@ -480,7 +589,7 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
 
         {/* Ribbon Row 2: Layout & Tiptap Styling Controls */}
         <div className="px-6 py-2 bg-slate-50 flex flex-wrap items-center justify-between gap-4 select-none">
-          {/* Seksie A: Layout (Font, Spasi, Margin) */}
+          {/* Seksie A: Layout (Font, Spasi) */}
           <div className="flex flex-wrap items-center gap-4">
             <div className="flex items-center gap-1.5">
               <span className="text-[9px] font-black text-slate-500 uppercase tracking-wider">Font:</span>
@@ -512,7 +621,7 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
               </select>
             </div>
 
-            
+            {/* UI Dropdown Margin sudah dihapus untuk mengunci margin di 2.5cm */}
           </div>
 
           <div className="hidden md:block h-5 w-px bg-slate-300" />
@@ -725,9 +834,79 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
         <div
           id="editor-scroll-container"
           onScroll={handleScroll}
-          className="flex-1 overflow-y-auto bg-slate-200/40 p-8 flex justify-center w-full min-h-[600px] select-text scroll-smooth"
+          className="flex-1 overflow-y-auto bg-slate-200/40 pt-0 px-8 pb-8 flex justify-center w-full min-h-150 select-text scroll-smooth"
         >
           <div className="relative h-fit mb-12">
+            {/* Visual A4 Ruler (no-print) */}
+            <div 
+              ref={rulerRef} 
+              className="w-[794px] h-[24px] bg-slate-100 border-b border-slate-350 flex relative select-none shrink-0 no-print sticky top-0 z-30 shadow-xs" 
+              style={{ fontFamily: 'Roboto, sans-serif' }}
+            >
+              {/* Left Margin area (Greyed out) */}
+              <div className="h-full bg-slate-300/40 border-r border-slate-350 relative" style={{ width: `${Math.round(marginCm * (96 / 2.54))}px` }}>
+                {/* Drag Handle */}
+                <div 
+                  className="absolute right-[-4px] top-0 bottom-0 w-[8px] cursor-col-resize hover:bg-teal-600/50 active:bg-teal-700 z-40 transition-colors" 
+                  onMouseDown={(e) => handleStartDrag(e, 'left')}
+                  title="Seret untuk mengubah margin kiri"
+                />
+              </div>
+              
+              {/* Printable Area (White) with tick marks */}
+              <div className="h-full bg-white relative flex-1 overflow-hidden">
+                {/* Tab Stop Indicators */}
+                {Array.from({ length: Math.floor((794 - Math.round(marginCm * (96 / 2.54)) * 2) / 48) }).map((_, i) => {
+                  const leftPx = (i + 1) * 48;
+                  return (
+                    <div 
+                      key={`tab-${i}`} 
+                      className="absolute top-[2px] w-[3px] h-[3px] bg-slate-400 rounded-full" 
+                      style={{ left: `${leftPx - 1.5}px` }} 
+                      title={`Tab Stop ${i + 1} (${((i + 1) * 1.27).toFixed(2)} cm)`}
+                    />
+                  );
+                })}
+
+                {/* Ticks and Numbers starting from 0 at the left margin line */}
+                {Array.from({ length: 22 }).map((_, i) => {
+                  const cmToPx = 96 / 2.54;
+                  const leftPx = i * cmToPx;
+                  const totalWidthPx = 794;
+                  const marginPx = Math.round(marginCm * cmToPx);
+                  const printableWidthPx = totalWidthPx - (marginPx * 2);
+                  
+                  if (leftPx > printableWidthPx) return null;
+                  
+                  return (
+                    <div key={i} className="absolute bottom-0 flex flex-col items-center" style={{ left: `${leftPx}px` }}>
+                      {/* Tick Mark */}
+                      <div className="w-[1px] h-[6px] bg-slate-400" />
+                      {/* Number */}
+                      {i % 2 === 0 && (
+                        <span className="text-[8px] font-black text-slate-500 absolute bottom-[8px]">
+                          {i}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              
+              {/* Right Margin area (Greyed out) */}
+              <div className="h-full bg-slate-300/40 border-l border-slate-350 relative" style={{ width: `${Math.round(marginCm * (96 / 2.54))}px` }}>
+                {/* Drag Handle */}
+                <div 
+                  className="absolute left-[-4px] top-0 bottom-0 w-[8px] cursor-col-resize hover:bg-teal-600/50 active:bg-teal-700 z-40 transition-colors" 
+                  onMouseDown={(e) => handleStartDrag(e, 'right')}
+                  title="Seret untuk mengubah margin kanan"
+                />
+              </div>
+            </div>
+            
+            {/* Jarak aman di bawah ruler agar kertas tidak langsung menempel saat dimuat */}
+            <div className="h-8 no-print" />
+
             <style>{`
               .page {
                 background-color: transparent !important;
@@ -749,10 +928,66 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
               }
               .ProseMirror {
                 outline: none !important;
+                white-space: pre-wrap !important;
+                tab-size: 48px !important;
               }
               .ProseMirror p {
                 line-height: ${lineSpacing} !important;
+                margin-top: 0px !important;
+                margin-bottom: 16px !important;
               }
+              .ProseMirror td p,
+              .ProseMirror th p,
+              .ProseMirror li p {
+                margin-bottom: 0px !important;
+              }
+              
+              /* CSS Tabel untuk Editor Frontend */
+              .ProseMirror table {
+                border-collapse: collapse !important;
+                table-layout: fixed !important;
+                width: 100% !important;
+                margin: 16px 0 !important;
+                overflow: hidden !important;
+              }
+              .ProseMirror td,
+              .ProseMirror th {
+                min-width: 80px;
+                border: 1px solid #cbd5e1;
+                padding: 6px 10px;
+                vertical-align: top;
+                box-sizing: border-box;
+                position: relative;
+                word-break: normal;
+                overflow-wrap: break-word;
+              }
+              .ProseMirror th {
+                font-weight: bold;
+                text-align: left;
+                background-color: #f8fafc;
+              }
+              .ProseMirror .column-resize-handle {
+                position: absolute;
+                right: -2px;
+                top: 0;
+                bottom: -2px;
+                width: 4px;
+                background-color: #0d9488;
+                pointer-events: none;
+              }
+              .ProseMirror.resize-cursor {
+                cursor: ew-resize !important;
+                cursor: col-resize !important;
+              }
+              .ProseMirror .selectedCell:after {
+                z-index: 2;
+                position: absolute;
+                content: "";
+                left: 0; right: 0; top: 0; bottom: 0;
+                background: rgba(200, 200, 255, 0.4);
+                pointer-events: none;
+              }
+
               .page-break-gap {
                 height: 20px;
                 background-color: #f1f5f9 !important; 

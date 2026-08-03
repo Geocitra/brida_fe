@@ -22,6 +22,7 @@ import {
   Sparkles,
   FileCheck,
   Globe,
+  FileText,
 } from 'lucide-react';
 import { AiAssistantService, AiServiceException } from '../../../services/ai-assistant.service';
 import { AiErrorMapper } from '../utils/error-mapper.util';
@@ -198,10 +199,18 @@ const parseInlineStylesRaw = (lineText: string, activeDocIds: string[] = [], all
           // Ambil detail metadata sitasi secara dinamis
           const docMatch = docId.match(/^doc(\d+)$/i);
           let targetDocId = docId;
+          let docDisplayIndex = 1;
+
           if (docMatch && activeDocIds.length > 0) {
             const idx = parseInt(docMatch[1], 10) - 1;
             if (idx >= 0 && idx < activeDocIds.length) {
               targetDocId = activeDocIds[idx];
+              docDisplayIndex = idx + 1;
+            }
+          } else if (activeDocIds.length > 0) {
+            const idx = activeDocIds.indexOf(targetDocId);
+            if (idx !== -1) {
+              docDisplayIndex = idx + 1;
             }
           }
 
@@ -211,6 +220,7 @@ const parseInlineStylesRaw = (lineText: string, activeDocIds: string[] = [], all
 
           // Tentukan URL: Prioritaskan sourceUrl eksternal, jika tidak ada, arahkan ke endpoint stream file API backend
           const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
+          const isWebUrl = !!doc?.metadata?.sourceUrl;
           const url = doc
             ? (doc.metadata?.sourceUrl || (doc.id ? `${API_BASE_URL}/documents/${doc.id}/file` : null))
             : null;
@@ -222,16 +232,24 @@ const parseInlineStylesRaw = (lineText: string, activeDocIds: string[] = [], all
                   href={url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-teal-50 hover:bg-teal-100 text-teal-850 border border-teal-200 text-[9px] font-bold font-mono rounded-none mx-0.5 cursor-pointer no-print transition-colors"
+                  className={`inline-flex items-center gap-1 px-2 py-0.5 border text-[9px] font-bold font-mono rounded-none mx-0.5 cursor-pointer no-print transition-colors ${
+                    isWebUrl 
+                      ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-850 border-emerald-200' 
+                      : 'bg-blue-50 hover:bg-blue-100 text-blue-850 border-blue-200'
+                  }`}
                 >
-                  <Globe size={9} className="text-teal-600 shrink-0" />
-                  <span>{`Sitasi:${chunkIdx}`}</span>
+                  {isWebUrl ? (
+                    <Globe size={10} className="text-emerald-600 shrink-0" />
+                  ) : (
+                    <FileText size={10} className="text-blue-600 shrink-0" />
+                  )}
+                  <span>{isWebUrl ? `Link:${docDisplayIndex}` : `Dokumen:${docDisplayIndex}`}</span>
                 </a>
               ) : (
                 <span
-                  className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 text-[9px] font-bold font-mono rounded-none mx-0.5 cursor-help no-print transition-colors"
+                  className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 text-[9px] font-bold font-mono rounded-none mx-0.5 cursor-help no-print transition-colors"
                 >
-                  <Globe size={9} className="text-slate-500 shrink-0" />
+                  <AlertCircle size={10} className="text-slate-500 shrink-0" />
                   <span>{`Sitasi:${chunkIdx}`}</span>
                 </span>
               )}
@@ -239,7 +257,7 @@ const parseInlineStylesRaw = (lineText: string, activeDocIds: string[] = [], all
               {/* Hover Reference Card (Rounded-None, Roboto, Sleek Dark Palette) */}
               <span className="invisible group-hover:visible absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-3 bg-slate-900 text-white rounded-none border border-slate-700 shadow-xl z-50 flex flex-col gap-1.5 pointer-events-none transition-all duration-150 text-left font-roboto">
                 <span className="text-[9px] font-extrabold uppercase tracking-wider text-teal-400">
-                  {category || 'Dokumen Acuan'}
+                  {isWebUrl ? 'Tautan Web Luar' : (category || 'Dokumen Acuan')}
                 </span>
                 <span className="text-[11px] font-bold leading-normal text-slate-100 line-clamp-2">
                   {title}
@@ -249,7 +267,8 @@ const parseInlineStylesRaw = (lineText: string, activeDocIds: string[] = [], all
                 </span>
                 {url && (
                   <span className="text-[9px] font-bold text-teal-300 mt-0.5 flex items-center gap-1">
-                    <Sparkles size={8} /> Klik untuk membuka sumber referensi
+                    <Sparkles size={8} /> 
+                    {isWebUrl ? 'Klik untuk membuka tautan web asli' : 'Klik untuk mengunduh/membuka file dokumen'}
                   </span>
                 )}
               </span>

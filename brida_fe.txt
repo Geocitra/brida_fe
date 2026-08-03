@@ -43,6 +43,10 @@
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",
     "@tiptap/extension-font-family": "^3.29.2",
+    "@tiptap/extension-table": "^3.29.2",
+    "@tiptap/extension-table-cell": "^3.29.2",
+    "@tiptap/extension-table-header": "^3.29.2",
+    "@tiptap/extension-table-row": "^3.29.2",
     "@tiptap/extension-text-align": "^3.29.2",
     "@tiptap/extension-text-style": "^3.29.2",
     "@tiptap/extension-underline": "^3.29.2",
@@ -4264,7 +4268,7 @@ export const useEditorStore = create<EditorState>()(
                     articleTitle: title,
                     draftContent: content,
                     isDirty: false,
-
+                    marginCm: 2.5,
                 });
             },
 
@@ -4279,9 +4283,13 @@ export const useEditorStore = create<EditorState>()(
             },
 
             setFormatting: (updates: Partial<EditorFormatting>) => {
+
+                const { marginCm, ...safeUpdates } = updates;
+
                 set((state) => ({
                     ...state,
-                    ...updates,
+                    ...safeUpdates,
+                    marginCm: 2.5,
                     isDirty: true,
                 }));
             },
@@ -4306,7 +4314,7 @@ export const useEditorStore = create<EditorState>()(
                 fontFamily: state.fontFamily,
                 fontSize: state.fontSize,
                 lineSpacing: state.lineSpacing,
-                marginCm: state.marginCm,
+
             }),
         }
     )
@@ -5009,8 +5017,7 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
 
       if (!initialSelectedDocIds || initialSelectedDocIds.length === 0) {
         if (fetched && fetched.length > 0 && selectedDocIds.length === 0) {
-          setSelectedDocIds([fetched[0].id]);
-          setArticleTitle(`Artikel Strategis: ${fetched[0].title}`);
+
         }
       }
     } catch (err: any) {
@@ -5030,11 +5037,6 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
 
         if (validIds.length > 0) {
           setSelectedDocIds(validIds);
-
-          const primaryDoc = documents.find((d) => d.id === validIds[0]);
-          if (primaryDoc && !articleTitle) {
-            setArticleTitle(`Artikel Strategis: ${primaryDoc.title}`);
-          }
         }
         onClearSharedDocIds?.();
       }
@@ -5189,7 +5191,7 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
 
         const firstSession = await AiAssistantService.generateArticleMulti({
           documentIds: selectedDocIds,
-          articleTitle: articleTitle || `Artikel Kolaboratif: ${selectedTone.toUpperCase()}`,
+          articleTitle: articleTitle.trim() || 'Draf Artikel Publikasi',
           targetLength: selectedLength,
           tone: selectedTone,
           userInstruction: queryText,
@@ -5323,7 +5325,7 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
       </div>
 
       {}
-      <div className="flex flex-row gap-0 w-full h-[850px] overflow-hidden">
+      <div className="flex flex-row gap-0 w-full h-212.5 overflow-hidden">
 
         {}
         {showHistorySidebar && (
@@ -5491,6 +5493,21 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
           </div>
 
           {}
+          <div className="shrink-0 border-b border-slate-200 bg-slate-50 p-3">
+            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700 mb-1.5">
+              Judul Artikel (opsional)
+            </label>
+            <input
+              type="text"
+              value={articleTitle}
+              onChange={(e) => setArticleTitle(e.target.value)}
+              placeholder="Ketik judul artikel Anda di sini"
+              className="w-full px-3 py-2 text-sm border border-slate-300 bg-white focus:outline-none focus:border-teal-700 rounded-none"
+              disabled={isGenerating}
+            />
+          </div>
+
+          {}
           <div className="shrink-0 border-t border-slate-200">
             <ChatInputBar
               isLoading={isGenerating}
@@ -5519,13 +5536,20 @@ import TextAlign from '@tiptap/extension-text-align';
 import { TextStyle } from '@tiptap/extension-text-style';
 import { FontFamily } from '@tiptap/extension-font-family';
 
+import { Table } from '@tiptap/extension-table';
+import { TableRow } from '@tiptap/extension-table-row';
+import { TableHeader } from '@tiptap/extension-table-header';
+import { TableCell } from '@tiptap/extension-table-cell';
+
 import { PaginationPlus } from 'tiptap-pagination-plus';
 
 import { AiAssistantService } from '../../../services/ai-assistant.service';
 import type { ArticleSessionDetail } from '../../../services/ai-assistant.service';
 import { PdfExportService } from '../../../services/pdf-export.service';
 import { MarkupConverter } from '../utils/markup-converter.util';
-import { useEditorStore, FontFamilyKey, EditorFormatting } from '../store/useEditorStore';
+
+import { useEditorStore } from '../store/useEditorStore';
+import type { FontFamilyKey, EditorFormatting } from '../store/useEditorStore';
 
 import {
   Loader2,
@@ -5639,12 +5663,19 @@ const TIPTAP_EXTENSIONS = [
   }),
   FontSizeExtension,
   PageBreakExtension,
+
+  Table.configure({
+    resizable: true,
+  }),
+  TableRow,
+  TableHeader,
+  TableCell,
+
   PaginationPlus.configure({
     pageHeight: 1123,
     pageWidth: 794,
     pageGap: 24,
     pageBreakBackground: '#f1f5f9',
-
     marginTop: 94,
     marginBottom: 94,
     marginLeft: 94,
@@ -5656,7 +5687,6 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
   sessionId,
   onBack,
 }) => {
-
   const {
     sessionId: storeSessionId,
     articleTitle,
@@ -5694,11 +5724,9 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
       },
     },
     onUpdate: ({ editor: ed }) => {
-
       setContent(ed.getHTML());
     },
     onSelectionUpdate: ({ editor: ed }) => {
-
       const attrs = ed.getAttributes('textStyle');
       const cssFont: string = attrs.fontFamily || '';
       const matched = CSS_TO_FONT_NAME[cssFont];
@@ -5716,7 +5744,6 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
       }
 
       if (Object.keys(updates).length > 0) {
-
         useEditorStore.getState().setFormatting(updates);
       }
     },
@@ -5735,6 +5762,31 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
     observer.observe(el);
     return () => observer.disconnect();
   }, [editor, isLoading]);
+
+  useEffect(() => {
+    if (editor && !editor.isDestroyed) {
+      try {
+        const px = Math.round(marginCm * (96 / 2.54));
+
+        const paginationExt = editor.extensionManager.extensions.find(e => e.name === 'pagination');
+        if (paginationExt) {
+          paginationExt.options.marginTop = px;
+          paginationExt.options.marginBottom = px;
+          paginationExt.options.marginLeft = px;
+          paginationExt.options.marginRight = px;
+        }
+
+        setTimeout(() => {
+          if (editor && !editor.isDestroyed) {
+
+            editor.view.dispatch(editor.state.tr);
+          }
+        }, 50);
+      } catch (err) {
+        console.error('Gagal memperbarui margin Tiptap:', err);
+      }
+    }
+  }, [editor, marginCm]);
 
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const scrollTop = e.currentTarget.scrollTop;
@@ -5769,7 +5821,6 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
         setActiveSession(session);
 
         const htmlContent = MarkupConverter.toHTML(session.fullArticleText || '');
-
         initSession(sessionId, session.articleTitle || session.title || '', htmlContent);
       } catch (err: any) {
         console.error('Gagal memuat sesi artikel:', err);
@@ -5809,7 +5860,6 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
       markSaved();
       onBack();
     } catch (err: any) {
-
       showToast(`⚠️ Sinkronisasi gagal: ${err.message}. Draft tetap aman di penyimpanan lokal (Offline Safe).`);
     } finally {
       setIsSaving(false);
@@ -6001,20 +6051,7 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
               </select>
             </div>
 
-            <div className="h-4 w-px bg-slate-300" />
-
-            <div className="flex items-center gap-1.5">
-              <span className="text-[9px] font-black text-slate-500 uppercase tracking-wider">Margin:</span>
-              <select
-                value={marginCm}
-                onChange={(e) => setFormatting({ marginCm: parseFloat(e.target.value) })}
-                disabled={isSaving || isPrinting}
-                className="bg-white border border-slate-300 text-[10px] font-bold px-2 py-1 focus:outline-none focus:border-teal-600 rounded-none cursor-pointer"
-              >
-                <option value="2.5">2.5 cm (Normal)</option>
-                <option value="3.0">3.0 cm (Longgar)</option>
-              </select>
-            </div>
+            {}
           </div>
 
           <div className="hidden md:block h-5 w-px bg-slate-300" />
@@ -6227,7 +6264,7 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
         <div
           id="editor-scroll-container"
           onScroll={handleScroll}
-          className="flex-1 overflow-y-auto bg-slate-200/40 p-8 flex justify-center w-full min-h-[600px] select-text scroll-smooth"
+          className="flex-1 overflow-y-auto bg-slate-200/40 p-8 flex justify-center w-full min-h-150 select-text scroll-smooth"
         >
           <div className="relative h-fit mb-12">
             <style>{`
@@ -6255,6 +6292,39 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
               .ProseMirror p {
                 line-height: ${lineSpacing} !important;
               }
+
+              /* CSS Tabel untuk Editor Frontend */
+              .ProseMirror table {
+                border-collapse: collapse;
+                table-layout: fixed;
+                width: 100%;
+                margin: 0;
+                overflow: hidden;
+              }
+              .ProseMirror td,
+              .ProseMirror th {
+                min-width: 1em;
+                border: 1px solid #cbd5e1;
+                padding: 6px 10px;
+                vertical-align: top;
+                box-sizing: border-box;
+                position: relative;
+              }
+              .ProseMirror th {
+                font-weight: bold;
+                text-align: left;
+                background-color: #f8fafc;
+              }
+              .ProseMirror .column-resize-handle {
+                position: absolute;
+                right: -2px;
+                top: 0;
+                bottom: -2px;
+                width: 4px;
+                background-color: #0d9488;
+                pointer-events: none;
+              }
+
               .page-break-gap {
                 height: 20px;
                 background-color: #f1f5f9 !important;

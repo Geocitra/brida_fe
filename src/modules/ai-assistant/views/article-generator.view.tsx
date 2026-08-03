@@ -227,8 +227,8 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
 
       if (!initialSelectedDocIds || initialSelectedDocIds.length === 0) {
         if (fetched && fetched.length > 0 && selectedDocIds.length === 0) {
-          setSelectedDocIds([fetched[0].id]);
-          setArticleTitle(`Artikel Strategis: ${fetched[0].title}`);
+          // Jangan pilih dokumen secara otomatis saat pengguna belum menentukan acuan.
+          // Biarkan state tetap kosong agar backend menerima konteks tanpa dokumen acuan.
         }
       }
     } catch (err: any) {
@@ -251,11 +251,6 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
 
         if (validIds.length > 0) {
           setSelectedDocIds(validIds);
-
-          const primaryDoc = documents.find((d) => d.id === validIds[0]);
-          if (primaryDoc && !articleTitle) {
-            setArticleTitle(`Artikel Strategis: ${primaryDoc.title}`);
-          }
         }
         onClearSharedDocIds?.();
       }
@@ -419,7 +414,7 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
         // Alur 1: Inisiasi Sesi Baru menggunakan generateArticleMulti (Creative Synthesis)
         const firstSession = await AiAssistantService.generateArticleMulti({
           documentIds: selectedDocIds,
-          articleTitle: articleTitle || `Artikel Kolaboratif: ${selectedTone.toUpperCase()}`,
+          articleTitle: articleTitle.trim() || 'Draf Artikel Publikasi',
           targetLength: selectedLength,
           tone: selectedTone,
           userInstruction: queryText,
@@ -555,7 +550,7 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
       </div>
 
       {/* SECTION 2. DUAL-PANE COOPERATIVE WORKSPACE AREA (100% Full-Width Workspace) [1.1.2] */}
-      <div className="flex flex-row gap-0 w-full h-[850px] overflow-hidden">
+      <div className="flex flex-row gap-0 w-full h-212.5 overflow-hidden">
 
         {/* Sub-Sidebar: Riwayat Sesi Kolaboratif (Chat History) */}
         {showHistorySidebar && (
@@ -720,6 +715,21 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
               </div>
             )}
             <div ref={messagesEndRef} />
+          </div>
+
+          {/* Input Judul Artikel Opsional */}
+          <div className="shrink-0 border-b border-slate-200 bg-slate-50 p-3">
+            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700 mb-1.5">
+              Judul Artikel (opsional)
+            </label>
+            <input
+              type="text"
+              value={articleTitle}
+              onChange={(e) => setArticleTitle(e.target.value)}
+              placeholder="Ketik judul artikel Anda di sini"
+              className="w-full px-3 py-2 text-sm border border-slate-300 bg-white focus:outline-none focus:border-teal-700 rounded-none"
+              disabled={isGenerating}
+            />
           </div>
 
           {/* ChatInputBar Multimodal Terintegrasi */}
