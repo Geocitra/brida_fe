@@ -206,8 +206,18 @@ export class MarkupConverter {
         }
 
         try {
-            // Bersihkan token sitasi RAG (misal: [doc1:1] atau \\\\\\\\\\\\[doc1:1\\\\\\\\\\\\]) agar tidak tampil di editor naskah
-            let processedMarkdown = markdown.replace(/\\*\[(?:[a-f0-9-]{8,}|doc(?:[-_a-z0-9]+)?):\d+\\*\]/gi, '');
+            // Bersihkan token sitasi RAG lokal (misal: [doc1:1] atau [uuid:chunkIdx]) agar tidak tampil di editor naskah
+            // PENTING: Jangan hapus sitasi URL web seperti [https://...] karena itu ditampilkan sebagai badge sitasi
+            let processedMarkdown = markdown.replace(/\\\*?\[(?!https?:\/\/)(?:[a-f0-9-]{8,}|doc(?:[-_a-z0-9]+)?):\d+\\\*?\]/gi, '');
+
+            // LINDUNGI sitasi URL web [https://...] dari diubah oleh marked.js menjadi <a href> standar
+            // Caranya: ganti dengan placeholder sementara sebelum parsing, lalu kembalikan setelah parsing
+            const urlCitationPlaceholders: string[] = [];
+            processedMarkdown = processedMarkdown.replace(/\[(https?:\/\/[^\]\s]+?)(?::(\d+))?\]/g, (match) => {
+                const idx = urlCitationPlaceholders.length;
+                urlCitationPlaceholders.push(match);
+                return `%%URLCITE_${idx}%%`;
+            });
 
             // Tahap 1: Konversi tag div alignment pembungkus menjadi paragraf individu dengan inline style perataan
             processedMarkdown = processedMarkdown.replace(
@@ -237,11 +247,16 @@ export class MarkupConverter {
             processedMarkdown = processedMarkdown.replace(/\r\n/g, '\n');
 
             // Tahap 3: Parsing string menggunakan mesin marked secara sinkronus
-            const rawHtml = marked.parse(processedMarkdown, {
+            let rawHtml = marked.parse(processedMarkdown, {
                 async: false,
                 breaks: true, // Menjaga perpindahan baris manual
                 gfm: true,    // Mengaktifkan GitHub Flavored Markdown
             }) as string;
+
+            // Kembalikan placeholder sitasi URL ke token aslinya setelah HTML terbentuk
+            urlCitationPlaceholders.forEach((original, idx) => {
+                rawHtml = rawHtml.replace(`%%URLCITE_${idx}%%`, original);
+            });
 
             const normalizedHtml = this.normalizePunctuationSpacing(rawHtml);
 
