@@ -412,6 +412,42 @@ export class MarkupConverter {
                         }
                     }
                 }
+
+                // ====================================================================
+                // TAHAP 7: Default Colgroup untuk tabel yang tidak memiliki kustom lebar
+                // Menggunakan piksel absolut (total 606px) agar kompatibel dengan TipTap
+                // resizable table dan otomatis terbentang lebar penuh halaman A4.
+                // ====================================================================
+                const tables = doc.querySelectorAll('table');
+                tables.forEach((table) => {
+                    const colgroup = table.querySelector('colgroup');
+                    if (!colgroup) {
+                        const firstRow = table.querySelector('tr');
+                        if (firstRow) {
+                            const cells = firstRow.querySelectorAll('th, td');
+                            const colCount = cells.length;
+                            if (colCount > 0) {
+                                const newColgroup = doc.createElement('colgroup');
+                                // Total lebar area cetak halaman A4 = 606px (794px - margin kiri/kanan 94px)
+                                const totalWidth = 606;
+                                const baseColWidth = Math.floor(totalWidth / colCount);
+                                const remainder = totalWidth % colCount;
+
+                                for (let i = 0; i < colCount; i++) {
+                                    const col = doc.createElement('col');
+                                    // Sisa pembagian ditambahkan ke kolom terakhir
+                                    const w = i === colCount - 1 ? baseColWidth + remainder : baseColWidth;
+                                    col.setAttribute('style', `width: ${w}px`);
+                                    newColgroup.appendChild(col);
+                                }
+                                table.insertBefore(newColgroup, table.firstChild);
+                            }
+                        }
+                    }
+                    // Paksa table style memiliki width 606px agar pas di halaman A4
+                    table.setAttribute('style', 'width: 606px');
+                });
+
                 return doc.body.innerHTML.trim();
             } catch (domErr) {
                 console.warn('[MarkupConverter] DOMParser gagal menyuntikkan lebar tabel:', domErr);

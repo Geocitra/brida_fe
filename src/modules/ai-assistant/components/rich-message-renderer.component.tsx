@@ -246,6 +246,22 @@ export const RichMessageRenderer: React.FC<RichMessageRendererProps> = ({ text, 
 
     if (trimmed.startsWith('|') && trimmed.endsWith('|')) {
       flushList();
+      
+      // Jika mendeteksi garis pemisah separator tabel baru (misal: |---|---|)
+      // sedangkan buffer tabel sudah memiliki isi (lebih dari 1 baris), ini berarti
+      // ada tabel baru yang menempel tanpa baris kosong pemisah.
+      const isSeparator = /^\|\s*[-:]+[\s-|]*\|$/.test(trimmed);
+      if (isSeparator && tableBuffer.length > 1) {
+        // Ambil baris terakhir (yang merupakan baris header dari tabel kedua)
+        const nextTableHeader = tableBuffer.pop();
+        // Render tabel pertama yang terkumpul
+        flushTable();
+        // Masukkan kembali header tabel kedua untuk memulai tabel baru
+        if (nextTableHeader) {
+          tableBuffer.push(nextTableHeader);
+        }
+      }
+
       insideTable = true;
       tableBuffer.push(line);
       continue;

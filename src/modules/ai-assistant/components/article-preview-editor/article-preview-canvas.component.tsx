@@ -1,6 +1,7 @@
 import React from 'react';
 import { EditorContent } from '@tiptap/react';
 import type { Editor } from '@tiptap/react';
+import { Loader2, Download } from 'lucide-react';
 
 interface ArticlePreviewCanvasProps {
     editor: Editor | null;
@@ -9,6 +10,11 @@ interface ArticlePreviewCanvasProps {
     activeTableElement: HTMLTableElement | null;
     onScroll: (event: React.UIEvent<HTMLDivElement>) => void;
     onStartTableResize: (event: React.MouseEvent<HTMLDivElement>, mode: 'column' | 'row', index: number, tableElement: HTMLTableElement) => void;
+    isSaving: boolean;
+    isPrinting: boolean;
+    isDirty: boolean;
+    onSaveAndBack: () => void;
+    onPrint: () => void;
 }
 
 export const ArticlePreviewCanvas: React.FC<ArticlePreviewCanvasProps> = ({
@@ -18,6 +24,11 @@ export const ArticlePreviewCanvas: React.FC<ArticlePreviewCanvasProps> = ({
     activeTableElement,
     onScroll,
     onStartTableResize,
+    isSaving,
+    isPrinting,
+    isDirty,
+    onSaveAndBack,
+    onPrint,
 }) => {
     return (
         <div
@@ -63,8 +74,13 @@ export const ArticlePreviewCanvas: React.FC<ArticlePreviewCanvasProps> = ({
             border-collapse: collapse !important;
             table-layout: fixed !important;
             width: 100% !important;
-            margin: 16px 0 !important;
+            margin-top: 16px !important;
+            margin-bottom: 32px !important;
             overflow: hidden !important;
+          }
+          .ProseMirror table + p,
+          .ProseMirror table + table {
+            margin-top: 32px !important;
           }
           .ProseMirror td,
           .ProseMirror th {
@@ -81,6 +97,10 @@ export const ArticlePreviewCanvas: React.FC<ArticlePreviewCanvasProps> = ({
             font-weight: bold;
             text-align: left;
             background-color: #f8fafc;
+          }
+          .ProseMirror tr {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
           }
           .ProseMirror .column-resize-handle {
             position: absolute;
@@ -191,6 +211,24 @@ export const ArticlePreviewCanvas: React.FC<ArticlePreviewCanvasProps> = ({
                             })}
                         </div>
                     )}
+                </div>
+
+                {/* Bottom Action Footer (no-print)
+                    Menyediakan tombol cetak PDF saja di bawah halaman kertas A4.
+                    Class 'no-print' menjamin footer ini tidak ikut tercetak di hasil PDF. */}
+                <div className="w-[794px] mt-8 mb-12 flex justify-center no-print font-roboto select-none">
+                    <button
+                        type="button"
+                        onClick={(e) => {
+                            console.log('[DEBUG] Tombol Cetak PDF Resmi di Canvas diklik!');
+                            onPrint();
+                        }}
+                        disabled={isSaving || isPrinting}
+                        className="px-6 py-2.5 bg-teal-700 hover:bg-teal-800 text-white font-extrabold text-xs uppercase tracking-wider border border-teal-800 rounded-none cursor-pointer transition-colors disabled:opacity-50 inline-flex items-center gap-1.5 shadow-sm"
+                    >
+                        {isPrinting ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
+                        <span>Cetak PDF Resmi</span>
+                    </button>
                 </div>
             </div>
         </div>

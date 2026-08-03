@@ -240,7 +240,12 @@ path.leaflet-interactive:focus-visible {
   width: 100% !important;
   border-collapse: collapse !important;
   margin-top: 1rem !important;
-  margin-bottom: 1rem !important;
+  margin-bottom: 2rem !important;
+}
+
+.prose table + p,
+.prose table + table {
+  margin-top: 2rem !important;
 }
 
 .prose table th,
@@ -333,5 +338,13 @@ path.leaflet-interactive:focus-visible {
   .no-print {
     display: none !important;
     visibility: hidden !important;
+  }
+  table {
+    page-break-inside: auto !important;
+    break-inside: auto !important;
+  }
+  tr {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
   }
 }

@@ -95,17 +95,6 @@ export const ArticlePreviewEditorHeader: React.FC<ArticlePreviewEditorHeaderProp
                     </div>
                 </div>
 
-                <div className="flex items-center gap-2">
-                    <button
-                        type="button"
-                        onClick={onPrint}
-                        disabled={isSaving || isPrinting}
-                        className="px-4 py-2 bg-teal-700 hover:bg-teal-800 text-white font-extrabold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-1.5 border border-teal-800 shadow-xs cursor-pointer disabled:opacity-50"
-                    >
-                        {isPrinting ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
-                        <span>Cetak PDF</span>
-                    </button>
-                </div>
             </div>
 
             <div className="px-6 py-2 bg-slate-50 flex flex-wrap items-center justify-between gap-4 select-none">

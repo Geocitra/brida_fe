@@ -47,7 +47,7 @@ export const MarkdownTableRenderer: React.FC<MarkdownTableRendererProps> = ({ ra
     const maxVal = Math.max(...values, 1);
 
     return (
-      <div className="border border-slate-300 my-3 p-3 bg-white rounded-none">
+      <div className="border border-slate-300 mt-3 mb-6 p-3 bg-white rounded-none">
         <div className="flex justify-between items-center border-b border-slate-200 pb-2 mb-3 select-none">
           <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Grafik Visualisasi</span>
           <button
@@ -84,7 +84,7 @@ export const MarkdownTableRenderer: React.FC<MarkdownTableRendererProps> = ({ ra
   }
 
   return (
-    <div className="overflow-x-auto border border-slate-300 my-3 rounded-none shadow-2xs">
+    <div className="overflow-x-auto border border-slate-300 mt-3 mb-6 rounded-none shadow-2xs">
       {hasChart && (
         <div className="flex justify-between items-center bg-slate-50 px-3 py-1.5 border-b border-slate-200 select-none">
           <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Tabel Data</span>
@@ -96,7 +96,7 @@ export const MarkdownTableRenderer: React.FC<MarkdownTableRendererProps> = ({ ra
           </button>
         </div>
       )}
-      <table className="min-w-full divide-y divide-slate-300 text-xs font-roboto">
+      <table className="w-full min-w-[550px] lg:min-w-full divide-y divide-slate-300 text-xs font-roboto">
         <thead className="bg-slate-100 font-bold text-slate-800 border-b border-slate-300">
           <tr>
             {headers.map((h, i) => (

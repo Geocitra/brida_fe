@@ -521,7 +521,9 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
   };
 
   const handlePrint = async () => {
-    if (!editor && !sessionId) {
+    console.log('[DEBUG] handlePrint dipanggil di Editor View. State:', { editor: !!editor, sessionId, isDirty, isPrinting });
+    if (!editor) {
+      console.warn('[DEBUG] Batal cetak karena editor null/undefined.');
       showToast('⚠️ Tidak ada naskah untuk dicetak.');
       return;
     }
@@ -688,6 +690,11 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
           activeTableElement={activeTableElement}
           onScroll={handleScroll}
           onStartTableResize={startTableResize}
+          isSaving={isSaving}
+          isPrinting={isPrinting}
+          isDirty={isDirty}
+          onSaveAndBack={handleSaveAndBack}
+          onPrint={handlePrint}
         />
 
       </div>
