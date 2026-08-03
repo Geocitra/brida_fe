@@ -15,6 +15,8 @@ interface ArticlePreviewCanvasProps {
     isDirty: boolean;
     onSaveAndBack: () => void;
     onPrint: () => void;
+    fontSize: string;
+    fontFamily: string;
 }
 
 export const ArticlePreviewCanvas: React.FC<ArticlePreviewCanvasProps> = ({
@@ -29,6 +31,8 @@ export const ArticlePreviewCanvas: React.FC<ArticlePreviewCanvasProps> = ({
     isDirty,
     onSaveAndBack,
     onPrint,
+    fontSize,
+    fontFamily,
 }) => {
     return (
         <div
@@ -123,6 +127,9 @@ export const ArticlePreviewCanvas: React.FC<ArticlePreviewCanvasProps> = ({
             background: rgba(200, 200, 255, 0.4);
             pointer-events: none;
           }
+          .ProseMirror .citation-url-node {
+            display: none !important;
+          }
           .page-break-gap {
             height: 20px;
             background-color: #f1f5f9 !important; 
@@ -161,8 +168,8 @@ export const ArticlePreviewCanvas: React.FC<ArticlePreviewCanvasProps> = ({
                         border: 'none',
                         boxShadow: 'none',
                         padding: 0,
-                        fontFamily: 'Arial, sans-serif',
-                        fontSize: '11pt',
+                        fontFamily: `${fontFamily}, sans-serif`,
+                        fontSize: `${fontSize}pt`,
                         ['--rm-margin-left' as any]: `${Math.round(marginCm * (96 / 2.54))}px`,
                         ['--rm-margin-right' as any]: `${Math.round(marginCm * (96 / 2.54))}px`,
                         ['--rm-margin-top' as any]: `${Math.round(marginCm * (96 / 2.54))}px`,

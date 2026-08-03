@@ -279,7 +279,7 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
     extensions: TIPTAP_EXTENSIONS,
     editorProps: {
       attributes: {
-        class: 'focus:outline-none max-w-none min-h-[500px] outline-none h-full text-slate-900 leading-relaxed text-xs focus:bg-white selection:bg-teal-700 selection:text-white',
+        class: 'focus:outline-none max-w-none min-h-[500px] outline-none h-full text-slate-900 leading-relaxed focus:bg-white selection:bg-teal-700 selection:text-white',
       },
       handleDOMEvents: {
         mousedown: (view, event) => {
@@ -695,6 +695,8 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
           isDirty={isDirty}
           onSaveAndBack={handleSaveAndBack}
           onPrint={handlePrint}
+          fontSize={fontSize}
+          fontFamily={fontFamily}
         />
 
       </div>
