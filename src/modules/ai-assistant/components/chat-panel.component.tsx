@@ -15,8 +15,9 @@ import {
   Paperclip,
   Sparkles,
   FileCheck,
+  Globe,
 } from 'lucide-react';
-import { AiAssistantService } from '../../../services/ai-assistant.service';
+import { AiAssistantService, AiServiceException } from '../../../services/ai-assistant.service';
 import { EmptyState } from '../../../components/common/empty-state.component';
 import { DocumentService } from '../../../services/document.service';
 
