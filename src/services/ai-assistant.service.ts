@@ -316,6 +316,7 @@ export const AiAssistantService = {
     id: string;
     title: string;
     documentId: string;
+    documentIds?: string[];
     documentTitle: string;
     createdAt: string;
     updatedAt: string;

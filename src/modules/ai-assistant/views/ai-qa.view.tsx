@@ -38,13 +38,6 @@ export const AiQaView: React.FC<AiQaViewProps> = ({
     try {
       const docs = await DocumentService.listDocuments();
       setDocuments(docs || []);
-
-      // HANYA jalankan inisialisasi default jika TIDAK ada dokumen hasil penerusan
-      if (!initialSelectedDocIds || initialSelectedDocIds.length === 0) {
-        if (docs && docs.length > 0 && selectedDocIds.length === 0) {
-          setSelectedDocIds([docs[0].id]);
-        }
-      }
     } catch (err: any) {
       setDocuments([]);
       setLoadError(`Gagal memuat dokumen dari database: ${err.message}`);
@@ -136,6 +129,8 @@ export const AiQaView: React.FC<AiQaViewProps> = ({
           onArticleIntentDetected={(promptText) => onNavigateToGenerator(promptText)}
           onLoadingChange={(loading) => setIsAiProcessing(loading)}
           initialSessionId={initialSessionId}
+          onSessionLoaded={(loadedDocIds) => setSelectedDocIds(loadedDocIds)}
+          onSessionReset={() => setSelectedDocIds([])}
         />
       )}
     </div>

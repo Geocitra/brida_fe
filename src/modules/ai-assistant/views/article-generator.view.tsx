@@ -291,6 +291,7 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
     setMessages([]);
     setSessionError(null);
     setLastFailedQuery(null);
+    setSelectedDocIds([]);
   };
 
   const handleLoadSession = async (sessionId: string) => {
@@ -306,7 +307,7 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
       setArticleTitle(session.articleTitle || session.title);
 
       if (session.sources && session.sources.length > 0) {
-        const sourceIds = session.sources.map((s: any) => s.id);
+        const sourceIds = session.sources.map((s: any) => s.documentId || s.id);
         setSelectedDocIds(sourceIds);
 
         // Pemicu Sinkronisasi: Muat ulang dokumen agar dokumen virtual hasil scrap langsung masuk ke selector

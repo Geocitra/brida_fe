@@ -10,6 +10,10 @@ import TurndownService from 'turndown';
 export class MarkupConverter {
     private static turndownService: TurndownService | null = null;
 
+    private static normalizePunctuationSpacing(text: string): string {
+        return text.replace(/\s+([,.;:!?])/g, '$1');
+    }
+
     /**
      * Mengonfigurasi dan menginisialisasi pustaka Turndown secara malas (lazy initialization)
      * untuk efisiensi performa dan isolasi siklus hidup instansi.
@@ -138,21 +142,21 @@ export class MarkupConverter {
             replacement: (content: string, node: Node) => {
                 const element = node as HTMLElement;
                 const parent = element.parentElement;
-                
-                const isHeader = element.querySelector('th') !== null || 
-                                 parent?.nodeName.toLowerCase() === 'thead' ||
-                                 (parent?.nodeName.toLowerCase() === 'tbody' && parent.firstElementChild === element && !parent.previousElementSibling);
-                
+
+                const isHeader = element.querySelector('th') !== null ||
+                    parent?.nodeName.toLowerCase() === 'thead' ||
+                    (parent?.nodeName.toLowerCase() === 'tbody' && parent.firstElementChild === element && !parent.previousElementSibling);
+
                 const trimmedContent = content.trim();
                 if (!trimmedContent) return '';
-                
+
                 let separator = '';
                 if (isHeader) {
                     const cellCount = element.querySelectorAll('th, td').length;
                     const sepCells = Array(cellCount).fill('---');
                     separator = `\n| ${sepCells.join(' | ')} |`;
                 }
-                
+
                 return `\n| ${trimmedContent}${separator}`;
             }
         });
@@ -162,13 +166,19 @@ export class MarkupConverter {
             replacement: (content: string, node: Node) => {
                 const element = node as HTMLElement;
                 const widthsAttr = element.getAttribute('data-widths');
-                
+                const rowHeightsAttr = element.getAttribute('data-row-heights');
+
                 let widthsComment = '';
                 if (widthsAttr) {
                     widthsComment = `<!-- table-widths: ${widthsAttr} -->\n`;
                 }
-                
-                return `\n\n${widthsComment}${content.trim()}\n\n`;
+
+                let rowHeightsComment = '';
+                if (rowHeightsAttr) {
+                    rowHeightsComment = `<!-- table-row-heights: ${rowHeightsAttr} -->\n`;
+                }
+
+                return `\n\n${widthsComment}${rowHeightsComment}${content.trim()}\n\n`;
             }
         });
 
@@ -233,23 +243,28 @@ export class MarkupConverter {
                 gfm: true,    // Mengaktifkan GitHub Flavored Markdown
             }) as string;
 
+            const normalizedHtml = this.normalizePunctuationSpacing(rawHtml);
+
             // Pasca-proses untuk menyuntikkan lebar kolom berdasarkan komentar
             try {
                 const parser = new DOMParser();
                 const doc = parser.parseFromString(rawHtml, 'text/html');
-                
+
                 const iterator = doc.createNodeIterator(doc.body, NodeFilter.SHOW_COMMENT);
                 let commentNode;
-                
+
                 while ((commentNode = iterator.nextNode())) {
                     const commentText = commentNode.nodeValue || '';
-                    const match = commentText.match(/table-widths:\s*(\[[\d,\s]+\])/i);
-                    if (match) {
+                    const widthsMatch = commentText.match(/table-widths:\s*(\[[\d,\s]+\])/i);
+                    const rowHeightsMatch = commentText.match(/table-row-heights:\s*(\[[\d,\s]+\])/i);
+
+                    if (widthsMatch || rowHeightsMatch) {
                         try {
-                            const widths = JSON.parse(match[1]) as number[];
+                            const widths = widthsMatch ? JSON.parse(widthsMatch[1]) as number[] : [];
+                            const rowHeights = rowHeightsMatch ? JSON.parse(rowHeightsMatch[1]) as number[] : [];
                             let sibling = commentNode.nextSibling;
                             let foundTable: HTMLTableElement | null = null;
-                            
+
                             while (sibling) {
                                 if (sibling.nodeName.toLowerCase() === 'table') {
                                     foundTable = sibling as HTMLTableElement;
@@ -261,33 +276,45 @@ export class MarkupConverter {
                                 }
                                 sibling = sibling.nextSibling;
                             }
-                            
+
                             if (foundTable) {
-                                let colgroup = foundTable.querySelector('colgroup');
-                                if (!colgroup) {
-                                    colgroup = doc.createElement('colgroup');
-                                    foundTable.insertBefore(colgroup, foundTable.firstChild);
-                                } else {
-                                    colgroup.innerHTML = '';
-                                }
-                                
-                                widths.forEach((w) => {
-                                    const col = doc.createElement('col');
-                                    if (w > 0) {
-                                        col.setAttribute('style', `width: ${w}px`);
+                                if (widths.length > 0) {
+                                    let colgroup = foundTable.querySelector('colgroup');
+                                    if (!colgroup) {
+                                        colgroup = doc.createElement('colgroup');
+                                        foundTable.insertBefore(colgroup, foundTable.firstChild);
+                                    } else {
+                                        colgroup.innerHTML = '';
                                     }
-                                    colgroup!.appendChild(col);
-                                });
+
+                                    widths.forEach((w) => {
+                                        const col = doc.createElement('col');
+                                        if (w > 0) {
+                                            col.setAttribute('style', `width: ${w}px`);
+                                        }
+                                        colgroup!.appendChild(col);
+                                    });
+                                }
+
+                                if (rowHeights.length > 0) {
+                                    const rows = Array.from(foundTable.rows);
+                                    rows.forEach((row, index) => {
+                                        const height = rowHeights[index];
+                                        if (height && height > 0) {
+                                            row.setAttribute('style', `height: ${height}px`);
+                                        }
+                                    });
+                                }
                             }
                         } catch (jsonErr) {
-                            console.warn('[MarkupConverter] Gagal melakukan parse JSON untuk lebar kolom:', jsonErr);
+                            console.warn('[MarkupConverter] Gagal melakukan parse JSON untuk lebar kolom atau tinggi baris:', jsonErr);
                         }
                     }
                 }
                 return doc.body.innerHTML.trim();
             } catch (domErr) {
                 console.warn('[MarkupConverter] DOMParser gagal menyuntikkan lebar tabel:', domErr);
-                return rawHtml.trim();
+                return normalizedHtml.trim();
             }
         } catch (err: any) {
             console.error('[MarkupConverter ERROR] Gagal mengonversi Markdown ke HTML:', err.message);
@@ -315,7 +342,7 @@ export class MarkupConverter {
                 const parser = new DOMParser();
                 const doc = parser.parseFromString(html, 'text/html');
                 const tables = doc.querySelectorAll('table');
-                
+
                 tables.forEach((table) => {
                     const colgroup = table.querySelector('colgroup');
                     const colWidths: number[] = [];
@@ -342,10 +369,25 @@ export class MarkupConverter {
                             }
                         });
                     }
-                    
+
                     const hasCustomWidths = colWidths.some(w => w > 0);
                     if (hasCustomWidths) {
                         table.setAttribute('data-widths', JSON.stringify(colWidths));
+                    }
+
+                    const rowHeights: number[] = [];
+                    table.querySelectorAll('tr').forEach((row) => {
+                        const styleAttr = row.getAttribute('style') || '';
+                        const match = styleAttr.match(/height:\s*([\d.]+)px/i);
+                        if (match) {
+                            rowHeights.push(Math.round(parseFloat(match[1])));
+                        } else {
+                            rowHeights.push(0);
+                        }
+                    });
+
+                    if (rowHeights.some(h => h > 0)) {
+                        table.setAttribute('data-row-heights', JSON.stringify(rowHeights));
                     }
                 });
                 processedHtml = doc.body.innerHTML;
@@ -357,11 +399,13 @@ export class MarkupConverter {
             const rawMarkdown = turndown.turndown(processedHtml);
 
             // Tahap Normalisasi Akhir: Bersihkan tumpukan baris kosong berlebih (maksimal 2 baris kosong berurutan)
-            const sanitizedMarkdown = rawMarkdown
-                .replace(/\n{3,}/g, '\n\n')
-                .replace(/&nbsp;/g, ' ') // Konversi entitas non-breaking space menjadi spasi normal
-                .replace(/\\([\[\]])/g, '$1') // Unescape bracket characters (e.g. \[doc1:13\] -> [doc1:13])
-                .trim();
+            const sanitizedMarkdown = this.normalizePunctuationSpacing(
+                rawMarkdown
+                    .replace(/\n{3,}/g, '\n\n')
+                    .replace(/&nbsp;/g, ' ') // Konversi entitas non-breaking space menjadi spasi normal
+                    .replace(/\\([\[\]])/g, '$1') // Unescape bracket characters (e.g. \[doc1:13\] -> [doc1:13])
+                    .trim()
+            );
 
             return sanitizedMarkdown;
         } catch (err: any) {

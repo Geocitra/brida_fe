@@ -327,9 +327,10 @@ export const ChatInputBar: React.FC<ChatInputBarProps> = ({
                 {activeSessionId && onNavigateToEditor && (
                     <button
                         type="button"
+                        disabled={isLoading}
                         onClick={() => onNavigateToEditor(activeSessionId)}
-                        className="px-3 py-1.5 text-teal-700 hover:text-teal-800 font-bold text-[10px] uppercase tracking-wider rounded-none inline-flex items-center gap-1.5 cursor-pointer transition-colors bg-transparent border-none"
-                        title="Alihkan langsung ke lembar kerja A4 Word WYSIWYG untuk sunting manual penuh"
+                        className="px-3 py-1.5 text-teal-700 hover:text-teal-800 disabled:text-slate-400 disabled:cursor-not-allowed font-bold text-[10px] uppercase tracking-wider rounded-none inline-flex items-center gap-1.5 cursor-pointer transition-colors bg-transparent border-none"
+                        title={isLoading ? "Tunggu AI selesai merakit naskah..." : "Alihkan langsung ke lembar kerja A4 Word WYSIWYG untuk sunting manual penuh"}
                     >
                         <PenTool size={12} className="shrink-0" />
                         <span>Sunting Manual</span>
