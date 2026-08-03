@@ -329,7 +329,7 @@ export const ChatInputBar: React.FC<ChatInputBarProps> = ({
                         type="button"
                         disabled={isLoading}
                         onClick={() => onNavigateToEditor(activeSessionId)}
-                        className="px-3 py-1.5 text-teal-700 hover:text-teal-800 disabled:text-slate-400 disabled:cursor-not-allowed font-bold text-[10px] uppercase tracking-wider rounded-none inline-flex items-center gap-1.5 cursor-pointer transition-colors bg-transparent border-none"
+                        className="px-3 py-1.5 text-teal-700 hover:bg-teal-50 border border-teal-300 hover:border-teal-500 disabled:text-slate-400 disabled:border-slate-200 disabled:cursor-not-allowed font-bold text-xs uppercase rounded-none inline-flex items-center gap-1.5 cursor-pointer transition-colors bg-white"
                         title={isLoading ? "Tunggu AI selesai merakit naskah..." : "Alihkan langsung ke lembar kerja A4 Word WYSIWYG untuk sunting manual penuh"}
                     >
                         <PenTool size={12} className="shrink-0" />
@@ -340,68 +340,62 @@ export const ChatInputBar: React.FC<ChatInputBarProps> = ({
 
             {/* Baris Bawah (Row 2): Kolom Masukan & Unggah Berkas */}
             <form onSubmit={handleSubmit} className="w-full">
-                <div className="flex flex-col border border-slate-350 focus-within:border-teal-600 bg-white transition-colors w-full rounded-none">
-                    
-                    {/* Textarea Area */}
+                <div className="flex items-center border border-slate-300 focus-within:border-teal-600 bg-white transition-colors w-full rounded-none gap-0">
+
+                    {/* Kiri: Tombol Lampirkan (Icon Only) */}
+                    <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={isLoading || isUploading}
+                        className="px-3 py-3 text-slate-400 hover:text-teal-700 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors shrink-0 border-r border-slate-200"
+                        title="Unggah berkas acuan atau screenshot (.pdf, .docx, .png, .jpg)"
+                    >
+                        {isUploading ? (
+                            <Loader2 size={16} className="animate-spin text-teal-600" />
+                        ) : (
+                            <Paperclip size={16} />
+                        )}
+                    </button>
+                    <input
+                        type="file"
+                        ref={fileInputRef}
+                        onChange={handleFileChange}
+                        accept=".pdf,.docx,.txt,image/*"
+                        className="hidden"
+                    />
+
+                    {/* Tengah: Textarea Input */}
                     <textarea
                         ref={textareaRef}
-                        rows={2}
+                        rows={1}
                         value={inputQuery}
                         onChange={(e) => setInputQuery(e.target.value)}
                         onKeyDown={handleKeyDown}
                         onPaste={handlePaste}
-                        placeholder="Ketik pertanyaan / draf revisi naskah Anda di sini... (Tekan Enter untuk mengirim, Shift+Enter untuk baris baru)"
+                        placeholder="Ketik pertanyaan / draf revisi Anda di sini..."
                         disabled={isLoading || isUploading}
-                        className="w-full bg-transparent px-4 py-3.5 text-xs text-slate-900 font-semibold focus:outline-none disabled:opacity-50 resize-none overflow-y-auto min-h-[64px] max-h-[144px] leading-relaxed"
-                        style={{ height: '64px' }}
+                        className="flex-1 bg-transparent px-4 py-3 text-xs text-slate-900 font-medium focus:outline-none disabled:opacity-50 resize-none overflow-y-auto leading-relaxed min-h-[44px] max-h-[144px]"
+                        style={{ height: '44px' }}
                     />
 
-                    {/* Action Bar / Toolbar at the Bottom of Textarea Container */}
-                    <div className="flex items-center justify-between px-3 py-1.5 bg-slate-50 border-t border-slate-200/80">
-                        {/* Left Side: Upload Attachment */}
-                        <div className="flex items-center">
-                            <button
-                                type="button"
-                                onClick={() => fileInputRef.current?.click()}
-                                disabled={isLoading || isUploading}
-                                className="p-2 text-slate-500 hover:text-teal-700 hover:bg-slate-200/40 disabled:opacity-40 cursor-pointer rounded-none transition-colors flex items-center justify-center gap-1.5 bg-transparent border-none"
-                                title="Unggah berkas acuan atau screenshot (.pdf, .docx, .png, .jpg)"
-                            >
-                                {isUploading ? (
-                                    <Loader2 size={15} className="animate-spin text-teal-600" />
-                                ) : (
-                                    <Paperclip size={15} />
-                                )}
-                                <span className="text-[10px] font-bold uppercase tracking-wider hidden sm:inline">Lampirkan Berkas</span>
-                            </button>
-                            <input
-                                type="file"
-                                ref={fileInputRef}
-                                onChange={handleFileChange}
-                                accept=".pdf,.docx,.txt,image/*"
-                                className="hidden"
-                            />
-                        </div>
-
-                        {/* Right Side: Send Button (Clean, transparent background-less style) */}
-                        <button
-                            type="submit"
-                            disabled={(!inputQuery.trim() && stagedAttachments.length === 0) || isLoading || isUploading}
-                            className="p-2 text-teal-700 hover:text-teal-800 disabled:text-slate-400 disabled:opacity-50 font-bold text-xs uppercase tracking-wider transition-colors flex items-center gap-1.5 cursor-pointer disabled:cursor-not-allowed rounded-none bg-transparent border-none"
-                        >
-                            {isLoading ? (
-                                <>
-                                    <span className="text-[10px] font-bold uppercase tracking-wider">Proses</span>
-                                    <Loader2 size={13} className="animate-spin text-teal-600 shrink-0" />
-                                </>
-                            ) : (
-                                <>
-                                    <span className="text-[10px] font-bold uppercase tracking-wider">Kirim</span>
-                                    <Send size={13} className="shrink-0" />
-                                </>
-                            )}
-                        </button>
-                    </div>
+                    {/* Kanan: Tombol KIRIM */}
+                    <button
+                        type="submit"
+                        disabled={(!inputQuery.trim() && stagedAttachments.length === 0) || isLoading || isUploading}
+                        className="px-4 py-3 text-teal-700 hover:text-teal-900 disabled:text-slate-300 font-extrabold text-xs uppercase tracking-widest transition-colors flex items-center gap-2 cursor-pointer disabled:cursor-not-allowed shrink-0 border-l border-slate-200 bg-transparent"
+                    >
+                        {isLoading ? (
+                            <>
+                                <span>Proses</span>
+                                <Loader2 size={14} className="animate-spin shrink-0" />
+                            </>
+                        ) : (
+                            <>
+                                <span>Kirim</span>
+                                <Send size={14} className="shrink-0" />
+                            </>
+                        )}
+                    </button>
                 </div>
             </form>
         </div>

@@ -108,7 +108,7 @@ const DraftingFallbackCard: React.FC<DraftingFallbackCardProps> = ({
           <button
             type="button"
             onClick={onRetry}
-            className="px-4 py-2 bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-1.5 cursor-pointer border border-teal-800 shadow-2xs"
+            className="px-3 py-1.5 bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs uppercase rounded-none inline-flex items-center gap-1.5 cursor-pointer border border-teal-800 shadow-2xs transition-colors"
           >
             <RefreshCw size={12} className="shrink-0" />
             <span>Coba Sintesis Ulang</span>
@@ -119,7 +119,7 @@ const DraftingFallbackCard: React.FC<DraftingFallbackCardProps> = ({
           <button
             type="button"
             onClick={onNewSession}
-            className="px-4 py-2 bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-1.5 cursor-pointer border border-teal-800 shadow-2xs"
+            className="px-3 py-1.5 bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs uppercase rounded-none inline-flex items-center gap-1.5 cursor-pointer border border-teal-800 shadow-2xs transition-colors"
           >
             <Plus size={12} className="shrink-0" />
             <span>Mulai Sesi Baru</span>
@@ -528,9 +528,9 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
         <div className="flex items-center gap-2">
           <button
             onClick={onNavigateToQa}
-            className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-2 transition-colors cursor-pointer"
+            className="px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs uppercase rounded-none inline-flex items-center gap-1.5 transition-colors cursor-pointer border border-slate-900"
           >
-            <MessageSquareCode size={14} />
+            <MessageSquareCode size={13} />
             <span>Tanya AI Chat</span>
           </button>
         </div>
