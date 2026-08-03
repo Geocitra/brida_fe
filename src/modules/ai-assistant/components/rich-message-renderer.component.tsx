@@ -117,9 +117,9 @@ export const parseInlineStylesRaw = (lineText: string, activeDocIds: string[] = 
                   href={url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className={`inline-flex items-center gap-1 px-2 py-0.5 border text-[9px] font-bold font-mono rounded-none mx-0.5 cursor-pointer no-print transition-colors ${isWebUrl
-                      ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-850 border-emerald-200'
-                      : 'bg-blue-50 hover:bg-blue-100 text-blue-850 border-blue-200'
+                  className={`inline-flex items-center gap-1 px-2 py-0.5 border-b text-[9px] font-bold font-mono rounded-none mx-0.5 cursor-pointer no-print transition-colors ${isWebUrl
+                    ? 'text-emerald-850 border-emerald-200'
+                    : 'text-blue-850 border-blue-200'
                     }`}
                 >
                   {isWebUrl ? (
@@ -131,7 +131,7 @@ export const parseInlineStylesRaw = (lineText: string, activeDocIds: string[] = 
                 </a>
               ) : (
                 <span
-                  className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 text-[9px] font-bold font-mono rounded-none mx-0.5 cursor-help no-print transition-colors"
+                  className="inline-flex items-center gap-1 px-2 py-0.5 hover:bg-slate-200 text-slate-700 border-b border-slate-300 text-[9px] font-bold font-mono rounded-none mx-0.5 cursor-help no-print transition-colors"
                 >
                   <AlertCircle size={10} className="text-slate-500 shrink-0" />
                   <span>{chunkIdx ? `Sitasi:${chunkIdx}` : 'Sitasi'}</span>
@@ -139,7 +139,7 @@ export const parseInlineStylesRaw = (lineText: string, activeDocIds: string[] = 
               )}
 
               {/* Hover Reference Card (Rounded-None, Roboto, Sleek Dark Palette) */}
-              <span className="invisible group-hover:visible absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-3 bg-slate-900 text-white rounded-none border border-slate-700 shadow-xl z-50 flex flex-col gap-1.5 pointer-events-none transition-all duration-150 text-left font-roboto">
+              <span className="invisible group-hover:visible absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-3 bg-teal-900 text-white rounded-none border-b border-slate-700 shadow-xl z-50 flex flex-col gap-1.5 pointer-events-none transition-all duration-150 text-left font-roboto">
                 <span className="text-[9px] font-extrabold uppercase tracking-wider text-teal-400">
                   {isWebUrl ? 'Tautan Web Luar' : (category || 'Dokumen Acuan')}
                 </span>

@@ -283,3 +283,55 @@ path.leaflet-interactive:focus-visible {
   margin-top: 1.25rem !important;
   margin-bottom: 0.5rem !important;
 }
+
+/* ============================================================================
+   CITATION URL NODE — Chip Sitasi Web Interaktif
+   Dirender sebagai chip inline yang bisa diklik di dalam TipTap editor.
+   Class `no-print` memastikan chip TIDAK muncul di export PDF/print.
+   ============================================================================ */
+.citation-url-node {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.1rem 0.45rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  font-family: 'Roboto', sans-serif;
+  color: #0f766e; /* teal-700 */
+  background-color: #ccfbf1; /* teal-100 */
+  border: 1px solid #5eead4; /* teal-300 */
+  border-radius: 0px !important;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  text-decoration: underline;
+  text-decoration-color: #0d9488; /* teal-600 */
+  text-underline-offset: 2px;
+  transition: background-color 0.15s ease, color 0.15s ease;
+  vertical-align: middle;
+  line-height: 1.4;
+  position: relative;
+  /* Pastikan tidak bisa diseleksi/diedit secara teks */
+  -webkit-user-modify: read-only;
+}
+
+.citation-url-node:hover {
+  background-color: #99f6e4; /* teal-200 */
+  color: #0d9488; /* teal-600 */
+}
+
+.citation-url-node::before {
+  content: '🔗';
+  font-size: 0.6rem;
+  opacity: 0.8;
+}
+
+/* ============================================================================
+   NO-PRINT — Sembunyikan elemen dari print dan PDF export
+   ============================================================================ */
+@media print {
+  .no-print {
+    display: none !important;
+    visibility: hidden !important;
+  }
+}

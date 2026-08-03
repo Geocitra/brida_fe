@@ -12,6 +12,9 @@ import { TableRow } from '@tiptap/extension-table-row';
 import { TableHeader } from '@tiptap/extension-table-header';
 import { TableCell } from '@tiptap/extension-table-cell';
 
+// --- Ekstensi Sitasi URL Interaktif ---
+import { CitationUrlNode } from '../components/article-preview-editor/citation-url.extension';
+
 // @ts-ignore
 import { PaginationPlus } from 'tiptap-pagination-plus';
 
@@ -154,6 +157,8 @@ const TIPTAP_EXTENSIONS = [
   TableRow,
   TableHeader,
   TableCell,
+  // --- Injeksi Ekstensi Sitasi URL ---
+  CitationUrlNode,
   // --- Injeksi Ekstensi Tab Key ---
   TabKeyExtension,
   // ------------------------------
@@ -537,8 +542,23 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
       showToast('🖨️ Merakit dokumen PDF resmi di server (True WYSIWYG)...');
       const targetFontSize = parseFloat(fontSize);
 
+      // Strip semua elemen `.no-print` (termasuk CitationUrlNode chip) dari HTML
+      // sebelum dikirim ke server PDF generator, agar tidak muncul di dokumen akhir.
+      const stripNoPrintElements = (htmlString: string): string => {
+        try {
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(htmlString, 'text/html');
+          doc.querySelectorAll('.no-print').forEach((el) => el.remove());
+          return doc.body.innerHTML;
+        } catch {
+          return htmlString;
+        }
+      };
+
+      const cleanHtmlForPdf = stripNoPrintElements(editor.getHTML());
+
       await PdfExportService.exportCustomFormattedArticlePdf(
-        editor.getHTML(),
+        cleanHtmlForPdf,
         {
           fontFamily,
           fontSize: isNaN(targetFontSize) ? 11 : targetFontSize,

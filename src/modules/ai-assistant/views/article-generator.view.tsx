@@ -40,10 +40,10 @@ interface MiniAnchorCardProps {
 
 const MiniAnchorCard: React.FC<MiniAnchorCardProps> = ({ title }) => {
   return (
-    <div className="p-4 my-3 bg-teal-50/50 border border-teal-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shadow-2xs no-print">
+    <div className="p-4 my-3 border-b border-teal-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shadow-2xs no-print">
       <div className="flex items-center gap-3">
-        <div className="p-2 bg-teal-100 border border-teal-300 text-teal-800 shrink-0">
-          <FileCheck size={18} className="animate-pulse" />
+        <div className="p-2 text-teal-800 shrink-0">
+          <FileCheck size={18} />
         </div>
         <div className="space-y-0.5 text-left">
           <strong className="text-xs uppercase tracking-wider text-teal-950 font-bold flex items-center gap-1">
@@ -528,7 +528,7 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
         <div className="flex items-center gap-2">
           <button
             onClick={onNavigateToQa}
-            className="px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs uppercase rounded-none inline-flex items-center gap-1.5 transition-colors cursor-pointer border border-slate-900"
+            className="px-3 py-1.5  text-black font-bold text-xs uppercase rounded-none inline-flex items-center gap-1.5 transition-colors cursor-pointer border-b border-slate-500 hover:bg-slate-100"
           >
             <MessageSquareCode size={13} />
             <span>Tanya AI Chat</span>
@@ -557,10 +557,10 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
         {showHistorySidebar && (
           <div className="w-64 h-full flex flex-col bg-white border border-slate-300 border-r-0 shadow-xs shrink-0 overflow-hidden">
             <div className="p-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between shrink-0">
-              <span className="text-[10px] font-extrabold text-slate-700 uppercase tracking-wider">Riwayat Naskah</span>
+              <span className="text-[12px] text-black tracking-wider font-roboto">Riwayat Naskah</span>
               <button
                 onClick={handleCreateNewSession}
-                className="p-1 bg-teal-700 text-white hover:bg-teal-800"
+                className="p-1 text-black"
                 title="Mulai sesi draf baru"
               >
                 <Plus size={12} />
@@ -669,9 +669,9 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
                   className={`p-4 flex gap-4 items-start transition-colors border-b border-slate-100 ${msg.sender === 'user' ? 'bg-teal-50/20' : 'bg-white'
                     }`}
                 >
-                  <div className={`w-7 h-7 flex items-center justify-center shrink-0 border ${msg.sender === 'user' ? 'bg-slate-900 border-slate-950 text-white' : 'bg-teal-700 border-teal-800 text-white'
+                  <div className={`w-7 h-7 flex items-center justify-center shrink-0 ${msg.sender === 'user' ?  'text-black' : ' text-black'
                     }`}>
-                    {msg.sender === 'user' ? <User size={13} /> : <Bot size={13} />}
+                    {msg.sender === 'user' ? <User size={16} /> : <Bot size={16} />}
                   </div>
 
                   <div className="flex-1 min-w-0">

@@ -292,7 +292,7 @@ export const ChatInputBar: React.FC<ChatInputBarProps> = ({
             )}
 
             {/* Baris Tengah (Row 1): Pemilihan Parameter Gaya Bahasa & Panjang Artikel */}
-            <div className="flex flex-wrap items-center justify-between gap-4 bg-slate-50 border border-slate-200 px-4 py-3 rounded-none">
+            <div className="flex flex-wrap items-center justify-between gap-4 bg-white px-4 py-2 rounded-none">
                 <div className="flex flex-wrap items-center gap-5">
                     <div className="flex items-center gap-2">
                         <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">Gaya Bahasa:</span>
@@ -300,12 +300,12 @@ export const ChatInputBar: React.FC<ChatInputBarProps> = ({
                             value={tone}
                             onChange={(e) => setTone(e.target.value)}
                             disabled={isLoading || isUploading}
-                            className="text-xs bg-white border border-slate-300 text-slate-800 font-bold focus:outline-none focus:border-teal-700 px-2.5 py-1.5 rounded-none cursor-pointer hover:border-slate-400 transition-colors"
+                            className="text-xs bg-white border-b border-slate-300 text-slate-800 font-bold focus:outline-none focus:border-teal-700 px-2.5 py-1.5 rounded-none cursor-pointer hover:border-slate-400 transition-colors"
                         >
-                            <option value="solutif">SOLUTIF (Bupati)</option>
-                            <option value="kritis">KRITIS (OPD)</option>
-                            <option value="akademis">AKADEMIS (Media)</option>
-                            <option value="populer">POPULER (Publik)</option>
+                            <option value="solutif">SOLUTIF</option>
+                            <option value="kritis">KRITIS</option>
+                            <option value="akademis">AKADEMIS</option>
+                            <option value="populer">POPULER</option>
                         </select>
                     </div>
 
@@ -315,7 +315,7 @@ export const ChatInputBar: React.FC<ChatInputBarProps> = ({
                             value={targetLength}
                             onChange={(e) => setTargetLength(e.target.value as any)}
                             disabled={isLoading || isUploading}
-                            className="text-xs bg-white border border-slate-300 text-slate-800 font-bold focus:outline-none focus:border-teal-700 px-2.5 py-1.5 rounded-none cursor-pointer hover:border-slate-400 transition-colors"
+                            className="text-xs bg-white border-b border-slate-300 text-slate-800 font-bold focus:outline-none focus:border-teal-700 px-2.5 py-1.5 rounded-none cursor-pointer hover:border-slate-400 transition-colors"
                         >
                             <option value="SHORT">Ringkas (~700 Kata)</option>
                             <option value="MEDIUM">Sedang (~1000 Kata)</option>
@@ -329,7 +329,7 @@ export const ChatInputBar: React.FC<ChatInputBarProps> = ({
                         type="button"
                         disabled={isLoading}
                         onClick={() => onNavigateToEditor(activeSessionId)}
-                        className="px-3 py-1.5 text-teal-700 hover:bg-teal-50 border border-teal-300 hover:border-teal-500 disabled:text-slate-400 disabled:border-slate-200 disabled:cursor-not-allowed font-bold text-xs uppercase rounded-none inline-flex items-center gap-1.5 cursor-pointer transition-colors bg-white"
+                        className="px-3 py-1.5 text-teal-700 disabled:text-slate-400 disabled:border-slate-200 disabled:cursor-not-allowed font-bold text-xs uppercase rounded-none inline-flex items-center gap-1.5 cursor-pointer transition-colors bg-white"
                         title={isLoading ? "Tunggu AI selesai merakit naskah..." : "Alihkan langsung ke lembar kerja A4 Word WYSIWYG untuk sunting manual penuh"}
                     >
                         <PenTool size={12} className="shrink-0" />

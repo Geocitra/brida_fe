@@ -36,10 +36,10 @@ interface MiniAnchorCardProps {
 
 const MiniAnchorCard: React.FC<MiniAnchorCardProps> = ({ title }) => {
   return (
-    <div className="p-4 my-3 bg-teal-50/50 border border-teal-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shadow-2xs no-print">
+    <div className="p-4 my-3 bg-white border-b border-teal-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shadow-2xs no-print">
       <div className="flex items-center gap-3">
-        <div className="p-2 bg-teal-100 border border-teal-300 text-teal-800 shrink-0">
-          <FileCheck size={18} className="animate-pulse" />
+        <div className="p-2 text-teal-800 shrink-0">
+          <FileCheck size={18} />
         </div>
         <div className="space-y-0.5 text-left">
           <strong className="text-xs uppercase tracking-wider text-teal-950 font-bold flex items-center gap-1">
@@ -515,17 +515,17 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       {showHistorySidebar && (
         <div className="w-full lg:w-80 shrink-0 flex flex-col h-full bg-white border-b lg:border-b-0 lg:border-r border-slate-300 overflow-hidden">
           <div className="p-3 border-b border-slate-300 bg-slate-100 flex items-center justify-between">
-            <h3 className="text-xs font-bold text-slate-900 uppercase flex items-center gap-1.5 font-roboto">
+            <h3 className="text-xs text-slate-900 flex items-center gap-1.5 font-roboto">
               <History size={14} className="text-teal-700" />
-              <span>Riwayat Chat DB ({qaSessions.length})</span>
+              <span>Riwayat Chat ({qaSessions.length})</span>
             </h3>
             <button
               onClick={handleCreateNewSession}
-              className="px-2 py-1 bg-teal-700 hover:bg-teal-800 text-white font-bold text-[11px] uppercase tracking-wider rounded-none inline-flex items-center gap-1 cursor-pointer transition-colors"
+              className="px-2 py-1 text-black text-[11px] tracking-wider rounded-none inline-flex items-center gap-1 cursor-pointer transition-colors"
               title="Mulai Sesi Chat Baru"
             >
               <Plus size={12} />
-              <span>Sesi Baru</span>
+              
             </button>
           </div>
 
@@ -640,9 +640,9 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                   }`}
               >
                 { }
-                <div className={`w-8 h-8 flex items-center justify-center shrink-0 border rounded-none shadow-2xs ${msg.sender === 'user'
-                  ? 'bg-slate-900 border-slate-950 text-white'
-                  : 'bg-teal-700 border-teal-800 text-white'
+                <div className={`w-8 h-8 flex items-center justify-center shrink-0 rounded-none shadow-2xs ${msg.sender === 'user'
+                  ? 'text-black'
+                  : 'text-black'
                   }`}>
                   {msg.sender === 'user' ? <User size={15} /> : <Bot size={15} />}
                 </div>
@@ -651,7 +651,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
                     <span className="text-xs font-bold text-slate-800 uppercase tracking-wide font-roboto">
-                      {msg.sender === 'user' ? 'User' : 'AKLS AI Assistant'}
+                      {msg.sender === 'user' ? 'User' : ' AKLS AI'}
                     </span>
                     <span className="text-[10px] text-slate-400 font-medium">{msg.timestamp}</span>
                   </div>
@@ -819,7 +819,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                 type="button"
                 onClick={handleOpenTransitionModal}
                 disabled={isLoading || messages.length === 0}
-                className="px-5 py-3 bg-teal-700 hover:bg-teal-850 disabled:bg-slate-300 text-white disabled:text-slate-500 font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-1.5 border border-teal-800 shadow-2xs cursor-pointer disabled:cursor-not-allowed transition-all shrink-0 justify-center"
+                className="px-5 py-3 bg-white hover:bg-slate-100 disabled:bg-slate-300 text-black disabled:text-slate-500 font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-1.5 border-b border-slate-600 shadow-2xs cursor-pointer disabled:cursor-not-allowed transition-all shrink-0 justify-center"
                 title="Konversi transkrip percakapan aktif secara terintegrasi menjadi draf naskah rilis baru"
               >
                 <PenTool size={14} className="shrink-0" />

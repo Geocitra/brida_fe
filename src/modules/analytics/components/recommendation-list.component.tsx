@@ -53,12 +53,12 @@ export const RecommendationList: React.FC<RecommendationListProps> = ({
                   </div>
                 </td>
                 <td className="py-3 px-3 text-center">
-                  <span className={`inline-block px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-none border ${
+                  <span className={`inline-block px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-none ${
                     item.priority === 'TINGGI'
-                      ? 'bg-red-50 text-red-700 border-red-200'
+                      ? 'text-red-700'
                       : item.priority === 'SEDANG'
-                      ? 'bg-amber-50 text-amber-800 border-amber-200'
-                      : 'bg-slate-100 text-slate-700 border-slate-300'
+                      ? 'text-amber-800'
+                      : 'text-slate-700'
                   }`}>
                     {item.priority}
                   </span>

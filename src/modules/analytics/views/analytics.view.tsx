@@ -518,7 +518,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
                   Pilih Dokumen Acuan yang Akan Dianalisis
                 </h2>
               </div>
-              <span className="text-xs font-bold text-teal-800 bg-teal-50 px-2.5 py-0.5 rounded-none">
+              <span className="text-xs font-bold text-teal-800 px-2.5 py-0.5 rounded-none">
                 {selectedDocIds.length} Dokumen Terpilih
               </span>
             </div>
@@ -676,7 +676,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
               <button
                 onClick={handleOpenMappingModal}
                 disabled={isComparing || selectedDocIds.length === 0}
-                className="px-5 py-2.5 bg-teal-700 hover:bg-teal-800 disabled:bg-slate-300 text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-2 border border-teal-900 shadow-sm cursor-pointer transition-colors"
+                className="px-5 py-2.5 bg-teal-700 hover:bg-teal-800 disabled:bg-white text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-2 cursor-pointer transition-colors"
               >
                 {isComparing ? (
                   <Loader2 size={16} className="animate-spin" />

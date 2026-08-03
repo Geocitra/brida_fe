@@ -31,11 +31,11 @@ export const DeviationSummaryCard: React.FC<DeviationSummaryCardProps> = ({
           </span>
         </div>
 
-        <span className={`self-start sm:self-auto px-3.5 py-1.5 text-xs font-bold uppercase tracking-wider rounded-none inline-flex items-center gap-1.5 border ${urgencyStatus === 'KRITIS'
-          ? 'bg-red-50 text-red-800 border-red-300'
+        <span className={`self-start sm:self-auto px-3.5 py-1.5 text-xs font-bold uppercase tracking-wider rounded-none inline-flex items-center gap-1.5 ${urgencyStatus === 'KRITIS'
+          ? 'text-red-800'
           : urgencyStatus === 'WASPADA'
-            ? 'bg-amber-50 text-amber-900 border-amber-300'
-            : 'bg-emerald-50 text-emerald-900 border-emerald-300'
+            ? 'text-amber-900'
+            : 'text-emerald-900'
           }`}>
           {urgencyStatus === 'KRITIS' && <AlertCircle size={14} className="text-red-700" />}
           {urgencyStatus === 'WASPADA' && <AlertTriangle size={14} className="text-amber-700" />}

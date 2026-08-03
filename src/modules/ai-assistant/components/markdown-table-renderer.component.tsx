@@ -52,7 +52,7 @@ export const MarkdownTableRenderer: React.FC<MarkdownTableRendererProps> = ({ ra
           <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Grafik Visualisasi</span>
           <button
             onClick={() => setViewMode('table')}
-            className="px-2.5 py-1 text-[9px] font-bold uppercase tracking-wider border border-slate-300 hover:bg-slate-100 transition-colors rounded-none cursor-pointer"
+            className="px-2.5 py-1 text-[9px] font-bold uppercase tracking-wider hover:bg-slate-100 transition-colors rounded-none cursor-pointer"
           >
             Tampilkan Tabel
           </button>
@@ -90,7 +90,7 @@ export const MarkdownTableRenderer: React.FC<MarkdownTableRendererProps> = ({ ra
           <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Tabel Data</span>
           <button
             onClick={() => setViewMode('chart')}
-            className="px-2.5 py-1 text-[9px] font-bold uppercase tracking-wider border border-slate-300 hover:bg-slate-100 transition-colors rounded-none cursor-pointer"
+            className="px-2.5 py-1 text-[9px] font-bold uppercase tracking-wider hover:bg-slate-100 transition-colors rounded-none cursor-pointer"
           >
             Tampilkan Grafik
           </button>

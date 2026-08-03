@@ -440,15 +440,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
             <span>Unggah Dokumen Acuan Baru</span>
           </button>
 
-          {onNavigateToDashboard && (
-            <button
-              onClick={onNavigateToDashboard}
-              className="px-3.5 py-2 bg-white hover:bg-slate-100 text-slate-700 text-xs font-semibold rounded-none border border-slate-300 flex items-center gap-2 cursor-pointer transition-colors"
-            >
-              <ArrowLeft size={14} />
-              <span>Dashboard</span>
-            </button>
-          )}
+          
         </div>
       </div>
 
@@ -586,10 +578,10 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                   const isMedium = urgencyStr.includes('SEDANG') || urgencyStr.includes('MENENGAH');
 
                   const bgClass = isHigh
-                    ? 'bg-red-50 text-red-800 border border-red-200'
+                    ? 'text-red-800'
                     : isMedium
-                      ? 'bg-amber-50 text-amber-800 border border-amber-200'
-                      : 'bg-emerald-50 text-emerald-800 border border-emerald-200';
+                      ? 'text-amber-800'
+                      : 'text-emerald-800';
 
                   return (
                     <span className={`px-3 py-1 text-xs font-bold uppercase rounded-none flex items-center gap-1.5 shrink-0 self-start ${bgClass}`}>

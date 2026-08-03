@@ -34,6 +34,32 @@ export class MarkupConverter {
         });
 
         /**
+         * ATURAN KUSTOM 0 [Information Expert]: Preservasi CitationUrlNode → Markdown
+         *
+         * Ketika TipTap menghasilkan HTML dari CitationUrlNode (<span data-citation-url="...">),
+         * Turndown WAJIB mengonversinya kembali ke format token Markdown asli [https://...].
+         * Ini menjamin roundtrip sempurna: DB → editor → DB tanpa kehilangan data.
+         *
+         * PENTING: Rule ini didaftarkan PERTAMA karena Turndown menerapkan rules secara LIFO
+         * (rule terakhir menang). Dengan urutan ini, sitasi URL selalu ditangkap lebih awal
+         * sebelum rule span generic menghapus attributnya.
+         */
+        service.addRule('citationUrlPreservationRule', {
+            filter: (node: HTMLElement) => {
+                return (
+                    node.nodeName.toLowerCase() === 'span' &&
+                    node.getAttribute('data-citation-url') !== null
+                );
+            },
+            replacement: (_content: string, node: Node) => {
+                const element = node as HTMLElement;
+                const url = element.getAttribute('data-citation-url') || '';
+                // Kembalikan ke format token Markdown asli yang disimpan di database
+                return url ? `[${url}]` : '';
+            },
+        });
+
+        /**
          * ATURAN KUSTOM 1 [Protected Variations]: Perataan Paragraf (Text Alignment)
          * Mengonversi elemen HTML TipTap yang memiliki inline style (seperti style="text-align: justify")
          * menjadi tag kontainer CommonMark standar (<div align="justify">) agar aman dibaca database & AI.
@@ -72,7 +98,7 @@ export class MarkupConverter {
                 // Jika perataan teks adalah default kiri (left), kembalikan teksnya saja
                 // agar Turndown bisa memproses blockquote, heading, paragraf secara native.
                 if (alignment === 'left') {
-                    return content;
+                    return `\n\n${content}\n\n`;
                 }
 
                 // Bungkus konten paragraf dengan tag div pembatas alignment yang CommonMark-compliant
@@ -81,7 +107,7 @@ export class MarkupConverter {
         });
 
         /**
-         * ATURAN KUSTOM 2 [Information Expert]: Preservasi Token Sitasi [doc-XYZ:chunkIndex]
+         * ATURAN KUSTOM 2 [Information Expert]: Preservasi Token Sitasi Dokumen [doc-XYZ:chunkIndex]
          * Mencegah konversi Turndown merusak markup token sitasi jika dirender sebagai
          * komponen visual badge oleh TipTap editor.
          */
@@ -109,7 +135,9 @@ export class MarkupConverter {
             filter: (node: HTMLElement) => {
                 const tagName = node.nodeName.toLowerCase();
                 const styleAttr = node.getAttribute('style') || '';
-                return tagName === 'span' && styleAttr.includes('font-size');
+                // Pastikan bukan CitationUrlNode — sudah ditangani rule 0
+                const hasCitationUrl = node.getAttribute('data-citation-url') !== null;
+                return tagName === 'span' && styleAttr.includes('font-size') && !hasCitationUrl;
             },
             replacement: (content: string, node: Node) => {
                 const element = node as HTMLElement;
@@ -189,6 +217,23 @@ export class MarkupConverter {
             }
         });
 
+        /**
+         * ATURAN KUSTOM 5 [Roundtrip Safety]: Normalisasi <br> menjadi pemisah paragraf
+         *
+         * TipTap dengan `breaks: true` menghasilkan <br> di dalam <p> untuk baris baru manual.
+         * Turndown secara default mengonversi <br> menjadi \n tunggal — ini menyebabkan
+         * paragraf bergabung saat dimuat ulang karena Markdown butuh \n\n antar blok.
+         *
+         * Solusi: Handle <br> eksplisit agar tidak menjadi noise saat roundtrip.
+         */
+        service.addRule('lineBreakRule', {
+            filter: ['br'],
+            replacement: () => {
+                // Kembalikan sebagai single newline. Paragraf sudah dipisahkan oleh rule <p>.
+                return '\n';
+            }
+        });
+
         this.turndownService = service;
         return this.turndownService;
     }
@@ -196,7 +241,13 @@ export class MarkupConverter {
     /**
      * Mengonversi naskah Markdown bersih dari database menjadi HTML dengan inline styles
      * agar dapat dipahami dan dirender secara visual oleh TipTap Editor.
-     * 
+     *
+     * Logika utama:
+     * 1. Strip token sitasi RAG lokal [doc-uuid:idx] agar tidak tampil sebagai noise
+     * 2. Konversi token sitasi URL [https://...] → elemen <span data-citation-url> interaktif
+     * 3. Parse Markdown → HTML via marked.js
+     * 4. Inject lebar kolom tabel dari komentar metadata
+     *
      * @param markdown String naskah Markdown dari database
      * @returns String HTML bersih dengan format perataan paragraf (CSS inline style)
      */
@@ -206,20 +257,43 @@ export class MarkupConverter {
         }
 
         try {
-            // Bersihkan token sitasi RAG lokal (misal: [doc1:1] atau [uuid:chunkIdx]) agar tidak tampil di editor naskah
-            // PENTING: Jangan hapus sitasi URL web seperti [https://...] karena itu ditampilkan sebagai badge sitasi
-            let processedMarkdown = markdown.replace(/\\\*?\[(?!https?:\/\/)(?:[a-f0-9-]{8,}|doc(?:[-_a-z0-9]+)?):\d+\\\*?\]/gi, '');
+            // ====================================================================
+            // TAHAP 1: Strip token sitasi RAG lokal yang tidak perlu tampil di editor
+            // Format yang di-strip: [doc-uuid:0], [doc-abc123:5], \*[doc-xyz:1]\*
+            // Format yang DILINDUNGI: [https://...] (ditangani di tahap 2)
+            // ====================================================================
+            let processedMarkdown = markdown
+                // Strip dengan atau tanpa escape backslash dan asterisk (varian legacy)
+                .replace(/\\?\*?\[(?!https?:\/\/)(?:[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}|doc(?:[-_a-z0-9]*)):\d+\]\\?\*?/gi, '')
+                // Strip format alternatif tanpa UUID penuh: [doc-123:0]
+                .replace(/\[doc[-_][a-z0-9]+:\d+\]/gi, '')
+                // Bersihkan spasi berlebih yang mungkin tertinggal setelah strip
+                .replace(/\s{2,}(?=[.,;:!?])/g, '');
 
-            // LINDUNGI sitasi URL web [https://...] dari diubah oleh marked.js menjadi <a href> standar
-            // Caranya: ganti dengan placeholder sementara sebelum parsing, lalu kembalikan setelah parsing
-            const urlCitationPlaceholders: string[] = [];
-            processedMarkdown = processedMarkdown.replace(/\[(https?:\/\/[^\]\s]+?)(?::(\d+))?\]/g, (match) => {
-                const idx = urlCitationPlaceholders.length;
-                urlCitationPlaceholders.push(match);
-                return `%%URLCITE_${idx}%%`;
-            });
+            // ====================================================================
+            // TAHAP 2: Lindungi token sitasi URL web dari parsing oleh marked.js
+            //
+            // Marked.js akan mengubah [https://...] menjadi <a href> standar,
+            // tapi kita ingin merender ini sebagai CitationUrlNode chip, bukan <a>.
+            //
+            // Strategi: ganti dengan placeholder sementara → parse → kembalikan
+            // sebagai elemen <span data-citation-url> yang akan diparsing TipTap
+            // sebagai CitationUrlNode (atom, non-editable, clickable).
+            // ====================================================================
+            const collectedCitations: string[] = [];
 
-            // Tahap 1: Konversi tag div alignment pembungkus menjadi paragraf individu dengan inline style perataan
+            processedMarkdown = processedMarkdown.replace(
+                /\[(https?:\/\/[^\]\s]+?)(?::\d+)?\]/g,
+                (match, url) => {
+                    const idx = collectedCitations.length;
+                    collectedCitations.push(url);
+                    return `%%URLCITE_${idx}%%`;
+                }
+            );
+
+            // ====================================================================
+            // TAHAP 3: Konversi tag div alignment pembungkus menjadi paragraf individu
+            // ====================================================================
             processedMarkdown = processedMarkdown.replace(
                 /<div align="(left|center|right|justify)">([\s\S]*?)<\/div>/gi,
                 (_, align, content) => {
@@ -228,11 +302,9 @@ export class MarkupConverter {
                         .map((p: string) => {
                             const trimmed = p.trim();
                             if (!trimmed) return '';
-                            // Jika sudah berwujud tag HTML block, biarkan
                             if (trimmed.startsWith('<p') || trimmed.startsWith('<h') || trimmed.startsWith('<div')) {
                                 return trimmed;
                             }
-                            // Jika merupakan list markdown atau header, biarkan untuk di-parse oleh marked
                             if (trimmed.startsWith('#') || trimmed.startsWith('- ') || trimmed.startsWith('* ') || trimmed.match(/^\d+\.\s/)) {
                                 return trimmed;
                             }
@@ -243,27 +315,41 @@ export class MarkupConverter {
                 }
             );
 
-            // Tahap 2: Lakukan pembersihan format spasi berlebih
+            // Normalisasi line endings
             processedMarkdown = processedMarkdown.replace(/\r\n/g, '\n');
 
-            // Tahap 3: Parsing string menggunakan mesin marked secara sinkronus
+            // ====================================================================
+            // TAHAP 4: Parse Markdown → HTML menggunakan marked.js
+            // ====================================================================
             let rawHtml = marked.parse(processedMarkdown, {
                 async: false,
-                breaks: true, // Menjaga perpindahan baris manual
-                gfm: true,    // Mengaktifkan GitHub Flavored Markdown
+                breaks: true,
+                gfm: true,
             }) as string;
 
-            // Kembalikan placeholder sitasi URL ke token aslinya setelah HTML terbentuk
-            urlCitationPlaceholders.forEach((original, idx) => {
-                rawHtml = rawHtml.replace(`%%URLCITE_${idx}%%`, original);
+            // ====================================================================
+            // TAHAP 5: Kembalikan placeholder URL ke elemen <span data-citation-url>
+            //
+            // Elemen ini akan diparsing oleh TipTap sebagai CitationUrlNode karena
+            // extension tersebut mendengarkan parseHTML() pada 'span[data-citation-url]'.
+            //
+            // Label "Link N" ditampilkan — URL asli tersimpan aman di data-citation-url.
+            // Class `no-print` memastikan chip ini tidak muncul di export PDF.
+            // ====================================================================
+            collectedCitations.forEach((url, idx) => {
+                const labelText = `Link ${idx + 1}`;
+                const citationSpan = `<span data-citation-url="${url}" data-citation-label="${labelText}" class="citation-url-node no-print" contenteditable="false" title="${url}">${labelText}</span>`;
+                rawHtml = rawHtml.replace(`%%URLCITE_${idx}%%`, citationSpan);
             });
 
             const normalizedHtml = this.normalizePunctuationSpacing(rawHtml);
 
-            // Pasca-proses untuk menyuntikkan lebar kolom berdasarkan komentar
+            // ====================================================================
+            // TAHAP 6: Pasca-proses — inject lebar kolom tabel dari komentar metadata
+            // ====================================================================
             try {
                 const parser = new DOMParser();
-                const doc = parser.parseFromString(rawHtml, 'text/html');
+                const doc = parser.parseFromString(normalizedHtml, 'text/html');
 
                 const iterator = doc.createNodeIterator(doc.body, NodeFilter.SHOW_COMMENT);
                 let commentNode;
@@ -333,7 +419,6 @@ export class MarkupConverter {
             }
         } catch (err: any) {
             console.error('[MarkupConverter ERROR] Gagal mengonversi Markdown ke HTML:', err.message);
-            // Fallback aman: kembalikan teks polos yang aman jika parsing fatal
             return `<p>${markdown}</p>`;
         }
     }
@@ -341,7 +426,13 @@ export class MarkupConverter {
     /**
      * Mengonversi konten HTML semantik dari TipTap editor menjadi Markdown CommonMark bersih
      * sebelum disinkronkan dan disimpan ke database PostgreSQL.
-     * 
+     *
+     * Logika utama:
+     * 1. Ekstrak lebar kolom tabel dari <colgroup> sebelum Turndown membuangnya
+     * 2. Turndown converts HTML → Markdown
+     * 3. CitationUrlNode (<span data-citation-url>) → [https://...] (via rule 0)
+     * 4. Normalisasi akhir: hapus baris kosong berlebih, unescape bracket
+     *
      * @param html String HTML semantik hasil ekstraksi TipTap (editor.getHTML())
      * @returns String Markdown bersih yang bebas dari tag visual kustom HTML
      */
@@ -351,7 +442,9 @@ export class MarkupConverter {
         }
 
         try {
-            // Pindai HTML menggunakan DOMParser untuk mengekstrak lebar kolom tabel
+            // ====================================================================
+            // TAHAP 1: Pre-proses HTML — ekstrak metadata tabel sebelum Turndown
+            // ====================================================================
             let processedHtml = html;
             try {
                 const parser = new DOMParser();
@@ -410,22 +503,32 @@ export class MarkupConverter {
                 console.warn('[MarkupConverter] DOMParser gagal mengekstrak lebar kolom tabel:', domErr);
             }
 
+            // ====================================================================
+            // TAHAP 2: Turndown HTML → Markdown
+            //
+            // Rule 0 (citationUrlPreservationRule) secara otomatis mengonversi
+            // <span data-citation-url="..."> kembali ke [https://...] untuk DB.
+            // ====================================================================
             const turndown = this.getTurndownInstance();
             const rawMarkdown = turndown.turndown(processedHtml);
 
-            // Tahap Normalisasi Akhir: Bersihkan tumpukan baris kosong berlebih (maksimal 2 baris kosong berurutan)
+            // ====================================================================
+            // TAHAP 3: Normalisasi akhir
+            // ====================================================================
             const sanitizedMarkdown = this.normalizePunctuationSpacing(
                 rawMarkdown
+                    // Maksimal 2 baris kosong berurutan (1 paragraf pemisah)
                     .replace(/\n{3,}/g, '\n\n')
-                    .replace(/&nbsp;/g, ' ') // Konversi entitas non-breaking space menjadi spasi normal
-                    .replace(/\\([\[\]])/g, '$1') // Unescape bracket characters (e.g. \[doc1:13\] -> [doc1:13])
+                    // Konversi entitas non-breaking space menjadi spasi normal
+                    .replace(/&nbsp;/g, ' ')
+                    // Unescape bracket agar sitasi dokumen kembali bersih: \[doc1:13\] → [doc1:13]
+                    .replace(/\\([\[\]])/g, '$1')
                     .trim()
             );
 
             return sanitizedMarkdown;
         } catch (err: any) {
             console.error('[MarkupConverter ERROR] Gagal mengonversi HTML ke Markdown:', err.message);
-            // Fallback aman: kembalikan teks mentah
             return html;
         }
     }

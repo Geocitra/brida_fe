@@ -64,7 +64,7 @@ export const SuggestionChips: React.FC<SuggestionChipsProps> = ({
           type="button"
           onClick={() => onClick(s)}
           disabled={disabled}
-          className="px-3 py-1.5 bg-teal-50 hover:bg-teal-100 disabled:opacity-50 text-teal-800 hover:text-teal-950 font-bold text-xs border border-teal-200 hover:border-teal-300 rounded-none shadow-2xs transition-colors cursor-pointer disabled:cursor-not-allowed inline-flex items-center gap-1.5"
+          className="px-3 py-1.5 hover:bg-teal-50 disabled:opacity-50 text-teal-800 hover:text-teal-950 font-bold text-xs border-b border-teal-200 hover:border-teal-300 rounded-none shadow-2xs transition-colors cursor-pointer disabled:cursor-not-allowed inline-flex items-center gap-1.5"
         >
           <span>{parseInlineStylesRaw(s)}</span>
           <ArrowRight size={11} className="text-teal-600 shrink-0 animate-pulse" />
