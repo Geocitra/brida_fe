@@ -5,6 +5,7 @@ import StarterKit from '@tiptap/starter-kit';
 import TextAlign from '@tiptap/extension-text-align';
 import { TextStyle } from '@tiptap/extension-text-style';
 import { FontFamily } from '@tiptap/extension-font-family';
+import { ResizableImage } from '../components/article-preview-editor/resizable-image.extension';
 
 // --- Ekstensi Tabel Baru ---
 import { Table } from '@tiptap/extension-table';
@@ -161,6 +162,8 @@ const TIPTAP_EXTENSIONS = [
   CitationUrlNode,
   // --- Injeksi Ekstensi Tab Key ---
   TabKeyExtension,
+  // --- Ekstensi Gambar Baru ---
+  ResizableImage,
   // ------------------------------
   PaginationPlus.configure({
     pageHeight: 1123,
@@ -304,7 +307,53 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
           }
           return false;
         }
-      }
+      },
+      handlePaste: (view, event) => {
+        const items = event.clipboardData?.items;
+        if (items) {
+          for (const item of items) {
+            if (item.type.indexOf('image') === 0) {
+              const file = item.getAsFile();
+              if (file) {
+                const reader = new FileReader();
+                reader.onload = (readerEvent) => {
+                  const base64 = readerEvent.target?.result as string;
+                  const { schema } = view.state;
+                  const node = schema.nodes.image.create({ src: base64 });
+                  const transaction = view.state.tr.replaceSelectionWith(node);
+                  view.dispatch(transaction);
+                };
+                reader.readAsDataURL(file);
+                event.preventDefault();
+                return true;
+              }
+            }
+          }
+        }
+        return false;
+      },
+      handleDrop: (view, event, slice, moved) => {
+        if (!moved && event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files.length > 0) {
+          const file = event.dataTransfer.files[0];
+          if (file.type.startsWith('image/')) {
+            const reader = new FileReader();
+            reader.onload = (readerEvent) => {
+              const base64 = readerEvent.target?.result as string;
+              const { schema } = view.state;
+              const coordinates = view.posAtCoords({ left: event.clientX, top: event.clientY });
+              if (coordinates) {
+                const node = schema.nodes.image.create({ src: base64 });
+                const transaction = view.state.tr.insert(coordinates.pos, node);
+                view.dispatch(transaction);
+              }
+            };
+            reader.readAsDataURL(file);
+            event.preventDefault();
+            return true;
+          }
+        }
+        return false;
+      },
     },
     onUpdate: ({ editor: ed }) => {
       setContent(ed.getHTML());

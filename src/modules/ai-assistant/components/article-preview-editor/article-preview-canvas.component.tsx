@@ -130,6 +130,12 @@ export const ArticlePreviewCanvas: React.FC<ArticlePreviewCanvasProps> = ({
           .ProseMirror .citation-url-node {
             display: none !important;
           }
+          .ProseMirror img {
+            max-width: 100% !important;
+            height: auto !important;
+            display: block !important;
+            margin: 16px auto !important;
+          }
           .page-break-gap {
             height: 20px;
             background-color: #f1f5f9 !important; 

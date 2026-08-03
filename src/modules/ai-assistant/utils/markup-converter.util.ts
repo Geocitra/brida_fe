@@ -155,6 +155,38 @@ export class MarkupConverter {
         });
 
         /**
+         * ATURAN KUSTOM 7 [Roundtrip Safety]: Preservasi Dimensi Gambar (Width/Height)
+         * Mencegah Turndown melucuti atribut inline CSS "style='width: ...'" atau atribut "width" pada gambar.
+         */
+        service.addRule('imageStyleRule', {
+            filter: ['img'],
+            replacement: (content: string, node: Node) => {
+                const element = node as HTMLElement;
+                const src = element.getAttribute('src') || '';
+                const alt = element.getAttribute('alt') || '';
+                const styleAttr = element.getAttribute('style') || '';
+                
+                // Cari apakah ada inline style width
+                const widthMatch = styleAttr.match(/width:\s*([\d.%]+)/i);
+                const heightMatch = styleAttr.match(/height:\s*([\d.%a-z]+)/i);
+                
+                let inlineStyle = '';
+                if (widthMatch) {
+                    inlineStyle += `width: ${widthMatch[1]};`;
+                }
+                if (heightMatch) {
+                    inlineStyle += `height: ${heightMatch[1]};`;
+                }
+                
+                const styleString = inlineStyle ? ` style="${inlineStyle}"` : '';
+                const altAttr = alt ? ` alt="${alt}"` : '';
+                
+                // Kembalikan sebagai tag img HTML murni di Markdown agar tersimpan aman di DB
+                return `<img src="${src}"${altAttr}${styleString} />`;
+            }
+        });
+
+        /**
          * ATURAN KUSTOM 4: Konversi Tabel HTML ke Markdown (GFM Compliant)
          */
         service.addRule('tableCellRule', {
