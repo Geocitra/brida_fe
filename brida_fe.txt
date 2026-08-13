@@ -43,6 +43,7 @@
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",
     "@tiptap/extension-font-family": "^3.29.2",
+    "@tiptap/extension-image": "^3.29.2",
     "@tiptap/extension-table": "^3.29.2",
     "@tiptap/extension-table-cell": "^3.29.2",
     "@tiptap/extension-table-header": "^3.29.2",
@@ -1040,7 +1041,12 @@ path.leaflet-interactive:focus-visible {
   width: 100% !important;
   border-collapse: collapse !important;
   margin-top: 1rem !important;
-  margin-bottom: 1rem !important;
+  margin-bottom: 2rem !important;
+}
+
+.prose table + p,
+.prose table + table {
+  margin-top: 2rem !important;
 }
 
 .prose table th,
@@ -1082,6 +1088,58 @@ path.leaflet-interactive:focus-visible {
   font-weight: 700 !important;
   margin-top: 1.25rem !important;
   margin-bottom: 0.5rem !important;
+}
+
+.citation-url-node {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.1rem 0.45rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  font-family: 'Roboto', sans-serif;
+  color: #0f766e;
+  background-color: #ccfbf1;
+  border: 1px solid #5eead4;
+  border-radius: 0px !important;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  text-decoration: underline;
+  text-decoration-color: #0d9488;
+  text-underline-offset: 2px;
+  transition: background-color 0.15s ease, color 0.15s ease;
+  vertical-align: middle;
+  line-height: 1.4;
+  position: relative;
+
+  -webkit-user-modify: read-only;
+}
+
+.citation-url-node:hover {
+  background-color: #99f6e4;
+  color: #0d9488;
+}
+
+.citation-url-node::before {
+  content: '🔗';
+  font-size: 0.6rem;
+  opacity: 0.8;
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+    visibility: hidden !important;
+  }
+  table {
+    page-break-inside: auto !important;
+    break-inside: auto !important;
+  }
+  tr {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
 }
 
 --- FILE: src\main.tsx ---
@@ -2308,7 +2366,7 @@ export const ChatInputBar: React.FC<ChatInputBarProps> = ({
             )}
 
             {}
-            <div className="flex flex-wrap items-center justify-between gap-4 bg-slate-50 border border-slate-200 px-4 py-3 rounded-none">
+            <div className="flex flex-wrap items-center justify-between gap-4 bg-white px-4 py-2 rounded-none">
                 <div className="flex flex-wrap items-center gap-5">
                     <div className="flex items-center gap-2">
                         <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">Gaya Bahasa:</span>
@@ -2316,12 +2374,12 @@ export const ChatInputBar: React.FC<ChatInputBarProps> = ({
                             value={tone}
                             onChange={(e) => setTone(e.target.value)}
                             disabled={isLoading || isUploading}
-                            className="text-xs bg-white border border-slate-300 text-slate-800 font-bold focus:outline-none focus:border-teal-700 px-2.5 py-1.5 rounded-none cursor-pointer hover:border-slate-400 transition-colors"
+                            className="text-xs bg-white border-b border-slate-300 text-slate-800 font-bold focus:outline-none focus:border-teal-700 px-2.5 py-1.5 rounded-none cursor-pointer hover:border-slate-400 transition-colors"
                         >
-                            <option value="solutif">SOLUTIF (Bupati)</option>
-                            <option value="kritis">KRITIS (OPD)</option>
-                            <option value="akademis">AKADEMIS (Media)</option>
-                            <option value="populer">POPULER (Publik)</option>
+                            <option value="solutif">SOLUTIF</option>
+                            <option value="kritis">KRITIS</option>
+                            <option value="akademis">AKADEMIS</option>
+                            <option value="populer">POPULER</option>
                         </select>
                     </div>
 
@@ -2331,7 +2389,7 @@ export const ChatInputBar: React.FC<ChatInputBarProps> = ({
                             value={targetLength}
                             onChange={(e) => setTargetLength(e.target.value as any)}
                             disabled={isLoading || isUploading}
-                            className="text-xs bg-white border border-slate-300 text-slate-800 font-bold focus:outline-none focus:border-teal-700 px-2.5 py-1.5 rounded-none cursor-pointer hover:border-slate-400 transition-colors"
+                            className="text-xs bg-white border-b border-slate-300 text-slate-800 font-bold focus:outline-none focus:border-teal-700 px-2.5 py-1.5 rounded-none cursor-pointer hover:border-slate-400 transition-colors"
                         >
                             <option value="SHORT">Ringkas (~700 Kata)</option>
                             <option value="MEDIUM">Sedang (~1000 Kata)</option>
@@ -2343,9 +2401,10 @@ export const ChatInputBar: React.FC<ChatInputBarProps> = ({
                 {activeSessionId && onNavigateToEditor && (
                     <button
                         type="button"
+                        disabled={isLoading}
                         onClick={() => onNavigateToEditor(activeSessionId)}
-                        className="px-3 py-1.5 text-teal-700 hover:text-teal-800 font-bold text-[10px] uppercase tracking-wider rounded-none inline-flex items-center gap-1.5 cursor-pointer transition-colors bg-transparent border-none"
-                        title="Alihkan langsung ke lembar kerja A4 Word WYSIWYG untuk sunting manual penuh"
+                        className="px-3 py-1.5 text-teal-700 disabled:text-slate-400 disabled:border-slate-200 disabled:cursor-not-allowed font-bold text-xs uppercase rounded-none inline-flex items-center gap-1.5 cursor-pointer transition-colors bg-white"
+                        title={isLoading ? "Tunggu AI selesai merakit naskah..." : "Alihkan langsung ke lembar kerja A4 Word WYSIWYG untuk sunting manual penuh"}
                     >
                         <PenTool size={12} className="shrink-0" />
                         <span>Sunting Manual</span>
@@ -2355,68 +2414,62 @@ export const ChatInputBar: React.FC<ChatInputBarProps> = ({
 
             {}
             <form onSubmit={handleSubmit} className="w-full">
-                <div className="flex flex-col border border-slate-350 focus-within:border-teal-600 bg-white transition-colors w-full rounded-none">
+                <div className="flex items-center border border-slate-300 focus-within:border-teal-600 bg-white transition-colors w-full rounded-none gap-0">
+
+                    {}
+                    <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={isLoading || isUploading}
+                        className="px-3 py-3 text-slate-400 hover:text-teal-700 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors shrink-0 border-r border-slate-200"
+                        title="Unggah berkas acuan atau screenshot (.pdf, .docx, .png, .jpg)"
+                    >
+                        {isUploading ? (
+                            <Loader2 size={16} className="animate-spin text-teal-600" />
+                        ) : (
+                            <Paperclip size={16} />
+                        )}
+                    </button>
+                    <input
+                        type="file"
+                        ref={fileInputRef}
+                        onChange={handleFileChange}
+                        accept=".pdf,.docx,.txt,image/*"
+                        className="hidden"
+                    />
 
                     {}
                     <textarea
                         ref={textareaRef}
-                        rows={2}
+                        rows={1}
                         value={inputQuery}
                         onChange={(e) => setInputQuery(e.target.value)}
                         onKeyDown={handleKeyDown}
                         onPaste={handlePaste}
-                        placeholder="Ketik pertanyaan / draf revisi naskah Anda di sini... (Tekan Enter untuk mengirim, Shift+Enter untuk baris baru)"
+                        placeholder="Ketik pertanyaan / draf revisi Anda di sini..."
                         disabled={isLoading || isUploading}
-                        className="w-full bg-transparent px-4 py-3.5 text-xs text-slate-900 font-semibold focus:outline-none disabled:opacity-50 resize-none overflow-y-auto min-h-[64px] max-h-[144px] leading-relaxed"
-                        style={{ height: '64px' }}
+                        className="flex-1 bg-transparent px-4 py-3 text-xs text-slate-900 font-medium focus:outline-none disabled:opacity-50 resize-none overflow-y-auto leading-relaxed min-h-[44px] max-h-[144px]"
+                        style={{ height: '44px' }}
                     />
 
                     {}
-                    <div className="flex items-center justify-between px-3 py-1.5 bg-slate-50 border-t border-slate-200/80">
-                        {}
-                        <div className="flex items-center">
-                            <button
-                                type="button"
-                                onClick={() => fileInputRef.current?.click()}
-                                disabled={isLoading || isUploading}
-                                className="p-2 text-slate-500 hover:text-teal-700 hover:bg-slate-200/40 disabled:opacity-40 cursor-pointer rounded-none transition-colors flex items-center justify-center gap-1.5 bg-transparent border-none"
-                                title="Unggah berkas acuan atau screenshot (.pdf, .docx, .png, .jpg)"
-                            >
-                                {isUploading ? (
-                                    <Loader2 size={15} className="animate-spin text-teal-600" />
-                                ) : (
-                                    <Paperclip size={15} />
-                                )}
-                                <span className="text-[10px] font-bold uppercase tracking-wider hidden sm:inline">Lampirkan Berkas</span>
-                            </button>
-                            <input
-                                type="file"
-                                ref={fileInputRef}
-                                onChange={handleFileChange}
-                                accept=".pdf,.docx,.txt,image/*"
-                                className="hidden"
-                            />
-                        </div>
-
-                        {}
-                        <button
-                            type="submit"
-                            disabled={(!inputQuery.trim() && stagedAttachments.length === 0) || isLoading || isUploading}
-                            className="p-2 text-teal-700 hover:text-teal-800 disabled:text-slate-400 disabled:opacity-50 font-bold text-xs uppercase tracking-wider transition-colors flex items-center gap-1.5 cursor-pointer disabled:cursor-not-allowed rounded-none bg-transparent border-none"
-                        >
-                            {isLoading ? (
-                                <>
-                                    <span className="text-[10px] font-bold uppercase tracking-wider">Proses</span>
-                                    <Loader2 size={13} className="animate-spin text-teal-600 shrink-0" />
-                                </>
-                            ) : (
-                                <>
-                                    <span className="text-[10px] font-bold uppercase tracking-wider">Kirim</span>
-                                    <Send size={13} className="shrink-0" />
-                                </>
-                            )}
-                        </button>
-                    </div>
+                    <button
+                        type="submit"
+                        disabled={(!inputQuery.trim() && stagedAttachments.length === 0) || isLoading || isUploading}
+                        className="px-4 py-3 text-teal-700 hover:text-teal-900 disabled:text-slate-300 font-extrabold text-xs uppercase tracking-widest transition-colors flex items-center gap-2 cursor-pointer disabled:cursor-not-allowed shrink-0 border-l border-slate-200 bg-transparent"
+                    >
+                        {isLoading ? (
+                            <>
+                                <span>Proses</span>
+                                <Loader2 size={14} className="animate-spin shrink-0" />
+                            </>
+                        ) : (
+                            <>
+                                <span>Kirim</span>
+                                <Send size={14} className="shrink-0" />
+                            </>
+                        )}
+                    </button>
                 </div>
             </form>
         </div>
@@ -2440,546 +2493,20 @@ import {
   Trash2,
   MessageSquare,
   X,
-  Clock,
-  ShieldAlert,
-  WifiOff,
-  Database,
-  RefreshCw,
-  LogOut,
   Paperclip,
   Sparkles,
   FileCheck,
   Globe,
 } from 'lucide-react';
 import { AiAssistantService, AiServiceException } from '../../../services/ai-assistant.service';
-import { AiErrorMapper } from '../utils/error-mapper.util';
 import { EmptyState } from '../../../components/common/empty-state.component';
 import { DocumentService } from '../../../services/document.service';
 
-interface MarkdownTableRendererProps {
-  rawTable: string;
-}
+import { RichMessageRenderer } from './rich-message-renderer.component';
+import { SuggestionChips } from './suggestion-chips.component';
+import { SystemFallbackCard } from './system-fallback-card.component';
 
-const MarkdownTableRenderer: React.FC<MarkdownTableRendererProps> = ({ rawTable }) => {
-  const [viewMode, setViewMode] = useState<'table' | 'chart'>('table');
-  const lines = rawTable.trim().split('\n');
-  if (lines.length < 2) return null;
-
-  const headerLine = lines[0];
-  const headers = headerLine
-    .split('|')
-    .map((h) => h.trim())
-    .filter((_, idx, arr) => idx > 0 && idx < arr.length - 1);
-
-  const rows = lines.slice(2).map((line) => {
-    return line
-      .split('|')
-      .map((cell) => cell.trim())
-      .filter((_, idx, arr) => idx > 0 && idx < arr.length - 1);
-  });
-
-  let numericColIdx = -1;
-  for (let c = 1; c < headers.length; c++) {
-    const isNumeric = rows.every(row => {
-      const val = row[c];
-      if (!val) return true;
-      const cleanVal = val.replace(/[^\d.-]/g, '');
-      return !isNaN(parseFloat(cleanVal)) && cleanVal.length > 0;
-    });
-    if (isNumeric && rows.length > 0) {
-      numericColIdx = c;
-      break;
-    }
-  }
-
-  const hasChart = numericColIdx !== -1;
-
-  if (viewMode === 'chart' && hasChart) {
-    const values = rows.map(r => {
-      const cleanVal = r[numericColIdx].replace(/[^\d.-]/g, '');
-      return parseFloat(cleanVal) || 0;
-    });
-    const maxVal = Math.max(...values, 1);
-
-    return (
-      <div className="border border-slate-300 my-3 p-3 bg-white rounded-none">
-        <div className="flex justify-between items-center border-b border-slate-200 pb-2 mb-3 select-none">
-          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Grafik Visualisasi</span>
-          <button
-            onClick={() => setViewMode('table')}
-            className="px-2.5 py-1 text-[9px] font-bold uppercase tracking-wider border border-slate-300 hover:bg-slate-100 transition-colors rounded-none cursor-pointer"
-          >
-            Tampilkan Tabel
-          </button>
-        </div>
-        <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar">
-          {rows.map((row, idx) => {
-            const label = row[0];
-            const rawVal = row[numericColIdx];
-            const val = values[idx];
-            const pct = Math.max(2, (val / maxVal) * 100);
-            return (
-              <div key={idx} className="flex flex-col text-left space-y-0.5">
-                <div className="flex justify-between text-[10px] font-bold text-slate-700">
-                  <span className="truncate max-w-48">{label}</span>
-                  <span className="font-mono text-teal-800">{rawVal}</span>
-                </div>
-                <div className="w-full bg-slate-100 h-2.5 rounded-none overflow-hidden">
-                  <div
-                    className="bg-teal-700 h-full rounded-none transition-all duration-500"
-                    style={{ width: `${pct}%` }}
-                  />
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="overflow-x-auto border border-slate-300 my-3 rounded-none shadow-2xs">
-      {hasChart && (
-        <div className="flex justify-between items-center bg-slate-50 px-3 py-1.5 border-b border-slate-200 select-none">
-          <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Tabel Data</span>
-          <button
-            onClick={() => setViewMode('chart')}
-            className="px-2.5 py-1 text-[9px] font-bold uppercase tracking-wider border border-slate-300 hover:bg-slate-100 transition-colors rounded-none cursor-pointer"
-          >
-            Tampilkan Grafik
-          </button>
-        </div>
-      )}
-      <table className="min-w-full divide-y divide-slate-300 text-xs font-roboto">
-        <thead className="bg-slate-100 font-bold text-slate-800 border-b border-slate-300">
-          <tr>
-            {headers.map((h, i) => (
-              <th
-                key={i}
-                className="px-4 py-2.5 text-left uppercase tracking-wider text-[10px] font-extrabold text-teal-900"
-              >
-                {h}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-slate-200 bg-white text-slate-700">
-          {rows.map((row, rIdx) => (
-            <tr key={rIdx} className="hover:bg-slate-50/80 transition-colors">
-              {row.map((cell, cIdx) => (
-                <td key={cIdx} className="px-4 py-2 whitespace-normal font-medium">
-                  {cell}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-};
-
-const parseInlineStylesRaw = (lineText: string, activeDocIds: string[] = [], allDocs: any[] = []): React.ReactNode[] => {
-  const parts: React.ReactNode[] = [];
-  let keyIdx = 0;
-
-  const boldParts = lineText.split('**');
-  boldParts.forEach((part, index) => {
-    const isBold = index % 2 === 1;
-    const codeParts = part.split('`');
-
-    codeParts.forEach((subPart, subIndex) => {
-      const isInlineCode = subIndex % 2 === 1;
-
-      if (isInlineCode) {
-        parts.push(
-          <code
-            key={keyIdx++}
-            className="px-1.5 py-0.5 bg-slate-100 text-teal-800 font-mono text-[11px] border border-slate-200"
-          >
-            {subPart}
-          </code>,
-        );
-      } else {
-
-        const citationRegex = /\[([a-zA-Z0-9-]+):(\d+)\]/gi;
-        let lastIndex = 0;
-        let match;
-        const subParts: React.ReactNode[] = [];
-
-        while ((match = citationRegex.exec(subPart)) !== null) {
-          const matchIndex = match.index;
-
-          if (matchIndex > lastIndex) {
-            subParts.push(subPart.slice(lastIndex, matchIndex));
-          }
-
-          const docId = match[1];
-          const chunkIdx = match[2];
-
-          const docMatch = docId.match(/^doc(\d+)$/i);
-          let targetDocId = docId;
-          if (docMatch && activeDocIds.length > 0) {
-            const idx = parseInt(docMatch[1], 10) - 1;
-            if (idx >= 0 && idx < activeDocIds.length) {
-              targetDocId = activeDocIds[idx];
-            }
-          }
-
-          const doc = allDocs.find(d => d.id === targetDocId || d.title.toLowerCase().includes(targetDocId.toLowerCase()));
-          const title = doc ? doc.title : `Dokumen Referensi (${docId})`;
-          const category = doc ? (doc.category || doc.metadata?.category) : 'Referensi Dokumen';
-
-          const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
-          const url = doc
-            ? (doc.metadata?.sourceUrl || (doc.id ? `${API_BASE_URL}/documents/${doc.id}/file` : null))
-            : null;
-
-          subParts.push(
-            <span key={keyIdx++} className="relative inline-block group">
-              {url ? (
-                <a
-                  href={url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-teal-50 hover:bg-teal-100 text-teal-850 border border-teal-200 text-[9px] font-bold font-mono rounded-none mx-0.5 cursor-pointer no-print transition-colors"
-                >
-                  <Globe size={9} className="text-teal-600 shrink-0" />
-                  <span>{`Sitasi:${chunkIdx}`}</span>
-                </a>
-              ) : (
-                <span
-                  className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 text-[9px] font-bold font-mono rounded-none mx-0.5 cursor-help no-print transition-colors"
-                >
-                  <Globe size={9} className="text-slate-500 shrink-0" />
-                  <span>{`Sitasi:${chunkIdx}`}</span>
-                </span>
-              )}
-
-              {}
-              <span className="invisible group-hover:visible absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-3 bg-slate-900 text-white rounded-none border border-slate-700 shadow-xl z-50 flex flex-col gap-1.5 pointer-events-none transition-all duration-150 text-left font-roboto">
-                <span className="text-[9px] font-extrabold uppercase tracking-wider text-teal-400">
-                  {category || 'Dokumen Acuan'}
-                </span>
-                <span className="text-[11px] font-bold leading-normal text-slate-100 line-clamp-2">
-                  {title}
-                </span>
-                <span className="text-[9px] text-slate-400 font-medium">
-                  Rujukan Paragraf: #{chunkIdx}
-                </span>
-                {url && (
-                  <span className="text-[9px] font-bold text-teal-300 mt-0.5 flex items-center gap-1">
-                    <Sparkles size={8} /> Klik untuk membuka sumber referensi
-                  </span>
-                )}
-              </span>
-            </span>
-          );
-
-          lastIndex = citationRegex.lastIndex;
-        }
-
-        if (lastIndex < subPart.length) {
-          subParts.push(subPart.slice(lastIndex));
-        }
-
-        if (isBold) {
-          parts.push(
-            <strong key={keyIdx++} className="font-bold text-slate-900">
-              {subParts.length > 0 ? subParts : subPart}
-            </strong>,
-          );
-        } else {
-          subParts.forEach((sp) => parts.push(sp));
-        }
-      }
-    });
-  });
-
-  return parts;
-};
-
-export interface RichMessageRendererProps {
-  text: string;
-  activeDocIds?: string[];
-}
-
-export const RichMessageRenderer: React.FC<RichMessageRendererProps> = ({ text, activeDocIds = [] }) => {
-  const [allDocs, setAllDocs] = useState<any[]>([]);
-
-  useEffect(() => {
-    DocumentService.listDocuments()
-      .then((docs) => setAllDocs(docs || []))
-      .catch((err) => console.warn('Gagal memuat dokumen untuk rujukan sitasi:', err));
-  }, []);
-
-  const parseInlineStyles = (lineText: string) => {
-    return parseInlineStylesRaw(lineText, activeDocIds, allDocs);
-  };
-
-  const cleanedText = (text || '')
-    .replace(/<div[^>]*>/gi, '')
-    .replace(/<\/div>/gi, '')
-    .replace(/<span[^>]*>/gi, '')
-    .replace(/<\/span>/gi, '')
-    .replace(/<p[^>]*>/gi, '')
-    .replace(/<\/p>/gi, '')
-    .replace(/\\+\[/g, '[')
-    .replace(/\\+\]/g, ']');
-
-  const lines = cleanedText.split('\n');
-  const elements: React.ReactNode[] = [];
-
-  let tableBuffer: string[] = [];
-  let insideTable = false;
-  let listBuffer: React.ReactNode[] = [];
-  let keyIdx = 0;
-
-  const flushList = () => {
-    if (listBuffer.length > 0) {
-      elements.push(
-        <ul key={`list-${keyIdx++}`} className="list-disc pl-5 space-y-1.5 my-2">
-          {listBuffer}
-        </ul>,
-      );
-      listBuffer = [];
-    }
-  };
-
-  const flushTable = () => {
-    if (tableBuffer.length > 0) {
-      elements.push(
-        <MarkdownTableRenderer key={`table-${keyIdx++}`} rawTable={tableBuffer.join('\n')} />,
-      );
-      tableBuffer = [];
-      insideTable = false;
-    }
-  };
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    const trimmed = line.trim();
-
-    if (trimmed.startsWith('|') && trimmed.endsWith('|')) {
-      flushList();
-      insideTable = true;
-      tableBuffer.push(line);
-      continue;
-    } else if (insideTable) {
-      flushTable();
-    }
-
-    if (trimmed.startsWith('- ') || trimmed.startsWith('* ') || trimmed.startsWith('• ')) {
-      const content = parseInlineStyles(trimmed.slice(2));
-      listBuffer.push(
-        <li key={`li-${keyIdx++}`} className="text-xs text-slate-700 leading-relaxed font-roboto">
-          {content}
-        </li>,
-      );
-      continue;
-    } else {
-      flushList();
-    }
-
-    if (trimmed.startsWith('### ')) {
-      elements.push(
-        <h4
-          key={keyIdx++}
-          className="text-xs font-bold text-teal-800 uppercase tracking-wider mt-4 mb-1.5 font-roboto"
-        >
-          {parseInlineStyles(trimmed.slice(4))}
-        </h4>,
-      );
-    } else if (trimmed.startsWith('## ')) {
-      elements.push(
-        <h3
-          key={keyIdx++}
-          className="text-sm font-bold text-slate-900 mt-5 mb-2 border-b border-slate-200 pb-1 font-roboto"
-        >
-          {parseInlineStyles(trimmed.slice(3))}
-        </h3>,
-      );
-    } else if (trimmed.startsWith('# ')) {
-      elements.push(
-        <h2
-          key={keyIdx++}
-          className="text-base font-extrabold text-slate-900 mt-6 mb-3 border-b-2 border-slate-300 pb-1.5 font-roboto"
-        >
-          {parseInlineStyles(trimmed.slice(2))}
-        </h2>,
-      );
-    } else if (trimmed === '') {
-      continue;
-    } else {
-      elements.push(
-        <p
-          key={keyIdx++}
-          className="text-xs text-slate-800 font-normal leading-relaxed my-2 font-roboto text-justify"
-        >
-          {parseInlineStyles(line)}
-        </p>
-      );
-    }
-  }
-
-  flushList();
-  flushTable();
-
-  return <div className="space-y-1 w-full text-left">{elements}</div>;
-};
-
-interface SuggestionChipsProps {
-  suggestions?: string[];
-  onClick: (suggestion: string) => void;
-  disabled: boolean;
-}
-
-const normalizeSuggestions = (suggestions?: string[]): string[] => {
-  if (!suggestions || suggestions.length === 0) return [];
-
-  if (suggestions.length === 1 && typeof suggestions[0] === 'string') {
-    const raw = suggestions[0];
-
-    if (raw.includes('\n-') || raw.includes(' - ') || raw.includes('? -') || raw.includes('?* -')) {
-      let cleaned = raw.replace(/^##\s*Opsi\s*Lanjutan\s*/i, '').trim();
-
-      const parts = cleaned
-        .split(/(?:\r?\n)?-\s+/)
-        .map(p => p.trim())
-        .filter(p => p.length > 0);
-
-      if (parts.length > 1) {
-        return parts;
-      }
-
-      const inlineParts = cleaned
-        .split(/\?\s+-\s+/)
-        .map((p, idx, arr) => {
-          let item = p.trim();
-          if (idx < arr.length - 1 && !item.endsWith('?')) {
-            item += '?';
-          }
-          return item;
-        })
-        .filter(p => p.length > 0);
-
-      if (inlineParts.length > 1) {
-        return inlineParts;
-      }
-    }
-  }
-
-  return suggestions
-    .map(s => s.replace(/^##\s*Opsi\s*Lanjutan\s*/i, '').replace(/^-\s+/, '').trim())
-    .filter(s => s.length > 0);
-};
-
-const SuggestionChips: React.FC<SuggestionChipsProps> = ({
-  suggestions,
-  onClick,
-  disabled,
-}) => {
-  const normalized = normalizeSuggestions(suggestions);
-  if (normalized.length === 0) return null;
-
-  return (
-    <div className="flex flex-wrap gap-2 mt-3 pt-2.5 border-t border-slate-100 no-print">
-      {normalized.map((s, idx) => (
-        <button
-          key={idx}
-          type="button"
-          onClick={() => onClick(s)}
-          disabled={disabled}
-          className="px-3 py-1.5 bg-teal-50 hover:bg-teal-100 disabled:opacity-50 text-teal-800 hover:text-teal-950 font-bold text-xs border border-teal-200 hover:border-teal-300 rounded-none shadow-2xs transition-colors cursor-pointer disabled:cursor-not-allowed inline-flex items-center gap-1.5"
-        >
-          <span>{parseInlineStylesRaw(s)}</span>
-          <ArrowRight size={11} className="text-teal-600 shrink-0 animate-pulse" />
-        </button>
-      ))}
-    </div>
-  );
-};
-
-const iconMap = {
-  AlertCircle,
-  Clock,
-  ShieldAlert,
-  WifiOff,
-  Database,
-};
-
-interface SystemFallbackCardProps {
-  errorType: string;
-  rawErrorMsg: string;
-  onRetry: () => void;
-  onNewSession: () => void;
-  onLogin: () => void;
-}
-
-const SystemFallbackCard: React.FC<SystemFallbackCardProps> = ({
-  errorType,
-  rawErrorMsg,
-  onRetry,
-  onNewSession,
-  onLogin,
-}) => {
-  const mapped = AiErrorMapper.map(new AiServiceException(500, errorType, rawErrorMsg));
-  const IconComponent = iconMap[mapped.iconName] || AlertCircle;
-
-  return (
-    <div className="bg-slate-50 border border-slate-300 p-4 my-3 font-roboto w-full text-slate-800 space-y-3 shadow-2xs">
-      <div className="flex items-start gap-3">
-        <div className="p-1.5 bg-white border border-slate-200 shrink-0 text-slate-600">
-          <IconComponent size={18} className="animate-pulse" />
-        </div>
-        <div className="space-y-1">
-          <h4 className="text-xs font-bold uppercase tracking-wider text-slate-900 leading-snug">
-            {mapped.title}
-          </h4>
-          <p className="text-xs font-medium text-slate-600 leading-relaxed text-justify">
-            {mapped.description}
-          </p>
-        </div>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-200/60 no-print">
-        {mapped.actionType === 'RETRY' && (
-          <button
-            type="button"
-            onClick={onRetry}
-            className="px-3 py-1.5 bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs uppercase transition-colors inline-flex items-center gap-1.5 cursor-pointer rounded-none border border-teal-800 shadow-2xs"
-          >
-            <RefreshCw size={12} className="shrink-0" />
-            <span>Coba Kirim Ulang</span>
-          </button>
-        )}
-
-        {mapped.actionType === 'NEW_SESSION' && (
-          <button
-            type="button"
-            onClick={onNewSession}
-            className="px-3 py-1.5 bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs uppercase transition-colors inline-flex items-center gap-1.5 cursor-pointer rounded-none border border-teal-800 shadow-2xs"
-          >
-            <Plus size={12} className="shrink-0" />
-            <span>Mulai Sesi Baru</span>
-          </button>
-        )}
-
-        {mapped.actionType === 'LOGIN' && (
-          <button
-            type="button"
-            onClick={onLogin}
-            className="px-3 py-1.5 bg-slate-900 hover:bg-slate-950 text-white font-bold text-xs uppercase transition-colors inline-flex items-center gap-1.5 cursor-pointer rounded-none border border-slate-950 shadow-2xs"
-          >
-            <LogOut size={12} className="shrink-0" />
-            <span>Masuk Sesi Kembali</span>
-          </button>
-        )}
-      </div>
-    </div>
-  );
-};
+export { RichMessageRenderer } from './rich-message-renderer.component';
 
 interface MiniAnchorCardProps {
   title: string;
@@ -2987,10 +2514,10 @@ interface MiniAnchorCardProps {
 
 const MiniAnchorCard: React.FC<MiniAnchorCardProps> = ({ title }) => {
   return (
-    <div className="p-4 my-3 bg-teal-50/50 border border-teal-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shadow-2xs no-print">
+    <div className="p-4 my-3 bg-white border-b border-teal-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shadow-2xs no-print">
       <div className="flex items-center gap-3">
-        <div className="p-2 bg-teal-100 border border-teal-300 text-teal-800 shrink-0">
-          <FileCheck size={18} className="animate-pulse" />
+        <div className="p-2 text-teal-800 shrink-0">
+          <FileCheck size={18} />
         </div>
         <div className="space-y-0.5 text-left">
           <strong className="text-xs uppercase tracking-wider text-teal-950 font-bold flex items-center gap-1">
@@ -3052,6 +2579,8 @@ interface ChatPanelProps {
   onLoadingChange?: (loading: boolean) => void;
   onDraftUpdated?: (newDraft: string, title: string) => void;
   initialSessionId?: string | null;
+  onSessionLoaded?: (documentIds: string[]) => void;
+  onSessionReset?: () => void;
 }
 
 const formatLastMessage = (content?: string | null): string => {
@@ -3085,6 +2614,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   onLoadingChange,
   onDraftUpdated,
   initialSessionId,
+  onSessionLoaded,
+  onSessionReset,
 }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputQuery, setInputQuery] = useState('');
@@ -3209,6 +2740,9 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       });
 
       setMessages(formattedMessages);
+      if (onSessionLoaded) {
+        onSessionLoaded(detail.documentIds || (detail.documentId ? [detail.documentId] : []));
+      }
     } catch (err: any) {
       setSessionError(`Gagal memuat sesi obrolan: ${err.message}`);
     } finally {
@@ -3223,6 +2757,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     setDetectedArticlePrompt(null);
     setLastFailedQuery(null);
     setStagedAttachments([]);
+    onSessionReset?.();
   };
 
   const handleDeleteQaSession = async (e: React.MouseEvent, idToDelete: string) => {
@@ -3456,17 +2991,17 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       {showHistorySidebar && (
         <div className="w-full lg:w-80 shrink-0 flex flex-col h-full bg-white border-b lg:border-b-0 lg:border-r border-slate-300 overflow-hidden">
           <div className="p-3 border-b border-slate-300 bg-slate-100 flex items-center justify-between">
-            <h3 className="text-xs font-bold text-slate-900 uppercase flex items-center gap-1.5 font-roboto">
+            <h3 className="text-xs text-slate-900 flex items-center gap-1.5 font-roboto">
               <History size={14} className="text-teal-700" />
-              <span>Riwayat Chat DB ({qaSessions.length})</span>
+              <span>Riwayat Chat ({qaSessions.length})</span>
             </h3>
             <button
               onClick={handleCreateNewSession}
-              className="px-2 py-1 bg-teal-700 hover:bg-teal-800 text-white font-bold text-[11px] uppercase tracking-wider rounded-none inline-flex items-center gap-1 cursor-pointer transition-colors"
+              className="px-2 py-1 text-black text-[11px] tracking-wider rounded-none inline-flex items-center gap-1 cursor-pointer transition-colors"
               title="Mulai Sesi Chat Baru"
             >
               <Plus size={12} />
-              <span>Sesi Baru</span>
+
             </button>
           </div>
 
@@ -3581,9 +3116,9 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                   }`}
               >
                 { }
-                <div className={`w-8 h-8 flex items-center justify-center shrink-0 border rounded-none shadow-2xs ${msg.sender === 'user'
-                  ? 'bg-slate-900 border-slate-950 text-white'
-                  : 'bg-teal-700 border-teal-800 text-white'
+                <div className={`w-8 h-8 flex items-center justify-center shrink-0 rounded-none shadow-2xs ${msg.sender === 'user'
+                  ? 'text-black'
+                  : 'text-black'
                   }`}>
                   {msg.sender === 'user' ? <User size={15} /> : <Bot size={15} />}
                 </div>
@@ -3592,7 +3127,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
                     <span className="text-xs font-bold text-slate-800 uppercase tracking-wide font-roboto">
-                      {msg.sender === 'user' ? 'User' : 'AKLS AI Assistant'}
+                      {msg.sender === 'user' ? 'User' : ' AKLS AI'}
                     </span>
                     <span className="text-[10px] text-slate-400 font-medium">{msg.timestamp}</span>
                   </div>
@@ -3760,7 +3295,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                 type="button"
                 onClick={handleOpenTransitionModal}
                 disabled={isLoading || messages.length === 0}
-                className="px-5 py-3 bg-teal-700 hover:bg-teal-850 disabled:bg-slate-300 text-white disabled:text-slate-500 font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-1.5 border border-teal-800 shadow-2xs cursor-pointer disabled:cursor-not-allowed transition-all shrink-0 justify-center"
+                className="px-5 py-3 bg-white hover:bg-slate-100 disabled:bg-slate-300 text-black disabled:text-slate-500 font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-1.5 border-b border-slate-600 shadow-2xs cursor-pointer disabled:cursor-not-allowed transition-all shrink-0 justify-center"
                 title="Konversi transkrip percakapan aktif secara terintegrasi menjadi draf naskah rilis baru"
               >
                 <PenTool size={14} className="shrink-0" />
@@ -4210,6 +3745,1388 @@ export const InteractivePaperSheet: React.FC<InteractivePaperSheetProps> = ({
 
 export default InteractivePaperSheet;
 
+--- FILE: src\modules\ai-assistant\components\markdown-table-renderer.component.tsx ---
+import React, { useState } from 'react';
+
+interface MarkdownTableRendererProps {
+  rawTable: string;
+}
+
+export const MarkdownTableRenderer: React.FC<MarkdownTableRendererProps> = ({ rawTable }) => {
+  const [viewMode, setViewMode] = useState<'table' | 'chart'>('table');
+  const lines = rawTable.trim().split('\n');
+  if (lines.length < 2) return null;
+
+  const headerLine = lines[0];
+  const headers = headerLine
+    .split('|')
+    .map((h) => h.trim())
+    .filter((_, idx, arr) => idx > 0 && idx < arr.length - 1);
+
+  const rows = lines.slice(2).map((line) => {
+    return line
+      .split('|')
+      .map((cell) => cell.trim())
+      .filter((_, idx, arr) => idx > 0 && idx < arr.length - 1);
+  });
+
+  let numericColIdx = -1;
+  for (let c = 1; c < headers.length; c++) {
+    const isNumeric = rows.every((row) => {
+      const val = row[c];
+      if (!val) return true;
+      const cleanVal = val.replace(/[^\d.-]/g, '');
+      return !isNaN(parseFloat(cleanVal)) && cleanVal.length > 0;
+    });
+    if (isNumeric && rows.length > 0) {
+      numericColIdx = c;
+      break;
+    }
+  }
+
+  const hasChart = numericColIdx !== -1;
+
+  if (viewMode === 'chart' && hasChart) {
+    const values = rows.map((row) => {
+      const cleanVal = row[numericColIdx].replace(/[^\d.-]/g, '');
+      return parseFloat(cleanVal) || 0;
+    });
+    const maxVal = Math.max(...values, 1);
+
+    return (
+      <div className="border border-slate-300 mt-3 mb-6 p-3 bg-white rounded-none">
+        <div className="flex justify-between items-center border-b border-slate-200 pb-2 mb-3 select-none">
+          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Grafik Visualisasi</span>
+          <button
+            onClick={() => setViewMode('table')}
+            className="px-2.5 py-1 text-[9px] font-bold uppercase tracking-wider hover:bg-slate-100 transition-colors rounded-none cursor-pointer"
+          >
+            Tampilkan Tabel
+          </button>
+        </div>
+        <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar">
+          {rows.map((row, idx) => {
+            const label = row[0];
+            const rawVal = row[numericColIdx];
+            const val = values[idx];
+            const pct = Math.max(2, (val / maxVal) * 100);
+            return (
+              <div key={idx} className="flex flex-col text-left space-y-0.5">
+                <div className="flex justify-between text-[10px] font-bold text-slate-700">
+                  <span className="truncate max-w-48">{label}</span>
+                  <span className="font-mono text-teal-800">{rawVal}</span>
+                </div>
+                <div className="w-full bg-slate-100 h-2.5 rounded-none overflow-hidden">
+                  <div
+                    className="bg-teal-700 h-full rounded-none transition-all duration-500"
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="overflow-x-auto border border-slate-300 mt-3 mb-6 rounded-none shadow-2xs">
+      {hasChart && (
+        <div className="flex justify-between items-center bg-slate-50 px-3 py-1.5 border-b border-slate-200 select-none">
+          <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Tabel Data</span>
+          <button
+            onClick={() => setViewMode('chart')}
+            className="px-2.5 py-1 text-[9px] font-bold uppercase tracking-wider hover:bg-slate-100 transition-colors rounded-none cursor-pointer"
+          >
+            Tampilkan Grafik
+          </button>
+        </div>
+      )}
+      <table className="w-full min-w-[550px] lg:min-w-full divide-y divide-slate-300 text-xs font-roboto">
+        <thead className="bg-slate-100 font-bold text-slate-800 border-b border-slate-300">
+          <tr>
+            {headers.map((h, i) => (
+              <th
+                key={i}
+                className="px-4 py-2.5 text-left uppercase tracking-wider text-[10px] font-extrabold text-teal-900"
+              >
+                {h}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-200 bg-white text-slate-700">
+          {rows.map((row, rIdx) => (
+            <tr key={rIdx} className="hover:bg-slate-50/80 transition-colors">
+              {row.map((cell, cIdx) => (
+                <td key={cIdx} className="px-4 py-2 whitespace-normal font-medium">
+                  {cell}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+};
+
+--- FILE: src\modules\ai-assistant\components\rich-message-renderer.component.tsx ---
+import React, { useState, useEffect } from 'react';
+import { Globe, FileText, AlertCircle, Sparkles } from 'lucide-react';
+import { DocumentService } from '../../../services/document.service';
+import { MarkdownTableRenderer } from './markdown-table-renderer.component';
+
+export const parseInlineStylesRaw = (lineText: string, activeDocIds: string[] = [], allDocs: any[] = []): React.ReactNode[] => {
+  const parts: React.ReactNode[] = [];
+  let keyIdx = 0;
+
+  const boldParts = lineText.split('**');
+  boldParts.forEach((part, index) => {
+    const isBold = index % 2 === 1;
+    const codeParts = part.split('`');
+
+    codeParts.forEach((subPart, subIndex) => {
+      const isInlineCode = subIndex % 2 === 1;
+
+      if (isInlineCode) {
+        parts.push(
+          <code
+            key={keyIdx++}
+            className="px-1.5 py-0.5 bg-slate-100 text-teal-800 font-mono text-[11px] border border-slate-200"
+          >
+            {subPart}
+          </code>,
+        );
+      } else {
+
+        const citationRegex = /\[(https?:\/\/[^\]\s]+?)(?::(\d+))?\]|\[([^\]\s:]+):(\d+)\]/gi;
+        let lastIndex = 0;
+        let match;
+        const subParts: React.ReactNode[] = [];
+
+        while ((match = citationRegex.exec(subPart)) !== null) {
+          const matchIndex = match.index;
+
+          if (matchIndex > lastIndex) {
+            subParts.push(subPart.slice(lastIndex, matchIndex));
+          }
+
+          let rawCitationId = '';
+          let chunkIdx = '';
+          let isExternalUrl = false;
+
+          if (match[1]) {
+
+            rawCitationId = match[1];
+            chunkIdx = match[2] || '';
+            isExternalUrl = true;
+          } else {
+
+            rawCitationId = match[3];
+            chunkIdx = match[4];
+            isExternalUrl = false;
+          }
+
+          const docId = rawCitationId;
+
+          const docMatch = docId.match(/^doc[-_]?(\d+)$/i);
+          let targetDocId = docId;
+          let docDisplayIndex = 1;
+
+          if (docMatch && activeDocIds.length > 0) {
+            const idx = parseInt(docMatch[1], 10) - 1;
+            if (idx >= 0 && idx < activeDocIds.length) {
+              targetDocId = activeDocIds[idx];
+              docDisplayIndex = idx + 1;
+            }
+          } else if (activeDocIds.length > 0) {
+            const idx = activeDocIds.indexOf(targetDocId);
+            if (idx !== -1) {
+              docDisplayIndex = idx + 1;
+            }
+          }
+
+          const doc = !isExternalUrl
+            ? allDocs.find((d) => {
+              const docTitle = (d.title || '').toLowerCase();
+              const targetId = (targetDocId || '').toLowerCase();
+              return d.id === targetDocId || d.id === docId || docTitle.includes(targetId) || docTitle.includes(docId.toLowerCase());
+            })
+            : allDocs.find((d) => d.metadata?.sourceUrl === rawCitationId);
+
+          let displayLabel = '';
+          if (isExternalUrl) {
+            if (doc) {
+              const idx = activeDocIds.indexOf(doc.id);
+              const displayIdx = idx !== -1 ? idx + 1 : 1;
+              displayLabel = `Link:${displayIdx}`;
+            } else {
+              displayLabel = 'Link';
+            }
+          } else {
+            displayLabel = `Dokumen:${docDisplayIndex}`;
+          }
+
+          const title = doc ? (doc.title || `Dokumen Referensi (${docId})`) : (isExternalUrl ? rawCitationId : `Dokumen Referensi (${docId})`);
+          const category = doc ? (doc.category || doc.metadata?.category) : (isExternalUrl ? 'Tautan Web Luar' : 'Referensi Dokumen');
+
+          const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
+          const isWebUrl = isExternalUrl || !!doc?.metadata?.sourceUrl;
+          const url = isExternalUrl
+            ? rawCitationId
+            : (doc
+              ? (doc.metadata?.sourceUrl || (doc.id ? `${API_BASE_URL}/documents/${doc.id}/file` : null))
+              : null);
+
+          subParts.push(
+            <span key={keyIdx++} className="relative inline-block group">
+              {url ? (
+                <a
+                  href={url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`inline-flex items-center gap-1 px-2 py-0.5 border-b text-[9px] font-bold font-mono rounded-none mx-0.5 cursor-pointer no-print transition-colors ${isWebUrl
+                    ? 'text-emerald-850 border-emerald-200'
+                    : 'text-blue-850 border-blue-200'
+                    }`}
+                >
+                  {isWebUrl ? (
+                    <Globe size={10} className="text-emerald-600 shrink-0" />
+                  ) : (
+                    <FileText size={10} className="text-blue-600 shrink-0" />
+                  )}
+                  <span>{displayLabel}</span>
+                </a>
+              ) : (
+                <span
+                  className="inline-flex items-center gap-1 px-2 py-0.5 hover:bg-slate-200 text-slate-700 border-b border-slate-300 text-[9px] font-bold font-mono rounded-none mx-0.5 cursor-help no-print transition-colors"
+                >
+                  <AlertCircle size={10} className="text-slate-500 shrink-0" />
+                  <span>{chunkIdx ? `Sitasi:${chunkIdx}` : 'Sitasi'}</span>
+                </span>
+              )}
+
+              {}
+              <span className="invisible group-hover:visible absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-3 bg-teal-900 text-white rounded-none border-b border-slate-700 shadow-xl z-50 flex flex-col gap-1.5 pointer-events-none transition-all duration-150 text-left font-roboto">
+                <span className="text-[9px] font-extrabold uppercase tracking-wider text-teal-400">
+                  {isWebUrl ? 'Tautan Web Luar' : (category || 'Dokumen Acuan')}
+                </span>
+                <span className="text-[11px] font-bold leading-normal text-slate-100 line-clamp-2">
+                  {title}
+                </span>
+                <span className="text-[9px] text-slate-400 font-medium">
+                  {chunkIdx ? `Rujukan Paragraf: #${chunkIdx}` : 'Rujukan Tautan Langsung'}
+                </span>
+                {url && (
+                  <span className="text-[9px] font-bold text-teal-300 mt-0.5 flex items-center gap-1">
+                    <Sparkles size={8} />
+                    {isWebUrl ? 'Klik untuk membuka tautan web asli' : 'Klik untuk mengunduh/membuka file dokumen'}
+                  </span>
+                )}
+              </span>
+            </span>
+          );
+
+          lastIndex = citationRegex.lastIndex;
+        }
+
+        if (lastIndex < subPart.length) {
+          subParts.push(subPart.slice(lastIndex));
+        }
+
+        if (isBold) {
+          parts.push(
+            <strong key={keyIdx++} className="font-bold text-slate-900">
+              {subParts.length > 0 ? subParts : subPart}
+            </strong>,
+          );
+        } else {
+          subParts.forEach((sp) => parts.push(sp));
+        }
+      }
+    });
+  });
+
+  return parts;
+};
+
+export interface RichMessageRendererProps {
+  text: string;
+  activeDocIds?: string[];
+}
+
+export const RichMessageRenderer: React.FC<RichMessageRendererProps> = ({ text, activeDocIds = [] }) => {
+  const [allDocs, setAllDocs] = useState<any[]>([]);
+
+  useEffect(() => {
+    DocumentService.listDocuments()
+      .then((docs) => setAllDocs(docs || []))
+      .catch((err) => console.warn('Gagal memuat dokumen untuk rujukan sitasi:', err));
+  }, []);
+
+  const parseInlineStyles = (lineText: string) => {
+    return parseInlineStylesRaw(lineText, activeDocIds, allDocs);
+  };
+
+  const cleanedText = (text || '')
+    .replace(/<div[^>]*>/gi, '')
+    .replace(/<\/div>/gi, '')
+    .replace(/<span[^>]*>/gi, '')
+    .replace(/<\/span>/gi, '')
+    .replace(/<p[^>]*>/gi, '')
+    .replace(/<\/p>/gi, '')
+    .replace(/\\+\[/g, '[')
+    .replace(/\\+\]/g, ']');
+
+  const lines = cleanedText.split('\n');
+  const elements: React.ReactNode[] = [];
+
+  let tableBuffer: string[] = [];
+  let insideTable = false;
+  let listBuffer: React.ReactNode[] = [];
+  let keyIdx = 0;
+
+  const flushList = () => {
+    if (listBuffer.length > 0) {
+      elements.push(
+        <ul key={`list-${keyIdx++}`} className="list-disc pl-5 space-y-1.5 my-2">
+          {listBuffer}
+        </ul>,
+      );
+      listBuffer = [];
+    }
+  };
+
+  const flushTable = () => {
+    if (tableBuffer.length > 0) {
+      elements.push(
+        <MarkdownTableRenderer key={`table-${keyIdx++}`} rawTable={tableBuffer.join('\n')} />,
+      );
+      tableBuffer = [];
+      insideTable = false;
+    }
+  };
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmed = line.trim();
+
+    if (trimmed.startsWith('|') && trimmed.endsWith('|')) {
+      flushList();
+
+      const isSeparator = /^\|\s*[-:]+[\s-|]*\|$/.test(trimmed);
+      if (isSeparator && tableBuffer.length > 1) {
+
+        const nextTableHeader = tableBuffer.pop();
+
+        flushTable();
+
+        if (nextTableHeader) {
+          tableBuffer.push(nextTableHeader);
+        }
+      }
+
+      insideTable = true;
+      tableBuffer.push(line);
+      continue;
+    } else if (insideTable) {
+      flushTable();
+    }
+
+    if (trimmed.startsWith('- ') || trimmed.startsWith('* ') || trimmed.startsWith('• ')) {
+      const content = parseInlineStyles(trimmed.slice(2));
+      listBuffer.push(
+        <li key={`li-${keyIdx++}`} className="text-xs text-slate-700 leading-relaxed font-roboto">
+          {content}
+        </li>,
+      );
+      continue;
+    } else {
+      flushList();
+    }
+
+    if (trimmed.startsWith('### ')) {
+      elements.push(
+        <h4
+          key={keyIdx++}
+          className="text-xs font-bold text-teal-800 uppercase tracking-wider mt-4 mb-1.5 font-roboto"
+        >
+          {parseInlineStyles(trimmed.slice(4))}
+        </h4>,
+      );
+    } else if (trimmed.startsWith('## ')) {
+      elements.push(
+        <h3
+          key={keyIdx++}
+          className="text-sm font-bold text-slate-900 mt-5 mb-2 border-b border-slate-200 pb-1 font-roboto"
+        >
+          {parseInlineStyles(trimmed.slice(3))}
+        </h3>,
+      );
+    } else if (trimmed.startsWith('# ')) {
+      elements.push(
+        <h2
+          key={keyIdx++}
+          className="text-base font-extrabold text-slate-900 mt-6 mb-3 border-b-2 border-slate-300 pb-1.5 font-roboto"
+        >
+          {parseInlineStyles(trimmed.slice(2))}
+        </h2>,
+      );
+    } else if (trimmed === '') {
+      continue;
+    } else {
+      elements.push(
+        <p
+          key={keyIdx++}
+          className="text-xs text-slate-800 font-normal leading-relaxed my-2 font-roboto text-justify"
+        >
+          {parseInlineStyles(line)}
+        </p>
+      );
+    }
+  }
+
+  flushList();
+  flushTable();
+
+  return <div className="space-y-1 w-full text-left">{elements}</div>;
+};
+
+--- FILE: src\modules\ai-assistant\components\suggestion-chips.component.tsx ---
+import React from 'react';
+import { ArrowRight } from 'lucide-react';
+import { parseInlineStylesRaw } from './rich-message-renderer.component';
+
+interface SuggestionChipsProps {
+  suggestions?: string[];
+  onClick: (suggestion: string) => void;
+  disabled: boolean;
+}
+
+const normalizeSuggestions = (suggestions?: string[]): string[] => {
+  if (!suggestions || suggestions.length === 0) return [];
+
+  if (suggestions.length === 1 && typeof suggestions[0] === 'string') {
+    const raw = suggestions[0];
+
+    if (raw.includes('\n-') || raw.includes(' - ') || raw.includes('? -') || raw.includes('?* -')) {
+      let cleaned = raw.replace(/^##\s*Opsi\s*Lanjutan\s*/i, '').trim();
+
+      const parts = cleaned
+        .split(/(?:\r?\n)?-\s+/)
+        .map((p) => p.trim())
+        .filter((p) => p.length > 0);
+
+      if (parts.length > 1) {
+        return parts;
+      }
+
+      const inlineParts = cleaned
+        .split(/\?\s+-\s+/)
+        .map((p, idx, arr) => {
+          let item = p.trim();
+          if (idx < arr.length - 1 && !item.endsWith('?')) {
+            item += '?';
+          }
+          return item;
+        })
+        .filter((p) => p.length > 0);
+
+      if (inlineParts.length > 1) {
+        return inlineParts;
+      }
+    }
+  }
+
+  return suggestions
+    .map((s) => s.replace(/^##\s*Opsi\s*Lanjutan\s*/i, '').replace(/^-\s+/, '').trim())
+    .filter((s) => s.length > 0);
+};
+
+export const SuggestionChips: React.FC<SuggestionChipsProps> = ({
+  suggestions,
+  onClick,
+  disabled,
+}) => {
+  const normalized = normalizeSuggestions(suggestions);
+  if (normalized.length === 0) return null;
+
+  return (
+    <div className="flex flex-wrap gap-2 mt-3 pt-2.5 border-t border-slate-100 no-print">
+      {normalized.map((s, idx) => (
+        <button
+          key={idx}
+          type="button"
+          onClick={() => onClick(s)}
+          disabled={disabled}
+          className="px-3 py-1.5 hover:bg-teal-50 disabled:opacity-50 text-teal-800 hover:text-teal-950 font-bold text-xs border-b border-teal-200 hover:border-teal-300 rounded-none shadow-2xs transition-colors cursor-pointer disabled:cursor-not-allowed inline-flex items-center gap-1.5"
+        >
+          <span>{parseInlineStylesRaw(s)}</span>
+          <ArrowRight size={11} className="text-teal-600 shrink-0 animate-pulse" />
+        </button>
+      ))}
+    </div>
+  );
+};
+
+--- FILE: src\modules\ai-assistant\components\system-fallback-card.component.tsx ---
+import React from 'react';
+import {
+  AlertCircle,
+  Clock,
+  ShieldAlert,
+  WifiOff,
+  Database,
+  RefreshCw,
+  Plus,
+  LogOut,
+} from 'lucide-react';
+import { AiServiceException } from '../../../services/ai-assistant.service';
+import { AiErrorMapper } from '../utils/error-mapper.util';
+
+const iconMap = {
+  AlertCircle,
+  Clock,
+  ShieldAlert,
+  WifiOff,
+  Database,
+};
+
+interface SystemFallbackCardProps {
+  errorType: string;
+  rawErrorMsg: string;
+  onRetry: () => void;
+  onNewSession: () => void;
+  onLogin: () => void;
+}
+
+export const SystemFallbackCard: React.FC<SystemFallbackCardProps> = ({
+  errorType,
+  rawErrorMsg,
+  onRetry,
+  onNewSession,
+  onLogin,
+}) => {
+  const mapped = AiErrorMapper.map(new AiServiceException(500, errorType, rawErrorMsg));
+  const IconComponent = iconMap[mapped.iconName as keyof typeof iconMap] || AlertCircle;
+
+  return (
+    <div className="bg-slate-50 border border-slate-300 p-4 my-3 font-roboto w-full text-slate-800 space-y-3 shadow-2xs">
+      <div className="flex items-start gap-3">
+        <div className="p-1.5 bg-white border border-slate-200 shrink-0 text-slate-600">
+          <IconComponent size={18} className="animate-pulse" />
+        </div>
+        <div className="space-y-1">
+          <h4 className="text-xs font-bold uppercase tracking-wider text-slate-900 leading-snug">
+            {mapped.title}
+          </h4>
+          <p className="text-xs font-medium text-slate-600 leading-relaxed text-justify">
+            {mapped.description}
+          </p>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-200/60 no-print">
+        {mapped.actionType === 'RETRY' && (
+          <button
+            type="button"
+            onClick={onRetry}
+            className="px-3 py-1.5 bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs uppercase transition-colors inline-flex items-center gap-1.5 cursor-pointer rounded-none border border-teal-800 shadow-2xs"
+          >
+            <RefreshCw size={12} className="shrink-0" />
+            <span>Coba Kirim Ulang</span>
+          </button>
+        )}
+
+        {mapped.actionType === 'NEW_SESSION' && (
+          <button
+            type="button"
+            onClick={onNewSession}
+            className="px-3 py-1.5 bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs uppercase transition-colors inline-flex items-center gap-1.5 cursor-pointer rounded-none border border-teal-800 shadow-2xs"
+          >
+            <Plus size={12} className="shrink-0" />
+            <span>Mulai Sesi Baru</span>
+          </button>
+        )}
+
+        {mapped.actionType === 'LOGIN' && (
+          <button
+            type="button"
+            onClick={onLogin}
+            className="px-3 py-1.5 bg-slate-900 hover:bg-slate-950 text-white font-bold text-xs uppercase transition-colors inline-flex items-center gap-1.5 cursor-pointer rounded-none border border-slate-950 shadow-2xs"
+          >
+            <LogOut size={12} className="shrink-0" />
+            <span>Masuk Sesi Kembali</span>
+          </button>
+        )}
+      </div>
+    </div>
+  );
+};
+
+--- FILE: src\modules\ai-assistant\components\article-preview-editor\article-preview-canvas.component.tsx ---
+import React from 'react';
+import { EditorContent } from '@tiptap/react';
+import type { Editor } from '@tiptap/react';
+import { Loader2, Download } from 'lucide-react';
+
+interface ArticlePreviewCanvasProps {
+    editor: Editor | null;
+    lineSpacing: number;
+    marginCm: number;
+    activeTableElement: HTMLTableElement | null;
+    onScroll: (event: React.UIEvent<HTMLDivElement>) => void;
+    onStartTableResize: (event: React.MouseEvent<HTMLDivElement>, mode: 'column' | 'row', index: number, tableElement: HTMLTableElement) => void;
+    isSaving: boolean;
+    isPrinting: boolean;
+    isDirty: boolean;
+    onSaveAndBack: () => void;
+    onPrint: () => void;
+    fontSize: string;
+    fontFamily: string;
+}
+
+export const ArticlePreviewCanvas: React.FC<ArticlePreviewCanvasProps> = ({
+    editor,
+    lineSpacing,
+    marginCm,
+    activeTableElement,
+    onScroll,
+    onStartTableResize,
+    isSaving,
+    isPrinting,
+    isDirty,
+    onSaveAndBack,
+    onPrint,
+    fontSize,
+    fontFamily,
+}) => {
+    return (
+        <div
+            id="editor-scroll-container"
+            onScroll={onScroll}
+            className="flex-1 overflow-y-auto bg-slate-200/40 p-8 flex justify-center w-full min-h-150 select-text scroll-smooth"
+        >
+            <div className="relative h-fit mb-12">
+                <style>{`
+          .page {
+            background-color: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            box-sizing: border-box !important;
+            margin-bottom: 0px !important;
+          }
+          .rm-pages-wrapper {
+            background: transparent !important;
+          }
+          .ProseMirror.rm-with-pagination {
+            background-color: white !important;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
+            border: 1px solid #cbd5e1 !important;
+            box-sizing: border-box !important;
+            line-height: ${lineSpacing} !important;
+          }
+          .ProseMirror {
+            outline: none !important;
+            white-space: pre-wrap !important;
+            tab-size: 48px !important;
+          }
+          .ProseMirror p {
+            line-height: ${lineSpacing} !important;
+            margin-top: 0px !important;
+            margin-bottom: 16px !important;
+          }
+          .ProseMirror td p,
+          .ProseMirror th p,
+          .ProseMirror li p {
+            margin-bottom: 0px !important;
+          }
+          .ProseMirror table {
+            border-collapse: collapse !important;
+            table-layout: fixed !important;
+            width: 100% !important;
+            margin-top: 16px !important;
+            margin-bottom: 32px !important;
+            overflow: hidden !important;
+          }
+          .ProseMirror table + p,
+          .ProseMirror table + table {
+            margin-top: 32px !important;
+          }
+          .ProseMirror td,
+          .ProseMirror th {
+            min-width: 80px;
+            border: 1px solid #cbd5e1;
+            padding: 6px 10px;
+            vertical-align: top;
+            box-sizing: border-box;
+            position: relative;
+            word-break: normal;
+            overflow-wrap: break-word;
+          }
+          .ProseMirror th {
+            font-weight: bold;
+            text-align: left;
+            background-color: #f8fafc;
+          }
+          .ProseMirror tr {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+          }
+          .ProseMirror .column-resize-handle {
+            position: absolute;
+            right: -2px;
+            top: 0;
+            bottom: -2px;
+            width: 4px;
+            background-color: #0d9488;
+            pointer-events: none;
+          }
+          .ProseMirror.resize-cursor {
+            cursor: ew-resize !important;
+            cursor: col-resize !important;
+          }
+          .ProseMirror .selectedCell:after {
+            z-index: 2;
+            position: absolute;
+            content: "";
+            left: 0; right: 0; top: 0; bottom: 0;
+            background: rgba(200, 200, 255, 0.4);
+            pointer-events: none;
+          }
+          .ProseMirror .citation-url-node {
+            display: none !important;
+          }
+          .ProseMirror img {
+            max-width: 100% !important;
+            height: auto !important;
+            display: block !important;
+            margin: 16px auto !important;
+          }
+          .page-break-gap {
+            height: 20px;
+            background-color: #f1f5f9 !important;
+            border-top: 1px solid #cbd5e1;
+            border-bottom: 1px solid #cbd5e1;
+            margin-top: 20px;
+            margin-bottom: 20px;
+            margin-left: -${marginCm}cm !important;
+            margin-right: -${marginCm}cm !important;
+            position: relative;
+            pointer-events: none;
+            display: block;
+          }
+          .page-break-gap::after {
+            content: 'POTONGAN HALAMAN (PDF BREAK)';
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 7px;
+            font-family: 'Roboto', sans-serif;
+            font-weight: 900;
+            color: #64748b;
+            letter-spacing: 0.15em;
+            background-color: #f1f5f9;
+            padding: 1px 8px;
+          }
+        `}</style>
+
+                <div
+                    id="virtual-a4-page"
+                    className="text-slate-800 text-left prose max-w-none prose-slate prose-xs focus:outline-none transition-all relative"
+                    style={{
+                        width: '794px',
+                        background: 'transparent',
+                        border: 'none',
+                        boxShadow: 'none',
+                        padding: 0,
+                        fontFamily: `${fontFamily}, sans-serif`,
+                        fontSize: `${fontSize}pt`,
+                        ['--rm-margin-left' as any]: `${Math.round(marginCm * (96 / 2.54))}px`,
+                        ['--rm-margin-right' as any]: `${Math.round(marginCm * (96 / 2.54))}px`,
+                        ['--rm-margin-top' as any]: `${Math.round(marginCm * (96 / 2.54))}px`,
+                        ['--rm-margin-bottom' as any]: `${Math.round(marginCm * (96 / 2.54))}px`,
+                    }}
+                >
+                    <EditorContent editor={editor} className="h-full focus:outline-none text-slate-800" />
+
+                    {activeTableElement && (
+                        <div className="absolute inset-0 pointer-events-none">
+                            {Array.from({ length: Math.max(1, activeTableElement.rows[0]?.cells.length || 1) }).map((_, colIndex) => {
+                                const firstRowCell = activeTableElement.rows[0]?.cells[colIndex];
+                                if (!firstRowCell) return null;
+                                const rect = firstRowCell.getBoundingClientRect();
+                                const tableRect = activeTableElement.getBoundingClientRect();
+                                const left = rect.left - tableRect.left + rect.width - 2;
+
+                                return (
+                                    <div
+                                        key={`col-handle-${colIndex}`}
+                                        className="absolute w-2 h-5 rounded-sm bg-teal-600/80 cursor-col-resize pointer-events-auto shadow-sm"
+                                        style={{ left: `${Math.max(0, left)}px`, top: `${Math.max(0, rect.top - tableRect.top - 4)}px` }}
+                                        onMouseDown={(event) => onStartTableResize(event, 'column', colIndex, activeTableElement)}
+                                        title={`Ubah lebar kolom ${colIndex + 1}`}
+                                    />
+                                );
+                            })}
+
+                            {Array.from({ length: Math.max(1, activeTableElement.rows.length) }).map((_, rowIndex) => {
+                                const row = activeTableElement.rows[rowIndex];
+                                if (!row) return null;
+                                const rect = row.getBoundingClientRect();
+                                const tableRect = activeTableElement.getBoundingClientRect();
+                                const top = rect.top - tableRect.top + rect.height - 2;
+                                const left = rect.left - tableRect.left + 4;
+
+                                return (
+                                    <div
+                                        key={`row-handle-${rowIndex}`}
+                                        className="absolute h-2 w-5 rounded-sm bg-amber-600/80 cursor-row-resize pointer-events-auto shadow-sm"
+                                        style={{ left: `${Math.max(0, left)}px`, top: `${Math.max(0, top)}px` }}
+                                        onMouseDown={(event) => onStartTableResize(event, 'row', rowIndex, activeTableElement)}
+                                        title={`Ubah tinggi baris ${rowIndex + 1}`}
+                                    />
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+
+                {}
+                <div className="w-[794px] mt-8 mb-12 flex justify-center no-print font-roboto select-none">
+                    <button
+                        type="button"
+                        onClick={(e) => {
+                            console.log('[DEBUG] Tombol Cetak PDF Resmi di Canvas diklik!');
+                            onPrint();
+                        }}
+                        disabled={isSaving || isPrinting}
+                        className="px-6 py-2.5 bg-teal-700 hover:bg-teal-800 text-white font-extrabold text-xs uppercase tracking-wider border border-teal-800 rounded-none cursor-pointer transition-colors disabled:opacity-50 inline-flex items-center gap-1.5 shadow-sm"
+                    >
+                        {isPrinting ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
+                        <span>Cetak PDF Resmi</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+--- FILE: src\modules\ai-assistant\components\article-preview-editor\article-preview-editor-header.component.tsx ---
+import React from 'react';
+import type { Editor } from '@tiptap/react';
+import {
+    Loader2,
+    Download,
+    ArrowLeft,
+    Bold,
+    Italic,
+    Underline as UnderlineIcon,
+    AlignLeft,
+    AlignCenter,
+    AlignRight,
+    AlignJustify,
+    List,
+    ListOrdered,
+    Undo,
+    Redo,
+    LayoutGrid,
+} from 'lucide-react';
+import type { FontFamilyKey } from '../../store/useEditorStore';
+
+interface ArticlePreviewEditorHeaderProps {
+    editor: Editor | null;
+    isSaving: boolean;
+    isPrinting: boolean;
+    isDirty: boolean;
+    articleTitle: string;
+    activeSessionTitle: string;
+    fontFamily: FontFamilyKey;
+    fontSize: string;
+    lineSpacing: number;
+    fontSizePresets: number[];
+    onSaveAndBack: () => void;
+    onPrint: () => void;
+    onFontFamilyChange: (value: FontFamilyKey) => void;
+    onLineSpacingChange: (value: number) => void;
+    onApplyFontSize: (size: string) => void;
+    onFontSizeStep: (direction: 'up' | 'down') => void;
+    onSetTextAlign: (alignment: 'left' | 'center' | 'right' | 'justify') => void;
+    onToggleBulletList: () => void;
+    onToggleOrderedList: () => void;
+    onUndo: () => void;
+    onRedo: () => void;
+    onInsertPageBreak: () => void;
+}
+
+export const ArticlePreviewEditorHeader: React.FC<ArticlePreviewEditorHeaderProps> = ({
+    editor,
+    isSaving,
+    isPrinting,
+    isDirty,
+    articleTitle,
+    activeSessionTitle,
+    fontFamily,
+    fontSize,
+    lineSpacing,
+    fontSizePresets,
+    onSaveAndBack,
+    onPrint,
+    onFontFamilyChange,
+    onLineSpacingChange,
+    onApplyFontSize,
+    onFontSizeStep,
+    onSetTextAlign,
+    onToggleBulletList,
+    onToggleOrderedList,
+    onUndo,
+    onRedo,
+    onInsertPageBreak,
+}) => {
+    const currentFontSize = parseInt(fontSize, 10);
+    const isFontSizePreset = fontSizePresets.includes(currentFontSize);
+
+    return (
+        <div className="bg-white border-b border-slate-350 flex flex-col shrink-0 no-print z-20 shadow-xs">
+            <div className="px-6 py-3 border-b border-slate-200 flex items-center justify-between gap-4">
+                <div className="flex items-center gap-4 text-left">
+                    <button
+                        onClick={onSaveAndBack}
+                        disabled={isSaving || isPrinting}
+                        className="px-3 py-1.5 bg-transparent hover:bg-transparent text-slate-700 disabled:opacity-50 inline-flex items-center gap-1.5 cursor-pointer font-bold text-xs uppercase border-none shadow-none rounded-none"
+                    >
+                        {isSaving ? <Loader2 size={12} className="animate-spin" /> : <ArrowLeft size={12} />}
+                        <span>{isDirty ? 'Simpan & Kembali' : 'Kembali'}</span>
+                    </button>
+                    <div className="h-4 w-px bg-slate-300" />
+                    <div>
+                        <h1 className="text-sm font-black uppercase text-slate-900 tracking-wider flex items-center gap-2">
+                            <span>Sunting Naskah &amp; Tata Letak A4</span>
+                            {isDirty && <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" title="Terdapat perubahan belum tersimpan" />}
+                        </h1>
+                        <p className="text-[10px] text-slate-500 font-bold uppercase mt-0.5 max-w-lg truncate">
+                            Sesi Cetak: <span className="text-teal-700 font-black">{articleTitle || activeSessionTitle}</span>
+                        </p>
+                    </div>
+                </div>
+
+            </div>
+
+            <div className="px-6 py-2 bg-slate-50 flex flex-wrap items-center justify-between gap-4 select-none">
+                <div className="flex flex-wrap items-center gap-4">
+                    <div className="flex items-center gap-1.5">
+                        <span className="text-[9px] font-black text-slate-500 uppercase tracking-wider">Font:</span>
+                        <select
+                            value={fontFamily}
+                            onChange={(e) => onFontFamilyChange(e.target.value as FontFamilyKey)}
+                            disabled={isSaving || isPrinting}
+                            className="bg-white border border-slate-300 text-[10px] font-bold px-2 py-1 focus:outline-none focus:border-teal-600 rounded-none cursor-pointer"
+                        >
+                            <option value="Calibri">Calibri</option>
+                            <option value="Times New Roman">Times New Roman</option>
+                            <option value="Verdana">Verdana</option>
+                            <option value="Arial">Arial</option>
+                        </select>
+                    </div>
+
+                    <div className="h-4 w-px bg-slate-300" />
+
+                    <div className="flex items-center gap-1.5">
+                        <span className="text-[9px] font-black text-slate-500 uppercase tracking-wider">Spasi:</span>
+                        <select
+                            value={lineSpacing}
+                            onChange={(e) => onLineSpacingChange(parseFloat(e.target.value))}
+                            disabled={isSaving || isPrinting}
+                            className="bg-white border border-slate-300 text-[10px] font-bold px-2 py-1 focus:outline-none focus:border-teal-600 rounded-none cursor-pointer"
+                        >
+                            <option value="1.18">1.18 (Nota Dinas)</option>
+                            <option value="1.5">1.50 (Laporan)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div className="hidden md:block h-5 w-px bg-slate-300" />
+
+                <div className="flex flex-wrap items-center gap-1">
+                    <button
+                        type="button"
+                        onClick={() => editor?.chain().focus().toggleBold().run()}
+                        className={`p-1 transition-colors cursor-pointer ${editor?.isActive('bold') ? 'bg-teal-700 text-white' : 'text-slate-650 hover:bg-slate-200'}`}
+                        title="Tebal (Ctrl+B)"
+                    >
+                        <Bold size={13} />
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => editor?.chain().focus().toggleItalic().run()}
+                        className={`p-1 transition-colors cursor-pointer ${editor?.isActive('italic') ? 'bg-teal-700 text-white' : 'text-slate-650 hover:bg-slate-200'}`}
+                        title="Miring (Ctrl+I)"
+                    >
+                        <Italic size={13} />
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => editor?.chain().focus().toggleUnderline().run()}
+                        className={`p-1 transition-colors cursor-pointer ${editor?.isActive('underline') ? 'bg-teal-700 text-white' : 'text-slate-650 hover:bg-slate-200'}`}
+                        title="Garis Bawah (Ctrl+U)"
+                    >
+                        <UnderlineIcon size={13} />
+                    </button>
+
+                    <div className="w-px h-3.5 bg-slate-300 mx-0.5" />
+
+                    <div className="flex items-center">
+                        <button
+                            type="button"
+                            onClick={() => onFontSizeStep('down')}
+                            disabled={isSaving || isPrinting || currentFontSize <= fontSizePresets[0]}
+                            className="flex items-center justify-center w-6 h-6 border border-slate-300 bg-white hover:bg-slate-100 disabled:opacity-30 cursor-pointer transition-colors"
+                            title="Perkecil Huruf"
+                        >
+                            <span className="text-[10px] font-black text-slate-600 select-none leading-none">A<sub style={{ fontSize: '7px', verticalAlign: 'sub' }}>▼</sub></span>
+                        </button>
+                        <select
+                            value={isFontSizePreset ? fontSize : ''}
+                            onChange={(e) => onApplyFontSize(e.target.value)}
+                            disabled={isSaving || isPrinting}
+                            className="h-6 bg-white border-t border-b border-slate-300 text-[10px] font-bold px-1 focus:outline-none focus:border-teal-600 rounded-none cursor-pointer w-12 text-center"
+                        >
+                            {!isFontSizePreset && <option value="" disabled>{fontSize}pt</option>}
+                            {fontSizePresets.map((size) => (
+                                <option key={size} value={String(size)}>{size}pt</option>
+                            ))}
+                        </select>
+                        <button
+                            type="button"
+                            onClick={() => onFontSizeStep('up')}
+                            disabled={isSaving || isPrinting || currentFontSize >= fontSizePresets[fontSizePresets.length - 1]}
+                            className="flex items-center justify-center w-6 h-6 border border-slate-300 bg-white hover:bg-slate-100 disabled:opacity-30 cursor-pointer transition-colors"
+                            title="Perbesar Huruf"
+                        >
+                            <span className="text-[11px] font-black text-slate-700 select-none leading-none">A<sup style={{ fontSize: '7px', verticalAlign: 'super' }}>▲</sup></span>
+                        </button>
+                    </div>
+
+                    <div className="w-px h-3.5 bg-slate-300 mx-0.5" />
+
+                    <button
+                        type="button"
+                        onClick={() => onSetTextAlign('left')}
+                        className={`p-1 transition-colors cursor-pointer ${editor?.isActive({ textAlign: 'left' }) ? 'bg-teal-700 text-white' : 'text-slate-650 hover:bg-slate-200'}`}
+                        title="Rata Kiri"
+                    >
+                        <AlignLeft size={13} />
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => onSetTextAlign('center')}
+                        className={`p-1 transition-colors cursor-pointer ${editor?.isActive({ textAlign: 'center' }) ? 'bg-teal-700 text-white' : 'text-slate-650 hover:bg-slate-200'}`}
+                        title="Rata Tengah"
+                    >
+                        <AlignCenter size={13} />
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => onSetTextAlign('right')}
+                        className={`p-1 transition-colors cursor-pointer ${editor?.isActive({ textAlign: 'right' }) ? 'bg-teal-700 text-white' : 'text-slate-650 hover:bg-slate-200'}`}
+                        title="Rata Kanan"
+                    >
+                        <AlignRight size={13} />
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => onSetTextAlign('justify')}
+                        className={`p-1 transition-colors cursor-pointer ${editor?.isActive({ textAlign: 'justify' }) ? 'bg-teal-700 text-white' : 'text-slate-650 hover:bg-slate-200'}`}
+                        title="Rata Kiri Kanan"
+                    >
+                        <AlignJustify size={13} />
+                    </button>
+
+                    <div className="w-px h-3.5 bg-slate-300 mx-0.5" />
+
+                    <button
+                        type="button"
+                        onClick={onToggleBulletList}
+                        className={`p-1 transition-colors cursor-pointer ${editor?.isActive('bulletList') ? 'bg-teal-700 text-white' : 'text-slate-650 hover:bg-slate-200'}`}
+                        title="Daftar Berbutir"
+                    >
+                        <List size={13} />
+                    </button>
+                    <button
+                        type="button"
+                        onClick={onToggleOrderedList}
+                        className={`p-1 transition-colors cursor-pointer ${editor?.isActive('orderedList') ? 'bg-teal-700 text-white' : 'text-slate-650 hover:bg-slate-200'}`}
+                        title="Daftar Berangka"
+                    >
+                        <ListOrdered size={13} />
+                    </button>
+
+                    <div className="w-px h-3.5 bg-slate-300 mx-0.5" />
+
+                    <button
+                        type="button"
+                        onClick={onUndo}
+                        disabled={!editor?.can().undo()}
+                        className="p-1 text-slate-500 hover:bg-slate-200 disabled:opacity-30 transition-colors cursor-pointer"
+                        title="Undo"
+                    >
+                        <Undo size={13} />
+                    </button>
+                    <button
+                        type="button"
+                        onClick={onRedo}
+                        disabled={!editor?.can().redo()}
+                        className="p-1 text-slate-500 hover:bg-slate-200 disabled:opacity-30 transition-colors cursor-pointer"
+                        title="Redo"
+                    >
+                        <Redo size={13} />
+                    </button>
+
+                    <div className="w-px h-3.5 bg-slate-300 mx-0.5" />
+
+                    <button
+                        type="button"
+                        onClick={onInsertPageBreak}
+                        className="p-1.5 hover:bg-slate-200 text-slate-700 transition-colors cursor-pointer inline-flex items-center gap-1 rounded-none border border-transparent hover:border-slate-300"
+                        title="Sisipkan Potongan Batas Halaman (Ctrl+Enter)"
+                    >
+                        <LayoutGrid size={12} className="text-teal-700" />
+                        <span className="text-[9px] font-black text-slate-500 uppercase tracking-wider">Potong Halaman</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+--- FILE: src\modules\ai-assistant\components\article-preview-editor\article-preview-page-navigator.component.tsx ---
+import React from 'react';
+
+interface ArticlePreviewPageNavigatorProps {
+    totalPages: number;
+    activePage: number;
+    onScrollToPage: (pageIdx: number) => void;
+}
+
+export const ArticlePreviewPageNavigator: React.FC<ArticlePreviewPageNavigatorProps> = ({
+    totalPages,
+    activePage,
+    onScrollToPage,
+}) => {
+    return (
+        <div className="w-56 bg-slate-50 border-r border-slate-300 flex flex-col min-h-0 select-none no-print shrink-0">
+            <div className="p-3 bg-slate-100 border-b border-slate-250 flex items-center justify-between text-left">
+                <span className="text-[10px] font-black uppercase text-slate-700 tracking-wider">
+                    Navigasi Halaman
+                </span>
+                <span className="text-[10px] font-bold text-slate-500 bg-slate-200 px-1.5 py-0.5">
+                    {totalPages} Hlm
+                </span>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4 custom-scrollbar">
+                {Array.from({ length: totalPages }).map((_, idx) => {
+                    const isCurrent = activePage === idx;
+                    return (
+                        <div
+                            key={idx}
+                            onClick={() => onScrollToPage(idx)}
+                            className={`flex flex-col items-center gap-1.5 cursor-pointer p-1.5 transition-all group ${isCurrent ? 'bg-teal-50/50 border border-teal-600 shadow-2xs' : 'border border-transparent hover:bg-slate-200/50'}`}
+                        >
+                            <div className={`w-28 h-36 bg-white shadow-xs border ${isCurrent ? 'border-teal-600' : 'border-slate-300 group-hover:border-slate-400'} flex flex-col justify-between p-2 relative overflow-hidden transition-colors`}>
+                                <div className="space-y-1.5 opacity-30 select-none">
+                                    <div className="h-1.5 bg-slate-600 w-3/4" />
+                                    <div className="h-1 bg-slate-400 w-full" />
+                                    <div className="h-1 bg-slate-400 w-full" />
+                                    <div className="h-1 bg-slate-400 w-5/6" />
+                                    <div className="pt-2 space-y-1">
+                                        <div className="h-1 bg-slate-400 w-full" />
+                                        <div className="h-1 bg-slate-400 w-2/3" />
+                                    </div>
+                                </div>
+                                <span className={`text-[8px] font-black text-right self-end mt-auto transition-colors ${isCurrent ? 'text-teal-700' : 'text-slate-400'}`}>
+                                    Hal {idx + 1}
+                                </span>
+                            </div>
+                            <span className={`text-[10px] font-bold transition-colors ${isCurrent ? 'text-teal-800' : 'text-slate-655 group-hover:text-slate-900'}`}>
+                                Halaman {idx + 1}
+                            </span>
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+    );
+};
+
+--- FILE: src\modules\ai-assistant\components\article-preview-editor\citation-url.extension.ts ---
+import { Node, mergeAttributes } from '@tiptap/core';
+
+export const CitationUrlNode = Node.create({
+    name: 'citationUrl',
+    group: 'inline',
+    inline: true,
+    atom: true,
+
+    addAttributes() {
+        return {
+            url: {
+                default: null,
+                parseHTML: (element) => element.getAttribute('data-citation-url'),
+                renderHTML: (attributes) => ({
+                    'data-citation-url': attributes.url,
+                }),
+            },
+            label: {
+                default: 'Link',
+                parseHTML: (element) => element.getAttribute('data-citation-label') || element.textContent || 'Link',
+                renderHTML: (attributes) => ({
+                    'data-citation-label': attributes.label,
+                }),
+            },
+        };
+    },
+
+    parseHTML() {
+        return [
+            {
+
+                tag: 'span[data-citation-url]',
+            },
+        ];
+    },
+
+    renderHTML({ HTMLAttributes }) {
+        return [
+            'span',
+            mergeAttributes(HTMLAttributes, {
+
+                class: 'citation-url-node no-print',
+
+                onclick: `(function(e){ e.preventDefault(); e.stopPropagation(); var u="${HTMLAttributes['data-citation-url'] || ''}"; if(u) window.open(u, '_blank', 'noopener,noreferrer'); })(event)`,
+                title: HTMLAttributes['data-citation-url'] || 'Tautan Sitasi',
+                contenteditable: 'false',
+
+                'aria-label': `Sitasi: ${HTMLAttributes['data-citation-label'] || 'Link'}`,
+            }),
+
+            HTMLAttributes['data-citation-label'] || 'Link',
+        ];
+    },
+
+});
+
+--- FILE: src\modules\ai-assistant\components\article-preview-editor\resizable-image.extension.tsx ---
+import React, { useRef, useState } from 'react';
+import { NodeViewWrapper, ReactNodeViewRenderer } from '@tiptap/react';
+import Image from '@tiptap/extension-image';
+
+export const ResizableImageComponent: React.FC<any> = ({ node, updateAttributes, selected }) => {
+  const imageRef = useRef<HTMLImageElement>(null);
+  const [isResizing, setIsResizing] = useState(false);
+
+  const onMouseDown = (event: React.MouseEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsResizing(true);
+
+    const startX = event.clientX;
+    const startWidth = imageRef.current?.getBoundingClientRect().width || 100;
+
+    const parentWidth = imageRef.current?.parentElement?.getBoundingClientRect().width || 1;
+
+    const onMouseMove = (moveEvent: MouseEvent) => {
+      const deltaX = moveEvent.clientX - startX;
+      let newWidth = startWidth + deltaX;
+
+      newWidth = Math.max(40, Math.min(newWidth, parentWidth));
+
+      const widthPct = `${Math.round((newWidth / parentWidth) * 100)}%`;
+      updateAttributes({ width: widthPct });
+    };
+
+    const onMouseUp = () => {
+      setIsResizing(false);
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+    };
+
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+  };
+
+  return (
+    <NodeViewWrapper
+      className={`relative inline-block my-4 mx-auto group ${selected ? 'ring-2 ring-teal-500' : ''}`}
+      style={{
+        width: node.attrs.width || '100%',
+        display: 'block',
+        textAlign: 'center'
+      }}
+    >
+      <img
+        ref={imageRef}
+        src={node.attrs.src}
+        alt={node.attrs.alt}
+        title={node.attrs.title}
+        style={{
+          width: '100%',
+          height: 'auto',
+          display: 'block',
+        }}
+      />
+      {}
+      <div
+        onMouseDown={onMouseDown}
+        className="absolute bottom-1 right-1 w-4 h-4 bg-teal-700 cursor-se-resize flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity border border-white shadow-md rounded-none select-none no-print"
+        style={{ zIndex: 10 }}
+        title="Geser untuk mengubah ukuran gambar"
+      >
+        <svg width="8" height="8" viewBox="0 0 8 8" fill="white">
+          <path d="M6 0h2v8H0V6h6V0z"/>
+        </svg>
+      </div>
+    </NodeViewWrapper>
+  );
+};
+
+export const ResizableImage = Image.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      width: {
+        default: '100%',
+        renderHTML: attributes => {
+          if (!attributes.width) return {};
+          return {
+            width: attributes.width,
+            style: `width: ${attributes.width}; max-width: 100%;`
+          };
+        },
+        parseHTML: element => element.getAttribute('width') || element.style.width || '100%',
+      },
+      height: {
+        default: 'auto',
+        renderHTML: attributes => {
+          if (!attributes.height) return {};
+          return {
+            height: attributes.height,
+            style: `height: ${attributes.height}`
+          };
+        },
+        parseHTML: element => element.getAttribute('height') || element.style.height || 'auto',
+      },
+    };
+  },
+
+  addNodeView() {
+    return ReactNodeViewRenderer(ResizableImageComponent);
+  },
+});
+
 --- FILE: src\modules\ai-assistant\store\useEditorStore.ts ---
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
@@ -4283,13 +5200,9 @@ export const useEditorStore = create<EditorState>()(
             },
 
             setFormatting: (updates: Partial<EditorFormatting>) => {
-
-                const { marginCm, ...safeUpdates } = updates;
-
                 set((state) => ({
                     ...state,
-                    ...safeUpdates,
-                    marginCm: 2.5,
+                    ...updates,
                     isDirty: true,
                 }));
             },
@@ -4461,6 +5374,10 @@ import TurndownService from 'turndown';
 export class MarkupConverter {
     private static turndownService: TurndownService | null = null;
 
+    private static normalizePunctuationSpacing(text: string): string {
+        return text.replace(/\s+([,.;:!?])/g, '$1');
+    }
+
     private static getTurndownInstance(): TurndownService {
         if (this.turndownService) {
             return this.turndownService;
@@ -4475,15 +5392,33 @@ export class MarkupConverter {
             strongDelimiter: '**',
         });
 
+        service.addRule('citationUrlPreservationRule', {
+            filter: (node: HTMLElement) => {
+                return (
+                    node.nodeName.toLowerCase() === 'span' &&
+                    node.getAttribute('data-citation-url') !== null
+                );
+            },
+            replacement: (_content: string, node: Node) => {
+                const element = node as HTMLElement;
+                const url = element.getAttribute('data-citation-url') || '';
+
+                return url ? `[${url}]` : '';
+            },
+        });
+
         service.addRule('textAlignRule', {
             filter: (node: HTMLElement) => {
                 const tagName = node.nodeName.toLowerCase();
                 const hasStyleAlign = node.getAttribute('style')?.includes('text-align') || false;
                 const hasAlignAttr = node.hasAttribute('align');
 
+                const isInsideListOrTable = node.closest('li, td, th') !== null;
+
                 return (
                     ['p', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'].includes(tagName) &&
-                    (hasStyleAlign || hasAlignAttr)
+                    (hasStyleAlign || hasAlignAttr) &&
+                    !isInsideListOrTable
                 );
             },
             replacement: (content: string, node: Node) => {
@@ -4528,7 +5463,9 @@ export class MarkupConverter {
             filter: (node: HTMLElement) => {
                 const tagName = node.nodeName.toLowerCase();
                 const styleAttr = node.getAttribute('style') || '';
-                return tagName === 'span' && styleAttr.includes('font-size');
+
+                const hasCitationUrl = node.getAttribute('data-citation-url') !== null;
+                return tagName === 'span' && styleAttr.includes('font-size') && !hasCitationUrl;
             },
             replacement: (content: string, node: Node) => {
                 const element = node as HTMLElement;
@@ -4545,6 +5482,100 @@ export class MarkupConverter {
             }
         });
 
+        service.addRule('imageStyleRule', {
+            filter: ['img'],
+            replacement: (content: string, node: Node) => {
+                const element = node as HTMLElement;
+                const src = element.getAttribute('src') || '';
+                const alt = element.getAttribute('alt') || '';
+                const styleAttr = element.getAttribute('style') || '';
+
+                const widthMatch = styleAttr.match(/width:\s*([\d.%]+)/i);
+                const heightMatch = styleAttr.match(/height:\s*([\d.%a-z]+)/i);
+
+                let inlineStyle = '';
+                if (widthMatch) {
+                    inlineStyle += `width: ${widthMatch[1]};`;
+                }
+                if (heightMatch) {
+                    inlineStyle += `height: ${heightMatch[1]};`;
+                }
+
+                const styleString = inlineStyle ? ` style="${inlineStyle}"` : '';
+                const altAttr = alt ? ` alt="${alt}"` : '';
+
+                return `<img src="${src}"${altAttr}${styleString} />`;
+            }
+        });
+
+        service.addRule('tableCellRule', {
+            filter: ['th', 'td'],
+            replacement: (content: string) => {
+                const cleanContent = content.replace(/\|/g, '\\|').trim().replace(/\s+/g, ' ');
+                return `${cleanContent} | `;
+            }
+        });
+
+        service.addRule('tableRowRule', {
+            filter: ['tr'],
+            replacement: (content: string, node: Node) => {
+                const element = node as HTMLElement;
+                const parent = element.parentElement;
+
+                const isHeader = element.querySelector('th') !== null ||
+                    parent?.nodeName.toLowerCase() === 'thead' ||
+                    (parent?.nodeName.toLowerCase() === 'tbody' && parent.firstElementChild === element && !parent.previousElementSibling);
+
+                const trimmedContent = content.trim();
+                if (!trimmedContent) return '';
+
+                let separator = '';
+                if (isHeader) {
+                    const cellCount = element.querySelectorAll('th, td').length;
+                    const sepCells = Array(cellCount).fill('---');
+                    separator = `\n| ${sepCells.join(' | ')} |`;
+                }
+
+                return `\n| ${trimmedContent}${separator}`;
+            }
+        });
+
+        service.addRule('tableRule', {
+            filter: ['table'],
+            replacement: (content: string, node: Node) => {
+                const element = node as HTMLElement;
+                const widthsAttr = element.getAttribute('data-widths');
+                const rowHeightsAttr = element.getAttribute('data-row-heights');
+
+                let widthsComment = '';
+                if (widthsAttr) {
+                    widthsComment = `<!-- table-widths: ${widthsAttr} -->\n`;
+                }
+
+                let rowHeightsComment = '';
+                if (rowHeightsAttr) {
+                    rowHeightsComment = `<!-- table-row-heights: ${rowHeightsAttr} -->\n`;
+                }
+
+                return `\n\n${widthsComment}${rowHeightsComment}${content.trim()}\n\n`;
+            }
+        });
+
+        service.addRule('tableSectionRule', {
+            filter: ['thead', 'tbody', 'tfoot'],
+            replacement: (content: string) => {
+                return content;
+            }
+        });
+
+        service.addRule('lineBreakRule', {
+            filter: ['br'],
+            replacement: () => {
+
+                return '\n';
+            }
+        });
+
         this.turndownService = service;
         return this.turndownService;
     }
@@ -4556,7 +5587,24 @@ export class MarkupConverter {
 
         try {
 
-            let processedMarkdown = markdown.replace(/\\*\[(?:[a-f0-9-]{8,}|doc(?:[-_a-z0-9]+)?):\d+\\*\]/gi, '');
+            let processedMarkdown = markdown
+
+                .replace(/\\?\*?\[(?!https?:\/\/)(?:[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}|doc(?:[-_a-z0-9]*)):\d+\]\\?\*?/gi, '')
+
+                .replace(/\[doc[-_][a-z0-9]+:\d+\]/gi, '')
+
+                .replace(/\s{2,}(?=[.,;:!?])/g, '');
+
+            const collectedCitations: string[] = [];
+
+            processedMarkdown = processedMarkdown.replace(
+                /\[(https?:\/\/[^\]\s]+?)(?::\d+)?\]/g,
+                (match, url) => {
+                    const idx = collectedCitations.length;
+                    collectedCitations.push(url);
+                    return `%%URLCITE_${idx}%%`;
+                }
+            );
 
             processedMarkdown = processedMarkdown.replace(
                 /<div align="(left|center|right|justify)">([\s\S]*?)<\/div>/gi,
@@ -4566,11 +5614,9 @@ export class MarkupConverter {
                         .map((p: string) => {
                             const trimmed = p.trim();
                             if (!trimmed) return '';
-
                             if (trimmed.startsWith('<p') || trimmed.startsWith('<h') || trimmed.startsWith('<div')) {
                                 return trimmed;
                             }
-
                             if (trimmed.startsWith('#') || trimmed.startsWith('- ') || trimmed.startsWith('* ') || trimmed.match(/^\d+\.\s/)) {
                                 return trimmed;
                             }
@@ -4583,16 +5629,123 @@ export class MarkupConverter {
 
             processedMarkdown = processedMarkdown.replace(/\r\n/g, '\n');
 
-            const rawHtml = marked.parse(processedMarkdown, {
+            let rawHtml = marked.parse(processedMarkdown, {
                 async: false,
                 breaks: true,
                 gfm: true,
             }) as string;
 
-            return rawHtml.trim();
+            collectedCitations.forEach((url, idx) => {
+                const labelText = `Link ${idx + 1}`;
+                const citationSpan = `<span data-citation-url="${url}" data-citation-label="${labelText}" class="citation-url-node no-print" contenteditable="false" title="${url}">${labelText}</span>`;
+                rawHtml = rawHtml.replace(`%%URLCITE_${idx}%%`, citationSpan);
+            });
+
+            const normalizedHtml = this.normalizePunctuationSpacing(rawHtml);
+
+            try {
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(normalizedHtml, 'text/html');
+
+                const iterator = doc.createNodeIterator(doc.body, NodeFilter.SHOW_COMMENT);
+                let commentNode;
+
+                while ((commentNode = iterator.nextNode())) {
+                    const commentText = commentNode.nodeValue || '';
+                    const widthsMatch = commentText.match(/table-widths:\s*(\[[\d,\s]+\])/i);
+                    const rowHeightsMatch = commentText.match(/table-row-heights:\s*(\[[\d,\s]+\])/i);
+
+                    if (widthsMatch || rowHeightsMatch) {
+                        try {
+                            const widths = widthsMatch ? JSON.parse(widthsMatch[1]) as number[] : [];
+                            const rowHeights = rowHeightsMatch ? JSON.parse(rowHeightsMatch[1]) as number[] : [];
+                            let sibling = commentNode.nextSibling;
+                            let foundTable: HTMLTableElement | null = null;
+
+                            while (sibling) {
+                                if (sibling.nodeName.toLowerCase() === 'table') {
+                                    foundTable = sibling as HTMLTableElement;
+                                    break;
+                                }
+                                if (sibling.nodeType === Node.ELEMENT_NODE) {
+                                    foundTable = (sibling as HTMLElement).querySelector('table');
+                                    if (foundTable) break;
+                                }
+                                sibling = sibling.nextSibling;
+                            }
+
+                            if (foundTable) {
+                                if (widths.length > 0) {
+                                    let colgroup = foundTable.querySelector('colgroup');
+                                    if (!colgroup) {
+                                        colgroup = doc.createElement('colgroup');
+                                        foundTable.insertBefore(colgroup, foundTable.firstChild);
+                                    } else {
+                                        colgroup.innerHTML = '';
+                                    }
+
+                                    widths.forEach((w) => {
+                                        const col = doc.createElement('col');
+                                        if (w > 0) {
+                                            col.setAttribute('style', `width: ${w}px`);
+                                        }
+                                        colgroup!.appendChild(col);
+                                    });
+                                }
+
+                                if (rowHeights.length > 0) {
+                                    const rows = Array.from(foundTable.rows);
+                                    rows.forEach((row, index) => {
+                                        const height = rowHeights[index];
+                                        if (height && height > 0) {
+                                            row.setAttribute('style', `height: ${height}px`);
+                                        }
+                                    });
+                                }
+                            }
+                        } catch (jsonErr) {
+                            console.warn('[MarkupConverter] Gagal melakukan parse JSON untuk lebar kolom atau tinggi baris:', jsonErr);
+                        }
+                    }
+                }
+
+                const tables = doc.querySelectorAll('table');
+                tables.forEach((table) => {
+                    const colgroup = table.querySelector('colgroup');
+                    if (!colgroup) {
+                        const firstRow = table.querySelector('tr');
+                        if (firstRow) {
+                            const cells = firstRow.querySelectorAll('th, td');
+                            const colCount = cells.length;
+                            if (colCount > 0) {
+                                const newColgroup = doc.createElement('colgroup');
+
+                                const totalWidth = 606;
+                                const baseColWidth = Math.floor(totalWidth / colCount);
+                                const remainder = totalWidth % colCount;
+
+                                for (let i = 0; i < colCount; i++) {
+                                    const col = doc.createElement('col');
+
+                                    const w = i === colCount - 1 ? baseColWidth + remainder : baseColWidth;
+                                    col.setAttribute('style', `width: ${w}px`);
+                                    newColgroup.appendChild(col);
+                                }
+                                table.insertBefore(newColgroup, table.firstChild);
+                            }
+                        }
+                    }
+
+                    table.setAttribute('style', 'width: 606px');
+                });
+
+                return doc.body.innerHTML.trim();
+            } catch (domErr) {
+                console.warn('[MarkupConverter] DOMParser gagal menyuntikkan lebar tabel:', domErr);
+                return normalizedHtml.trim();
+            }
         } catch (err: any) {
             console.error('[MarkupConverter ERROR] Gagal mengonversi Markdown ke HTML:', err.message);
-
             return `<p>${markdown}</p>`;
         }
     }
@@ -4603,19 +5756,82 @@ export class MarkupConverter {
         }
 
         try {
-            const turndown = this.getTurndownInstance();
-            const rawMarkdown = turndown.turndown(html);
 
-            const sanitizedMarkdown = rawMarkdown
-                .replace(/\n{3,}/g, '\n\n')
-                .replace(/&nbsp;/g, ' ')
-                .replace(/\\([\[\]])/g, '$1')
-                .trim();
+            let processedHtml = html;
+            try {
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                const tables = doc.querySelectorAll('table');
+
+                tables.forEach((table) => {
+                    const colgroup = table.querySelector('colgroup');
+                    const colWidths: number[] = [];
+                    if (colgroup) {
+                        const cols = colgroup.querySelectorAll('col');
+                        cols.forEach((col) => {
+                            const styleAttr = col.getAttribute('style') || '';
+                            const match = styleAttr.match(/width:\s*([\d.]+)px/i);
+                            if (match) {
+                                colWidths.push(Math.round(parseFloat(match[1])));
+                            } else {
+                                colWidths.push(0);
+                            }
+                        });
+                    } else {
+                        const firstRowCells = table.querySelectorAll('tr:first-child th, tr:first-child td');
+                        firstRowCells.forEach((cell) => {
+                            const styleAttr = (cell as HTMLElement).getAttribute('style') || '';
+                            const match = styleAttr.match(/width:\s*([\d.]+)px/i);
+                            if (match) {
+                                colWidths.push(Math.round(parseFloat(match[1])));
+                            } else {
+                                colWidths.push(0);
+                            }
+                        });
+                    }
+
+                    const hasCustomWidths = colWidths.some(w => w > 0);
+                    if (hasCustomWidths) {
+                        table.setAttribute('data-widths', JSON.stringify(colWidths));
+                    }
+
+                    const rowHeights: number[] = [];
+                    table.querySelectorAll('tr').forEach((row) => {
+                        const styleAttr = row.getAttribute('style') || '';
+                        const match = styleAttr.match(/height:\s*([\d.]+)px/i);
+                        if (match) {
+                            rowHeights.push(Math.round(parseFloat(match[1])));
+                        } else {
+                            rowHeights.push(0);
+                        }
+                    });
+
+                    if (rowHeights.some(h => h > 0)) {
+                        table.setAttribute('data-row-heights', JSON.stringify(rowHeights));
+                    }
+                });
+                processedHtml = doc.body.innerHTML;
+            } catch (domErr) {
+                console.warn('[MarkupConverter] DOMParser gagal mengekstrak lebar kolom tabel:', domErr);
+            }
+
+            const turndown = this.getTurndownInstance();
+            const rawMarkdown = turndown.turndown(processedHtml);
+
+            const sanitizedMarkdown = this.normalizePunctuationSpacing(
+                rawMarkdown
+
+                    .replace(/\n{3,}/g, '\n\n')
+
+                    .replace(/&nbsp;/g, ' ')
+
+                    .replace(/\\([\[\]])/g, '$1')
+                    .trim()
+            );
 
             return sanitizedMarkdown;
         } catch (err: any) {
             console.error('[MarkupConverter ERROR] Gagal mengonversi HTML ke Markdown:', err.message);
-
             return html;
         }
     }
@@ -4662,12 +5878,6 @@ export const AiQaView: React.FC<AiQaViewProps> = ({
     try {
       const docs = await DocumentService.listDocuments();
       setDocuments(docs || []);
-
-      if (!initialSelectedDocIds || initialSelectedDocIds.length === 0) {
-        if (docs && docs.length > 0 && selectedDocIds.length === 0) {
-          setSelectedDocIds([docs[0].id]);
-        }
-      }
     } catch (err: any) {
       setDocuments([]);
       setLoadError(`Gagal memuat dokumen dari database: ${err.message}`);
@@ -4754,6 +5964,8 @@ export const AiQaView: React.FC<AiQaViewProps> = ({
           onArticleIntentDetected={(promptText) => onNavigateToGenerator(promptText)}
           onLoadingChange={(loading) => setIsAiProcessing(loading)}
           initialSessionId={initialSessionId}
+          onSessionLoaded={(loadedDocIds) => setSelectedDocIds(loadedDocIds)}
+          onSessionReset={() => setSelectedDocIds([])}
         />
       )}
     </div>
@@ -4839,10 +6051,10 @@ interface MiniAnchorCardProps {
 
 const MiniAnchorCard: React.FC<MiniAnchorCardProps> = ({ title }) => {
   return (
-    <div className="p-4 my-3 bg-teal-50/50 border border-teal-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shadow-2xs no-print">
+    <div className="p-4 my-3 border-b border-teal-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shadow-2xs no-print">
       <div className="flex items-center gap-3">
-        <div className="p-2 bg-teal-100 border border-teal-300 text-teal-800 shrink-0">
-          <FileCheck size={18} className="animate-pulse" />
+        <div className="p-2 text-teal-800 shrink-0">
+          <FileCheck size={18} />
         </div>
         <div className="space-y-0.5 text-left">
           <strong className="text-xs uppercase tracking-wider text-teal-950 font-bold flex items-center gap-1">
@@ -4905,7 +6117,7 @@ const DraftingFallbackCard: React.FC<DraftingFallbackCardProps> = ({
           <button
             type="button"
             onClick={onRetry}
-            className="px-4 py-2 bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-1.5 cursor-pointer border border-teal-800 shadow-2xs"
+            className="px-3 py-1.5 bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs uppercase rounded-none inline-flex items-center gap-1.5 cursor-pointer border border-teal-800 shadow-2xs transition-colors"
           >
             <RefreshCw size={12} className="shrink-0" />
             <span>Coba Sintesis Ulang</span>
@@ -4916,7 +6128,7 @@ const DraftingFallbackCard: React.FC<DraftingFallbackCardProps> = ({
           <button
             type="button"
             onClick={onNewSession}
-            className="px-4 py-2 bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-1.5 cursor-pointer border border-teal-800 shadow-2xs"
+            className="px-3 py-1.5 bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs uppercase rounded-none inline-flex items-center gap-1.5 cursor-pointer border border-teal-800 shadow-2xs transition-colors"
           >
             <Plus size={12} className="shrink-0" />
             <span>Mulai Sesi Baru</span>
@@ -5077,6 +6289,7 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
     setMessages([]);
     setSessionError(null);
     setLastFailedQuery(null);
+    setSelectedDocIds([]);
   };
 
   const handleLoadSession = async (sessionId: string) => {
@@ -5091,7 +6304,7 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
       setArticleTitle(session.articleTitle || session.title);
 
       if (session.sources && session.sources.length > 0) {
-        const sourceIds = session.sources.map((s: any) => s.id);
+        const sourceIds = session.sources.map((s: any) => s.documentId || s.id);
         setSelectedDocIds(sourceIds);
 
         await loadDocuments();
@@ -5302,9 +6515,9 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
         <div className="flex items-center gap-2">
           <button
             onClick={onNavigateToQa}
-            className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-2 transition-colors cursor-pointer"
+            className="px-3 py-1.5  text-black font-bold text-xs uppercase rounded-none inline-flex items-center gap-1.5 transition-colors cursor-pointer border-b border-slate-500 hover:bg-slate-100"
           >
-            <MessageSquareCode size={14} />
+            <MessageSquareCode size={13} />
             <span>Tanya AI Chat</span>
           </button>
         </div>
@@ -5331,10 +6544,10 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
         {showHistorySidebar && (
           <div className="w-64 h-full flex flex-col bg-white border border-slate-300 border-r-0 shadow-xs shrink-0 overflow-hidden">
             <div className="p-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between shrink-0">
-              <span className="text-[10px] font-extrabold text-slate-700 uppercase tracking-wider">Riwayat Naskah</span>
+              <span className="text-[12px] text-black tracking-wider font-roboto">Riwayat Naskah</span>
               <button
                 onClick={handleCreateNewSession}
-                className="p-1 bg-teal-700 text-white hover:bg-teal-800"
+                className="p-1 text-black"
                 title="Mulai sesi draf baru"
               >
                 <Plus size={12} />
@@ -5443,9 +6656,9 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
                   className={`p-4 flex gap-4 items-start transition-colors border-b border-slate-100 ${msg.sender === 'user' ? 'bg-teal-50/20' : 'bg-white'
                     }`}
                 >
-                  <div className={`w-7 h-7 flex items-center justify-center shrink-0 border ${msg.sender === 'user' ? 'bg-slate-900 border-slate-950 text-white' : 'bg-teal-700 border-teal-800 text-white'
+                  <div className={`w-7 h-7 flex items-center justify-center shrink-0 ${msg.sender === 'user' ?  'text-black' : ' text-black'
                     }`}>
-                    {msg.sender === 'user' ? <User size={13} /> : <Bot size={13} />}
+                    {msg.sender === 'user' ? <User size={16} /> : <Bot size={16} />}
                   </div>
 
                   <div className="flex-1 min-w-0">
@@ -5528,18 +6741,21 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
 export default ArticleGeneratorView;
 
 --- FILE: src\modules\ai-assistant\views\article-preview-editor.view.tsx ---
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useEditor, EditorContent, Extension } from '@tiptap/react';
 import { Node, mergeAttributes } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 import TextAlign from '@tiptap/extension-text-align';
 import { TextStyle } from '@tiptap/extension-text-style';
 import { FontFamily } from '@tiptap/extension-font-family';
+import { ResizableImage } from '../components/article-preview-editor/resizable-image.extension';
 
 import { Table } from '@tiptap/extension-table';
 import { TableRow } from '@tiptap/extension-table-row';
 import { TableHeader } from '@tiptap/extension-table-header';
 import { TableCell } from '@tiptap/extension-table-cell';
+
+import { CitationUrlNode } from '../components/article-preview-editor/citation-url.extension';
 
 import { PaginationPlus } from 'tiptap-pagination-plus';
 
@@ -5553,23 +6769,13 @@ import type { FontFamilyKey, EditorFormatting } from '../store/useEditorStore';
 
 import {
   Loader2,
-  Download,
   ArrowLeft,
   CheckCircle2,
   AlertCircle,
-  Bold,
-  Italic,
-  Underline as UnderlineIcon,
-  AlignLeft,
-  AlignCenter,
-  AlignRight,
-  AlignJustify,
-  List,
-  ListOrdered,
-  Undo,
-  Redo,
-  LayoutGrid,
 } from 'lucide-react';
+import { ArticlePreviewEditorHeader } from '../components/article-preview-editor/article-preview-editor-header.component';
+import { ArticlePreviewPageNavigator } from '../components/article-preview-editor/article-preview-page-navigator.component';
+import { ArticlePreviewCanvas } from '../components/article-preview-editor/article-preview-canvas.component';
 
 interface ArticlePreviewEditorViewProps {
   sessionId: string | null;
@@ -5648,6 +6854,25 @@ const PageBreakExtension = Node.create({
   },
 });
 
+const TabKeyExtension = Extension.create({
+  name: 'tabKey',
+  addKeyboardShortcuts() {
+    return {
+      Tab: () => {
+
+        if (
+          this.editor.isActive('table') ||
+          this.editor.isActive('bulletList') ||
+          this.editor.isActive('orderedList')
+        ) {
+          return false;
+        }
+        return this.editor.commands.insertContent('\t');
+      },
+    };
+  },
+});
+
 const TIPTAP_EXTENSIONS = [
   StarterKit.configure({
     heading: { levels: [1, 2, 3] },
@@ -5655,7 +6880,7 @@ const TIPTAP_EXTENSIONS = [
   TextAlign.configure({
     types: ['heading', 'paragraph'],
     alignments: ['left', 'center', 'right', 'justify'],
-    defaultAlignment: 'justify',
+    defaultAlignment: 'left',
   }),
   TextStyle,
   FontFamily.configure({
@@ -5666,10 +6891,18 @@ const TIPTAP_EXTENSIONS = [
 
   Table.configure({
     resizable: true,
+    cellMinWidth: 80,
+    handleWidth: 10,
   }),
   TableRow,
   TableHeader,
   TableCell,
+
+  CitationUrlNode,
+
+  TabKeyExtension,
+
+  ResizableImage,
 
   PaginationPlus.configure({
     pageHeight: 1123,
@@ -5707,20 +6940,159 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [isPrinting, setIsPrinting] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const loadedSessionIdRef = useRef<string | null>(null);
 
   const [totalPages, setTotalPages] = useState<number>(1);
   const [activePage, setActivePage] = useState<number>(0);
+  const [activeTableElement, setActiveTableElement] = useState<HTMLTableElement | null>(null);
+  const [tableResizeState, setTableResizeState] = useState<{
+    mode: 'column' | 'row';
+    index: number;
+    startX: number;
+    startY: number;
+    initialValue: number;
+    tableElement: HTMLTableElement;
+  } | null>(null);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 4000);
   };
 
+  const applyColumnWidth = useCallback((tableElement: HTMLTableElement, colIndex: number, widthPx: number) => {
+    const rows = Array.from(tableElement.rows);
+    const safeWidth = Math.max(72, Math.round(widthPx));
+
+    rows.forEach((row) => {
+      const cell = row.cells[colIndex];
+      if (!cell) return;
+      cell.style.width = `${safeWidth}px`;
+      cell.style.minWidth = `${safeWidth}px`;
+      cell.style.maxWidth = `${safeWidth}px`;
+    });
+
+    const colgroup = tableElement.querySelector('colgroup');
+    if (colgroup) {
+      const cols = colgroup.querySelectorAll('col');
+      const targetCol = cols[colIndex];
+      if (targetCol) {
+        targetCol.style.width = `${safeWidth}px`;
+      }
+    }
+  }, []);
+
+  const applyRowHeight = useCallback((tableElement: HTMLTableElement, rowIndex: number, heightPx: number) => {
+    const rows = Array.from(tableElement.rows);
+    const safeHeight = Math.max(28, Math.round(heightPx));
+
+    const targetRow = rows[rowIndex];
+    if (!targetRow) return;
+
+    targetRow.style.height = `${safeHeight}px`;
+    Array.from(targetRow.cells).forEach((cell) => {
+      cell.style.height = `${safeHeight}px`;
+      cell.style.minHeight = `${safeHeight}px`;
+    });
+  }, []);
+
+  const startTableResize = useCallback((event: React.MouseEvent, mode: 'column' | 'row', index: number, tableElement: HTMLTableElement) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    setActiveTableElement(tableElement);
+
+    const startX = event.clientX;
+    const startY = event.clientY;
+    const initialValue = mode === 'column'
+      ? Math.max(72, Math.round(tableElement.rows[0]?.cells[index]?.getBoundingClientRect().width || 72))
+      : Math.max(28, Math.round(tableElement.rows[index]?.getBoundingClientRect().height || 28));
+
+    setTableResizeState({
+      mode,
+      index,
+      startX,
+      startY,
+      initialValue,
+      tableElement,
+    });
+  }, []);
+
   const editor = useEditor({
     extensions: TIPTAP_EXTENSIONS,
     editorProps: {
       attributes: {
-        class: 'focus:outline-none max-w-none min-h-[500px] outline-none h-full text-slate-900 leading-relaxed text-xs focus:bg-white selection:bg-teal-700 selection:text-white',
+        class: 'focus:outline-none max-w-none min-h-[500px] outline-none h-full text-slate-900 leading-relaxed focus:bg-white selection:bg-teal-700 selection:text-white',
+      },
+      handleDOMEvents: {
+        mousedown: (view, event) => {
+          const target = event.target as HTMLElement;
+          const tableElement = target.closest('table') as HTMLTableElement | null;
+          const isTableClick = tableElement !== null;
+          const isResizeHandle = target.classList.contains('column-resize-handle') ||
+            target.classList.contains('column-resize-handle-active');
+
+          if (tableElement) {
+            setActiveTableElement(tableElement);
+          } else {
+            setActiveTableElement(null);
+          }
+
+          if (isTableClick || isResizeHandle) {
+            try {
+              (view as any).editor.commands.disablePagination();
+            } catch (e) {
+              console.warn('[Pagination Freeze] Gagal menonaktifkan pagination:', e);
+            }
+          }
+          return false;
+        }
+      },
+      handlePaste: (view, event) => {
+        const items = event.clipboardData?.items;
+        if (items) {
+          for (let i = 0; i < items.length; i++) {
+            const item = items[i];
+            if (item.type.indexOf('image') === 0) {
+              const file = item.getAsFile();
+              if (file) {
+                const reader = new FileReader();
+                reader.onload = (readerEvent) => {
+                  const base64 = readerEvent.target?.result as string;
+                  const { schema } = view.state;
+                  const node = schema.nodes.image.create({ src: base64 });
+                  const transaction = view.state.tr.replaceSelectionWith(node);
+                  view.dispatch(transaction);
+                };
+                reader.readAsDataURL(file);
+                event.preventDefault();
+                return true;
+              }
+            }
+          }
+        }
+        return false;
+      },
+      handleDrop: (view, event, slice, moved) => {
+        if (!moved && event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files.length > 0) {
+          const file = event.dataTransfer.files[0];
+          if (file.type.startsWith('image/')) {
+            const reader = new FileReader();
+            reader.onload = (readerEvent) => {
+              const base64 = readerEvent.target?.result as string;
+              const { schema } = view.state;
+              const coordinates = view.posAtCoords({ left: event.clientX, top: event.clientY });
+              if (coordinates) {
+                const node = schema.nodes.image.create({ src: base64 });
+                const transaction = view.state.tr.insert(coordinates.pos, node);
+                view.dispatch(transaction);
+              }
+            };
+            reader.readAsDataURL(file);
+            event.preventDefault();
+            return true;
+          }
+        }
+        return false;
       },
     },
     onUpdate: ({ editor: ed }) => {
@@ -5762,6 +7134,67 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
     observer.observe(el);
     return () => observer.disconnect();
   }, [editor, isLoading]);
+
+  useEffect(() => {
+    const handleGlobalMouseUp = () => {
+      if (editor && !editor.isDestroyed) {
+        try {
+          editor.commands.enablePagination();
+        } catch (e) {
+
+        }
+      }
+
+      if (tableResizeState && editor && !editor.isDestroyed) {
+        const nextHtml = editor.view.dom.innerHTML;
+        editor.commands.setContent(nextHtml, { emitUpdate: true });
+      }
+
+      setTableResizeState(null);
+    };
+
+    window.addEventListener('mouseup', handleGlobalMouseUp);
+    return () => {
+      window.removeEventListener('mouseup', handleGlobalMouseUp);
+    };
+  }, [editor, tableResizeState]);
+
+  useEffect(() => {
+    if (!tableResizeState || !editor || editor.isDestroyed) return;
+
+    const handleGlobalMouseMove = (moveEvent: MouseEvent) => {
+      const deltaX = moveEvent.clientX - tableResizeState.startX;
+      const deltaY = moveEvent.clientY - tableResizeState.startY;
+
+      if (tableResizeState.mode === 'column') {
+        const nextWidth = Math.max(72, tableResizeState.initialValue + deltaX);
+        applyColumnWidth(tableResizeState.tableElement, tableResizeState.index, nextWidth);
+      } else {
+        const nextHeight = Math.max(28, tableResizeState.initialValue + deltaY);
+        applyRowHeight(tableResizeState.tableElement, tableResizeState.index, nextHeight);
+      }
+    };
+
+    window.addEventListener('mousemove', handleGlobalMouseMove);
+    return () => {
+      window.removeEventListener('mousemove', handleGlobalMouseMove);
+    };
+  }, [applyColumnWidth, applyRowHeight, editor, tableResizeState]);
+
+  useEffect(() => {
+    if (!activeTableElement) return;
+
+    const updateOverlay = () => {
+      if (!activeTableElement.isConnected) {
+        setActiveTableElement(null);
+      }
+    };
+
+    updateOverlay();
+    const observer = new ResizeObserver(updateOverlay);
+    observer.observe(activeTableElement);
+    return () => observer.disconnect();
+  }, [activeTableElement]);
 
   useEffect(() => {
     if (editor && !editor.isDestroyed) {
@@ -5834,15 +7267,20 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
   }, [sessionId, initSession, onBack]);
 
   useEffect(() => {
-    if (editor && draftContent && editor.isEmpty) {
-      editor.commands.setContent(draftContent);
-      requestAnimationFrame(() => {
-        if (editor && !editor.isDestroyed) {
-          editor.commands.focus('end');
-        }
-      });
+    if (isLoading) return;
+
+    if (editor && !editor.isDestroyed && storeSessionId === sessionId && sessionId) {
+      if (loadedSessionIdRef.current !== sessionId) {
+        editor.commands.setContent(draftContent || '');
+        loadedSessionIdRef.current = sessionId;
+        requestAnimationFrame(() => {
+          if (editor && !editor.isDestroyed) {
+            editor.commands.focus('end');
+          }
+        });
+      }
     }
-  }, [editor, draftContent]);
+  }, [editor, isLoading, storeSessionId, sessionId, draftContent]);
 
   const handleSaveAndBack = async () => {
     if (!sessionId || !editor || isSaving) return;
@@ -5867,7 +7305,9 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
   };
 
   const handlePrint = async () => {
-    if (!editor && !sessionId) {
+    console.log('[DEBUG] handlePrint dipanggil di Editor View. State:', { editor: !!editor, sessionId, isDirty, isPrinting });
+    if (!editor) {
+      console.warn('[DEBUG] Batal cetak karena editor null/undefined.');
       showToast('⚠️ Tidak ada naskah untuk dicetak.');
       return;
     }
@@ -5888,8 +7328,21 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
       showToast('🖨️ Merakit dokumen PDF resmi di server (True WYSIWYG)...');
       const targetFontSize = parseFloat(fontSize);
 
+      const stripNoPrintElements = (htmlString: string): string => {
+        try {
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(htmlString, 'text/html');
+          doc.querySelectorAll('.no-print').forEach((el) => el.remove());
+          return doc.body.innerHTML;
+        } catch {
+          return htmlString;
+        }
+      };
+
+      const cleanHtmlForPdf = stripNoPrintElements(editor.getHTML());
+
       await PdfExportService.exportCustomFormattedArticlePdf(
-        editor.getHTML(),
+        cleanHtmlForPdf,
         {
           fontFamily,
           fontSize: isNaN(targetFontSize) ? 11 : targetFontSize,
@@ -5970,7 +7423,7 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
   }
 
   return (
-    <div className="w-full h-screen flex flex-col bg-slate-100 overflow-hidden relative font-roboto select-none">
+    <div className="w-full h-screen flex flex-col bg-slate-100 overflow-hidden relative font-roboto">
       {toastMessage && (
         <div className="fixed top-5 right-5 z-50 bg-slate-900 text-teal-400 border border-slate-700 px-4 py-2 text-xs font-bold uppercase tracking-wider flex items-center gap-2 shadow-xl animate-in fade-in duration-200">
           <CheckCircle2 size={14} />
@@ -5978,405 +7431,55 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
         </div>
       )}
 
-      {}
-      <div className="bg-white border-b border-slate-350 flex flex-col shrink-0 no-print z-20 shadow-xs">
-
-        {}
-        <div className="px-6 py-3 border-b border-slate-200 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-4 text-left">
-            <button
-              onClick={handleSaveAndBack}
-              disabled={isSaving || isPrinting}
-              className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 disabled:opacity-50 inline-flex items-center gap-1.5 cursor-pointer font-bold text-xs uppercase border border-slate-300 shadow-2xs rounded-none"
-            >
-              {isSaving ? <Loader2 size={12} className="animate-spin" /> : <ArrowLeft size={12} />}
-              <span>{isDirty ? 'Simpan & Kembali' : 'Kembali'}</span>
-            </button>
-            <div className="h-4 w-px bg-slate-300" />
-            <div>
-              <h1 className="text-sm font-black uppercase text-slate-900 tracking-wider flex items-center gap-2">
-                <span>Sunting Naskah &amp; Tata Letak A4</span>
-                {isDirty && <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" title="Terdapat perubahan belum tersimpan" />}
-              </h1>
-              <p className="text-[10px] text-slate-500 font-bold uppercase mt-0.5 max-w-lg truncate">
-                Sesi Cetak: <span className="text-teal-700 font-black">{articleTitle || activeSession.title}</span>
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={handlePrint}
-              disabled={isSaving || isPrinting}
-              className="px-4 py-2 bg-teal-700 hover:bg-teal-800 text-white font-extrabold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-1.5 border border-teal-800 shadow-xs cursor-pointer disabled:opacity-50"
-            >
-              {isPrinting ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
-              <span>Cetak PDF</span>
-            </button>
-          </div>
-        </div>
-
-        {}
-        <div className="px-6 py-2 bg-slate-50 flex flex-wrap items-center justify-between gap-4 select-none">
-          {}
-          <div className="flex flex-wrap items-center gap-4">
-            <div className="flex items-center gap-1.5">
-              <span className="text-[9px] font-black text-slate-500 uppercase tracking-wider">Font:</span>
-              <select
-                value={fontFamily}
-                onChange={(e) => handleFontFamilyChange(e.target.value as FontFamilyKey)}
-                disabled={isSaving || isPrinting}
-                className="bg-white border border-slate-300 text-[10px] font-bold px-2 py-1 focus:outline-none focus:border-teal-600 rounded-none cursor-pointer"
-              >
-                <option value="Calibri">Calibri</option>
-                <option value="Times New Roman">Times New Roman</option>
-                <option value="Verdana">Verdana</option>
-                <option value="Arial">Arial</option>
-              </select>
-            </div>
-
-            <div className="h-4 w-px bg-slate-300" />
-
-            <div className="flex items-center gap-1.5">
-              <span className="text-[9px] font-black text-slate-500 uppercase tracking-wider">Spasi:</span>
-              <select
-                value={lineSpacing}
-                onChange={(e) => setFormatting({ lineSpacing: parseFloat(e.target.value) })}
-                disabled={isSaving || isPrinting}
-                className="bg-white border border-slate-300 text-[10px] font-bold px-2 py-1 focus:outline-none focus:border-teal-600 rounded-none cursor-pointer"
-              >
-                <option value="1.18">1.18 (Nota Dinas)</option>
-                <option value="1.5">1.50 (Laporan)</option>
-              </select>
-            </div>
-
-            {}
-          </div>
-
-          <div className="hidden md:block h-5 w-px bg-slate-300" />
-
-          {}
-          <div className="flex flex-wrap items-center gap-1">
-            <button
-              type="button"
-              onClick={() => editor?.chain().focus().toggleBold().run()}
-              className={`p-1 transition-colors cursor-pointer ${editor?.isActive('bold') ? 'bg-teal-700 text-white' : 'text-slate-650 hover:bg-slate-200'}`}
-              title="Tebal (Ctrl+B)"
-            >
-              <Bold size={13} />
-            </button>
-            <button
-              type="button"
-              onClick={() => editor?.chain().focus().toggleItalic().run()}
-              className={`p-1 transition-colors cursor-pointer ${editor?.isActive('italic') ? 'bg-teal-700 text-white' : 'text-slate-650 hover:bg-slate-200'}`}
-              title="Miring (Ctrl+I)"
-            >
-              <Italic size={13} />
-            </button>
-            <button
-              type="button"
-              onClick={() => editor?.chain().focus().toggleUnderline().run()}
-              className={`p-1 transition-colors cursor-pointer ${editor?.isActive('underline') ? 'bg-teal-700 text-white' : 'text-slate-650 hover:bg-slate-200'}`}
-              title="Garis Bawah (Ctrl+U)"
-            >
-              <UnderlineIcon size={13} />
-            </button>
-
-            <div className="w-px h-3.5 bg-slate-300 mx-0.5" />
-
-            <div className="flex items-center">
-              <button
-                type="button"
-                onClick={() => handleFontSizeStep('down')}
-                disabled={isSaving || isPrinting || parseInt(fontSize, 10) <= FONT_SIZE_PRESETS[0]}
-                className="flex items-center justify-center w-6 h-6 border border-slate-300 bg-white hover:bg-slate-100 disabled:opacity-30 cursor-pointer transition-colors"
-                title="Perkecil Huruf"
-              >
-                <span className="text-[10px] font-black text-slate-600 select-none leading-none">A<sub style={{ fontSize: '7px', verticalAlign: 'sub' }}>▼</sub></span>
-              </button>
-              <select
-                value={FONT_SIZE_PRESETS.includes(parseInt(fontSize, 10)) ? fontSize : ''}
-                onChange={(e) => handleApplyFontSize(e.target.value)}
-                disabled={isSaving || isPrinting}
-                className="h-6 bg-white border-t border-b border-slate-300 text-[10px] font-bold px-1 focus:outline-none focus:border-teal-600 rounded-none cursor-pointer w-12 text-center"
-              >
-                {!FONT_SIZE_PRESETS.includes(parseInt(fontSize, 10)) && (
-                  <option value="" disabled>{fontSize}pt</option>
-                )}
-                {FONT_SIZE_PRESETS.map(s => (
-                  <option key={s} value={String(s)}>{s}pt</option>
-                ))}
-              </select>
-              <button
-                type="button"
-                onClick={() => handleFontSizeStep('up')}
-                disabled={isSaving || isPrinting || parseInt(fontSize, 10) >= FONT_SIZE_PRESETS[FONT_SIZE_PRESETS.length - 1]}
-                className="flex items-center justify-center w-6 h-6 border border-slate-300 bg-white hover:bg-slate-100 disabled:opacity-30 cursor-pointer transition-colors"
-                title="Perbesar Huruf"
-              >
-                <span className="text-[11px] font-black text-slate-700 select-none leading-none">A<sup style={{ fontSize: '7px', verticalAlign: 'super' }}>▲</sup></span>
-              </button>
-            </div>
-
-            <div className="w-px h-3.5 bg-slate-300 mx-0.5" />
-
-            <button
-              type="button"
-              onClick={() => editor?.chain().focus().setTextAlign('left').run()}
-              className={`p-1 transition-colors cursor-pointer ${editor?.isActive({ textAlign: 'left' }) ? 'bg-teal-700 text-white' : 'text-slate-650 hover:bg-slate-200'}`}
-              title="Rata Kiri"
-            >
-              <AlignLeft size={13} />
-            </button>
-            <button
-              type="button"
-              onClick={() => editor?.chain().focus().setTextAlign('center').run()}
-              className={`p-1 transition-colors cursor-pointer ${editor?.isActive({ textAlign: 'center' }) ? 'bg-teal-700 text-white' : 'text-slate-650 hover:bg-slate-200'}`}
-              title="Rata Tengah"
-            >
-              <AlignCenter size={13} />
-            </button>
-            <button
-              type="button"
-              onClick={() => editor?.chain().focus().setTextAlign('right').run()}
-              className={`p-1 transition-colors cursor-pointer ${editor?.isActive({ textAlign: 'right' }) ? 'bg-teal-700 text-white' : 'text-slate-650 hover:bg-slate-200'}`}
-              title="Rata Kanan"
-            >
-              <AlignRight size={13} />
-            </button>
-            <button
-              type="button"
-              onClick={() => editor?.chain().focus().setTextAlign('justify').run()}
-              className={`p-1 transition-colors cursor-pointer ${editor?.isActive({ textAlign: 'justify' }) ? 'bg-teal-700 text-white' : 'text-slate-650 hover:bg-slate-200'}`}
-              title="Rata Kiri Kanan"
-            >
-              <AlignJustify size={13} />
-            </button>
-
-            <div className="w-px h-3.5 bg-slate-300 mx-0.5" />
-
-            <button
-              type="button"
-              onClick={() => editor?.chain().focus().toggleBulletList().run()}
-              className={`p-1 transition-colors cursor-pointer ${editor?.isActive('bulletList') ? 'bg-teal-700 text-white' : 'text-slate-650 hover:bg-slate-200'}`}
-              title="Daftar Berbutir"
-            >
-              <List size={13} />
-            </button>
-            <button
-              type="button"
-              onClick={() => editor?.chain().focus().toggleOrderedList().run()}
-              className={`p-1 transition-colors cursor-pointer ${editor?.isActive('orderedList') ? 'bg-teal-700 text-white' : 'text-slate-650 hover:bg-slate-200'}`}
-              title="Daftar Berangka"
-            >
-              <ListOrdered size={13} />
-            </button>
-
-            <div className="w-px h-3.5 bg-slate-300 mx-0.5" />
-
-            <button
-              type="button"
-              onClick={() => editor?.chain().focus().undo().run()}
-              disabled={!editor?.can().undo()}
-              className="p-1 text-slate-500 hover:bg-slate-200 disabled:opacity-30 transition-colors cursor-pointer"
-              title="Undo"
-            >
-              <Undo size={13} />
-            </button>
-            <button
-              type="button"
-              onClick={() => editor?.chain().focus().redo().run()}
-              disabled={!editor?.can().redo()}
-              className="p-1 text-slate-500 hover:bg-slate-200 disabled:opacity-30 transition-colors cursor-pointer"
-              title="Redo"
-            >
-              <Redo size={13} />
-            </button>
-
-            <div className="w-px h-3.5 bg-slate-300 mx-0.5" />
-
-            <button
-              type="button"
-              onClick={() => editor?.chain().focus().insertContent({ type: 'pageBreak' }).run()}
-              className="p-1.5 hover:bg-slate-200 text-slate-700 transition-colors cursor-pointer inline-flex items-center gap-1 rounded-none border border-transparent hover:border-slate-300"
-              title="Sisipkan Potongan Batas Halaman (Ctrl+Enter)"
-            >
-              <LayoutGrid size={12} className="text-teal-700" />
-              <span className="text-[9px] font-black text-slate-500 uppercase tracking-wider">Potong Halaman</span>
-            </button>
-          </div>
-        </div>
-      </div>
+      <ArticlePreviewEditorHeader
+        editor={editor}
+        isSaving={isSaving}
+        isPrinting={isPrinting}
+        isDirty={isDirty}
+        articleTitle={articleTitle}
+        activeSessionTitle={activeSession.title}
+        fontFamily={fontFamily}
+        fontSize={fontSize}
+        lineSpacing={lineSpacing}
+        fontSizePresets={FONT_SIZE_PRESETS}
+        onSaveAndBack={handleSaveAndBack}
+        onPrint={handlePrint}
+        onFontFamilyChange={handleFontFamilyChange}
+        onLineSpacingChange={(value) => setFormatting({ lineSpacing: value })}
+        onApplyFontSize={handleApplyFontSize}
+        onFontSizeStep={handleFontSizeStep}
+        onSetTextAlign={(alignment) => editor?.chain().focus().setTextAlign(alignment).run()}
+        onToggleBulletList={() => editor?.chain().focus().toggleBulletList().run()}
+        onToggleOrderedList={() => editor?.chain().focus().toggleOrderedList().run()}
+        onUndo={() => editor?.chain().focus().undo().run()}
+        onRedo={() => editor?.chain().focus().redo().run()}
+        onInsertPageBreak={() => editor?.chain().focus().insertContent({ type: 'pageBreak' }).run()}
+      />
 
       {}
       <div className="flex-1 flex flex-row min-h-0 w-full overflow-hidden">
 
-        {}
-        <div className="w-56 bg-slate-50 border-r border-slate-300 flex flex-col min-h-0 select-none no-print shrink-0">
-          <div className="p-3 bg-slate-100 border-b border-slate-250 flex items-center justify-between text-left">
-            <span className="text-[10px] font-black uppercase text-slate-700 tracking-wider">
-              Navigasi Halaman
-            </span>
-            <span className="text-[10px] font-bold text-slate-500 bg-slate-200 px-1.5 py-0.5">
-              {totalPages} Hlm
-            </span>
-          </div>
+        <ArticlePreviewPageNavigator
+          totalPages={totalPages}
+          activePage={activePage}
+          onScrollToPage={handleScrollToPage}
+        />
 
-          <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4 custom-scrollbar">
-            {Array.from({ length: totalPages }).map((_, idx) => {
-              const isCurrent = activePage === idx;
-              return (
-                <div
-                  key={idx}
-                  onClick={() => handleScrollToPage(idx)}
-                  className={`flex flex-col items-center gap-1.5 cursor-pointer p-1.5 transition-all group ${isCurrent ? 'bg-teal-50/50 border border-teal-600 shadow-2xs' : 'border border-transparent hover:bg-slate-200/50'
-                    }`}
-                >
-                  <div className={`w-28 h-36 bg-white shadow-xs border ${isCurrent ? 'border-teal-600' : 'border-slate-300 group-hover:border-slate-400'
-                    } flex flex-col justify-between p-2 relative overflow-hidden transition-colors`}>
-                    <div className="space-y-1.5 opacity-30 select-none">
-                      <div className="h-1.5 bg-slate-600 w-3/4" />
-                      <div className="h-1 bg-slate-400 w-full" />
-                      <div className="h-1 bg-slate-400 w-full" />
-                      <div className="h-1 bg-slate-400 w-5/6" />
-                      <div className="pt-2 space-y-1">
-                        <div className="h-1 bg-slate-400 w-full" />
-                        <div className="h-1 bg-slate-400 w-2/3" />
-                      </div>
-                    </div>
-                    <span className={`text-[8px] font-black text-right self-end mt-auto transition-colors ${isCurrent ? 'text-teal-700' : 'text-slate-400'
-                      }`}>
-                      Hal {idx + 1}
-                    </span>
-                  </div>
-                  <span className={`text-[10px] font-bold transition-colors ${isCurrent ? 'text-teal-800' : 'text-slate-655 group-hover:text-slate-900'
-                    }`}>
-                    Halaman {idx + 1}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {}
-        <div
-          id="editor-scroll-container"
+        <ArticlePreviewCanvas
+          editor={editor}
+          lineSpacing={lineSpacing}
+          marginCm={marginCm}
+          activeTableElement={activeTableElement}
           onScroll={handleScroll}
-          className="flex-1 overflow-y-auto bg-slate-200/40 p-8 flex justify-center w-full min-h-150 select-text scroll-smooth"
-        >
-          <div className="relative h-fit mb-12">
-            <style>{`
-              .page {
-                background-color: transparent !important;
-                border: none !important;
-                box-shadow: none !important;
-                box-sizing: border-box !important;
-                margin-bottom: 0px !important;
-              }
-              .rm-pages-wrapper {
-                background: transparent !important;
-              }
-              /* Injeksi spasi line-spacing dan gaya dasar ke ProseMirror (WYSIWYG 1:1 Backend PDF) */
-              .ProseMirror.rm-with-pagination {
-                background-color: white !important;
-                box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
-                border: 1px solid #cbd5e1 !important;
-                box-sizing: border-box !important;
-                line-height: ${lineSpacing} !important;
-              }
-              .ProseMirror {
-                outline: none !important;
-              }
-              .ProseMirror p {
-                line-height: ${lineSpacing} !important;
-              }
-
-              /* CSS Tabel untuk Editor Frontend */
-              .ProseMirror table {
-                border-collapse: collapse;
-                table-layout: fixed;
-                width: 100%;
-                margin: 0;
-                overflow: hidden;
-              }
-              .ProseMirror td,
-              .ProseMirror th {
-                min-width: 1em;
-                border: 1px solid #cbd5e1;
-                padding: 6px 10px;
-                vertical-align: top;
-                box-sizing: border-box;
-                position: relative;
-              }
-              .ProseMirror th {
-                font-weight: bold;
-                text-align: left;
-                background-color: #f8fafc;
-              }
-              .ProseMirror .column-resize-handle {
-                position: absolute;
-                right: -2px;
-                top: 0;
-                bottom: -2px;
-                width: 4px;
-                background-color: #0d9488;
-                pointer-events: none;
-              }
-
-              .page-break-gap {
-                height: 20px;
-                background-color: #f1f5f9 !important;
-                border-top: 1px solid #cbd5e1;
-                border-bottom: 1px solid #cbd5e1;
-                margin-top: 20px;
-                margin-bottom: 20px;
-                margin-left: -${marginCm}cm !important;
-                margin-right: -${marginCm}cm !important;
-                position: relative;
-                pointer-events: none;
-                display: block;
-              }
-              .page-break-gap::after {
-                content: 'POTONGAN HALAMAN (PDF BREAK)';
-                position: absolute;
-                left: 50%;
-                top: 50%;
-                transform: translate(-50%, -50%);
-                font-size: 7px;
-                font-family: 'Roboto', sans-serif;
-                font-weight: 900;
-                color: #64748b;
-                letter-spacing: 0.15em;
-                background-color: #f1f5f9;
-                padding: 1px 8px;
-              }
-            `}</style>
-
-            <div
-              id="virtual-a4-page"
-              className="text-slate-800 text-justify prose max-w-none prose-slate prose-xs focus:outline-none transition-all"
-              style={{
-                width: '794px',
-                background: 'transparent',
-                border: 'none',
-                boxShadow: 'none',
-                padding: 0,
-
-                fontFamily: FONT_FAMILY_MAP[fontFamily],
-                fontSize: fontFamily === 'Times New Roman' ? '11pt' : fontFamily === 'Verdana' ? '10pt' : '11pt',
-
-                ['--rm-margin-left' as any]: `${Math.round(marginCm * (96 / 2.54))}px`,
-                ['--rm-margin-right' as any]: `${Math.round(marginCm * (96 / 2.54))}px`,
-                ['--rm-margin-top' as any]: `${Math.round(marginCm * (96 / 2.54))}px`,
-                ['--rm-margin-bottom' as any]: `${Math.round(marginCm * (96 / 2.54))}px`,
-              }}
-            >
-              <EditorContent editor={editor} className="h-full focus:outline-none text-slate-800" />
-            </div>
-          </div>
-        </div>
+          onStartTableResize={startTableResize}
+          isSaving={isSaving}
+          isPrinting={isPrinting}
+          isDirty={isDirty}
+          onSaveAndBack={handleSaveAndBack}
+          onPrint={handlePrint}
+          fontSize={fontSize}
+          fontFamily={fontFamily}
+        />
 
       </div>
     </div>
@@ -6501,11 +7604,11 @@ export const DeviationSummaryCard: React.FC<DeviationSummaryCardProps> = ({
           </span>
         </div>
 
-        <span className={`self-start sm:self-auto px-3.5 py-1.5 text-xs font-bold uppercase tracking-wider rounded-none inline-flex items-center gap-1.5 border ${urgencyStatus === 'KRITIS'
-          ? 'bg-red-50 text-red-800 border-red-300'
+        <span className={`self-start sm:self-auto px-3.5 py-1.5 text-xs font-bold uppercase tracking-wider rounded-none inline-flex items-center gap-1.5 ${urgencyStatus === 'KRITIS'
+          ? 'text-red-800'
           : urgencyStatus === 'WASPADA'
-            ? 'bg-amber-50 text-amber-900 border-amber-300'
-            : 'bg-emerald-50 text-emerald-900 border-emerald-300'
+            ? 'text-amber-900'
+            : 'text-emerald-900'
           }`}>
           {urgencyStatus === 'KRITIS' && <AlertCircle size={14} className="text-red-700" />}
           {urgencyStatus === 'WASPADA' && <AlertTriangle size={14} className="text-amber-700" />}
@@ -6750,12 +7853,12 @@ export const RecommendationList: React.FC<RecommendationListProps> = ({
                   </div>
                 </td>
                 <td className="py-3 px-3 text-center">
-                  <span className={`inline-block px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-none border ${
+                  <span className={`inline-block px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-none ${
                     item.priority === 'TINGGI'
-                      ? 'bg-red-50 text-red-700 border-red-200'
+                      ? 'text-red-700'
                       : item.priority === 'SEDANG'
-                      ? 'bg-amber-50 text-amber-800 border-amber-200'
-                      : 'bg-slate-100 text-slate-700 border-slate-300'
+                      ? 'text-amber-800'
+                      : 'text-slate-700'
                   }`}>
                     {item.priority}
                   </span>
@@ -7290,7 +8393,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
                   Pilih Dokumen Acuan yang Akan Dianalisis
                 </h2>
               </div>
-              <span className="text-xs font-bold text-teal-800 bg-teal-50 px-2.5 py-0.5 rounded-none">
+              <span className="text-xs font-bold text-teal-800 px-2.5 py-0.5 rounded-none">
                 {selectedDocIds.length} Dokumen Terpilih
               </span>
             </div>
@@ -7448,7 +8551,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
               <button
                 onClick={handleOpenMappingModal}
                 disabled={isComparing || selectedDocIds.length === 0}
-                className="px-5 py-2.5 bg-teal-700 hover:bg-teal-800 disabled:bg-slate-300 text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-2 border border-teal-900 shadow-sm cursor-pointer transition-colors"
+                className="px-5 py-2.5 bg-teal-700 hover:bg-teal-800 disabled:bg-white text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-2 cursor-pointer transition-colors"
               >
                 {isComparing ? (
                   <Loader2 size={16} className="animate-spin" />
@@ -15348,15 +16451,6 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
             <span>Unggah Dokumen Acuan Baru</span>
           </button>
 
-          {onNavigateToDashboard && (
-            <button
-              onClick={onNavigateToDashboard}
-              className="px-3.5 py-2 bg-white hover:bg-slate-100 text-slate-700 text-xs font-semibold rounded-none border border-slate-300 flex items-center gap-2 cursor-pointer transition-colors"
-            >
-              <ArrowLeft size={14} />
-              <span>Dashboard</span>
-            </button>
-          )}
         </div>
       </div>
 
@@ -15494,10 +16588,10 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                   const isMedium = urgencyStr.includes('SEDANG') || urgencyStr.includes('MENENGAH');
 
                   const bgClass = isHigh
-                    ? 'bg-red-50 text-red-800 border border-red-200'
+                    ? 'text-red-800'
                     : isMedium
-                      ? 'bg-amber-50 text-amber-800 border border-amber-200'
-                      : 'bg-emerald-50 text-emerald-800 border border-emerald-200';
+                      ? 'text-amber-800'
+                      : 'text-emerald-800';
 
                   return (
                     <span className={`px-3 py-1 text-xs font-bold uppercase rounded-none flex items-center gap-1.5 shrink-0 self-start ${bgClass}`}>
@@ -16144,6 +17238,7 @@ export const AiAssistantService = {
     id: string;
     title: string;
     documentId: string;
+    documentIds?: string[];
     documentTitle: string;
     createdAt: string;
     updatedAt: string;

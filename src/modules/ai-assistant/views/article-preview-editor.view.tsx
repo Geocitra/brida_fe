@@ -311,7 +311,8 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
       handlePaste: (view, event) => {
         const items = event.clipboardData?.items;
         if (items) {
-          for (const item of items) {
+          for (let i = 0; i < items.length; i++) {
+            const item = items[i];
             if (item.type.indexOf('image') === 0) {
               const file = item.getAsFile();
               if (file) {
