@@ -60,6 +60,19 @@ export class MarkupConverter {
         });
 
         /**
+         * ATURAN KUSTOM: Hapus AutoPageSpacer saat konversi HTML -> Markdown
+         */
+        service.addRule('autoPageSpacerRule', {
+            filter: (node: HTMLElement) => {
+                return (
+                    node.getAttribute('data-auto-page-spacer') !== null ||
+                    node.classList.contains('no-print') && node.hasAttribute('data-auto-page-spacer')
+                );
+            },
+            replacement: () => '',
+        });
+
+        /**
          * ATURAN KUSTOM 1 [Protected Variations]: Perataan Paragraf (Text Alignment)
          * Mengonversi elemen HTML TipTap yang memiliki inline style (seperti style="text-align: justify")
          * menjadi tag kontainer CommonMark standar (<div align="justify">) agar aman dibaca database & AI.

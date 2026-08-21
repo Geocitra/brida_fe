@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import type { Editor } from '@tiptap/react';
 import {
     Loader2,
@@ -16,8 +16,17 @@ import {
     Undo,
     Redo,
     LayoutGrid,
+    Image as ImageIcon,
+    ZoomIn,
+    ZoomOut,
 } from 'lucide-react';
 import type { FontFamilyKey } from '../../store/useEditorStore';
+
+const ZOOM_PRESETS = [0.5, 0.75, 0.9, 1.0, 1.25, 1.5, 2.0];
+const ZOOM_LABELS: Record<number, string> = {
+    0.5: '50%', 0.75: '75%', 0.9: '90%', 1.0: '100%',
+    1.25: '125%', 1.5: '150%', 2.0: '200%',
+};
 
 interface ArticlePreviewEditorHeaderProps {
     editor: Editor | null;
@@ -30,6 +39,7 @@ interface ArticlePreviewEditorHeaderProps {
     fontSize: string;
     lineSpacing: number;
     fontSizePresets: number[];
+    zoomLevel: number;
     onSaveAndBack: () => void;
     onPrint: () => void;
     onFontFamilyChange: (value: FontFamilyKey) => void;
@@ -42,6 +52,8 @@ interface ArticlePreviewEditorHeaderProps {
     onUndo: () => void;
     onRedo: () => void;
     onInsertPageBreak: () => void;
+    onInsertImage: (file: File) => void;
+    onZoomChange: (level: number) => void;
 }
 
 export const ArticlePreviewEditorHeader: React.FC<ArticlePreviewEditorHeaderProps> = ({
@@ -55,6 +67,7 @@ export const ArticlePreviewEditorHeader: React.FC<ArticlePreviewEditorHeaderProp
     fontSize,
     lineSpacing,
     fontSizePresets,
+    zoomLevel,
     onSaveAndBack,
     onPrint,
     onFontFamilyChange,
@@ -67,9 +80,28 @@ export const ArticlePreviewEditorHeader: React.FC<ArticlePreviewEditorHeaderProp
     onUndo,
     onRedo,
     onInsertPageBreak,
+    onInsertImage,
+    onZoomChange,
 }) => {
+    const zoomOut = () => {
+        const idx = ZOOM_PRESETS.indexOf(zoomLevel);
+        if (idx > 0) onZoomChange(ZOOM_PRESETS[idx - 1]);
+    };
+    const zoomIn = () => {
+        const idx = ZOOM_PRESETS.indexOf(zoomLevel);
+        if (idx < ZOOM_PRESETS.length - 1) onZoomChange(ZOOM_PRESETS[idx + 1]);
+    };
+    const fileInputRef = useRef<HTMLInputElement>(null);
     const currentFontSize = parseInt(fontSize, 10);
     const isFontSizePreset = fontSizePresets.includes(currentFontSize);
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            onInsertImage(file);
+            e.target.value = '';
+        }
+    };
 
     return (
         <div className="bg-white border-b border-slate-350 flex flex-col shrink-0 no-print z-20 shadow-xs">
@@ -278,6 +310,59 @@ export const ArticlePreviewEditorHeader: React.FC<ArticlePreviewEditorHeaderProp
                         <LayoutGrid size={12} className="text-teal-700" />
                         <span className="text-[9px] font-black text-slate-500 uppercase tracking-wider">Potong Halaman</span>
                     </button>
+
+                    <div className="w-px h-3.5 bg-slate-300 mx-0.5" />
+
+                    {/* ===== ZOOM CONTROLS ===== */}
+                    <div className="flex items-center gap-0.5">
+                        <button
+                            type="button"
+                            onClick={zoomOut}
+                            disabled={zoomLevel <= ZOOM_PRESETS[0]}
+                            className="flex items-center justify-center w-6 h-6 border border-slate-300 bg-white hover:bg-slate-100 disabled:opacity-30 cursor-pointer transition-colors"
+                            title="Perkecil tampilan (Zoom Out)"
+                        >
+                            <ZoomOut size={11} className="text-slate-600" />
+                        </button>
+                        <select
+                            value={zoomLevel}
+                            onChange={(e) => onZoomChange(parseFloat(e.target.value))}
+                            className="h-6 bg-white border-t border-b border-slate-300 text-[10px] font-bold px-1 focus:outline-none focus:border-teal-600 w-14 text-center cursor-pointer"
+                        >
+                            {ZOOM_PRESETS.map((z) => (
+                                <option key={z} value={z}>{ZOOM_LABELS[z]}</option>
+                            ))}
+                        </select>
+                        <button
+                            type="button"
+                            onClick={zoomIn}
+                            disabled={zoomLevel >= ZOOM_PRESETS[ZOOM_PRESETS.length - 1]}
+                            className="flex items-center justify-center w-6 h-6 border border-slate-300 bg-white hover:bg-slate-100 disabled:opacity-30 cursor-pointer transition-colors"
+                            title="Perbesar tampilan (Zoom In)"
+                        >
+                            <ZoomIn size={11} className="text-slate-600" />
+                        </button>
+                    </div>
+
+                    <div className="w-px h-3.5 bg-slate-300 mx-0.5" />
+
+                    <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={isSaving || isPrinting}
+                        className="p-1.5 hover:bg-slate-200 text-slate-700 transition-colors cursor-pointer inline-flex items-center gap-1 rounded-none border border-transparent hover:border-slate-300 disabled:opacity-50"
+                        title="Sisipkan Berkas Gambar dari Komputer"
+                    >
+                        <ImageIcon size={12} className="text-teal-700" />
+                        <span className="text-[9px] font-black text-slate-500 uppercase tracking-wider">Sisipkan Gambar</span>
+                    </button>
+                    <input
+                        type="file"
+                        ref={fileInputRef}
+                        accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
+                        onChange={handleFileChange}
+                        className="hidden"
+                    />
                 </div>
             </div>
         </div>

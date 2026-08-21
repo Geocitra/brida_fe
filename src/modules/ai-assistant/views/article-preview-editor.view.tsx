@@ -6,6 +6,7 @@ import TextAlign from '@tiptap/extension-text-align';
 import { TextStyle } from '@tiptap/extension-text-style';
 import { FontFamily } from '@tiptap/extension-font-family';
 import { ResizableImage } from '../components/article-preview-editor/resizable-image.extension';
+import { AutoPageSpacer } from '../components/article-preview-editor/auto-page-spacer.extension';
 
 // --- Ekstensi Tabel Baru ---
 import { Table } from '@tiptap/extension-table';
@@ -15,9 +16,6 @@ import { TableCell } from '@tiptap/extension-table-cell';
 
 // --- Ekstensi Sitasi URL Interaktif ---
 import { CitationUrlNode } from '../components/article-preview-editor/citation-url.extension';
-
-// @ts-ignore
-import { PaginationPlus } from 'tiptap-pagination-plus';
 
 import { AiAssistantService } from '../../../services/ai-assistant.service';
 import type { ArticleSessionDetail } from '../../../services/ai-assistant.service';
@@ -102,8 +100,7 @@ const PageBreakExtension = Node.create({
       'div',
       mergeAttributes(HTMLAttributes, {
         'data-type': 'page-break',
-        class: 'page-break-gap no-print',
-        style: 'page-break-after: always;',
+        class: 'page-break-indicator no-print',
       }),
     ];
   },
@@ -164,17 +161,8 @@ const TIPTAP_EXTENSIONS = [
   TabKeyExtension,
   // --- Ekstensi Gambar Baru ---
   ResizableImage,
-  // ------------------------------
-  PaginationPlus.configure({
-    pageHeight: 1123,
-    pageWidth: 794,
-    pageGap: 24,
-    pageBreakBackground: '#f1f5f9',
-    marginTop: 94,
-    marginBottom: 94,
-    marginLeft: 94,
-    marginRight: 94,
-  }),
+  // --- Injeksi Ekstensi Auto Page Spacer ---
+  AutoPageSpacer,
 ];
 
 export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> = ({
@@ -200,11 +188,13 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [isPrinting, setIsPrinting] = useState<boolean>(false);
+  const [isUploadingMedia, setIsUploadingMedia] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const loadedSessionIdRef = useRef<string | null>(null);
 
   const [totalPages, setTotalPages] = useState<number>(1);
   const [activePage, setActivePage] = useState<number>(0);
+  const lastPageCountRef = useRef<number>(1);
   const [activeTableElement, setActiveTableElement] = useState<HTMLTableElement | null>(null);
   const [tableResizeState, setTableResizeState] = useState<{
     mode: 'column' | 'row';
@@ -214,6 +204,30 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
     initialValue: number;
     tableElement: HTMLTableElement;
   } | null>(null);
+  const [zoomLevel, setZoomLevel] = useState<number>(1.0);
+
+  // Dipanggil oleh ArticlePreviewCanvas setiap kali tinggi konten berubah
+  const handlePageCountChange = useCallback((count: number) => {
+    if (count !== lastPageCountRef.current) {
+      lastPageCountRef.current = count;
+      setTotalPages(count);
+    }
+  }, []);
+
+  // Update activePage saat user menggulir dokumen
+  const handleScroll = useCallback((event: React.UIEvent<HTMLDivElement>) => {
+    const scrollTop = event.currentTarget.scrollTop;
+    const page = Math.floor(scrollTop / (1123 * zoomLevel));
+    setActivePage(Math.max(0, page));
+  }, [zoomLevel]);
+
+  // Gulir ke halaman tertentu saat user klik thumbnail di navigator
+  const handleScrollToPage = useCallback((pageIdx: number) => {
+    const container = document.getElementById('editor-scroll-container');
+    if (!container) return;
+    container.scrollTo({ top: pageIdx * 1123 * zoomLevel, behavior: 'smooth' });
+    setActivePage(pageIdx);
+  }, [zoomLevel]);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -297,35 +311,37 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
           } else {
             setActiveTableElement(null);
           }
-
-          if (isTableClick || isResizeHandle) {
-            try {
-              (view as any).editor.commands.disablePagination();
-            } catch (e) {
-              console.warn('[Pagination Freeze] Gagal menonaktifkan pagination:', e);
-            }
-          }
           return false;
         }
       },
       handlePaste: (view, event) => {
         const items = event.clipboardData?.items;
-        if (items) {
+        if (items && sessionId) {
           for (let i = 0; i < items.length; i++) {
             const item = items[i];
             if (item.type.indexOf('image') === 0) {
               const file = item.getAsFile();
               if (file) {
-                const reader = new FileReader();
-                reader.onload = (readerEvent) => {
-                  const base64 = readerEvent.target?.result as string;
-                  const { schema } = view.state;
-                  const node = schema.nodes.image.create({ src: base64 });
-                  const transaction = view.state.tr.replaceSelectionWith(node);
-                  view.dispatch(transaction);
-                };
-                reader.readAsDataURL(file);
                 event.preventDefault();
+                setIsUploadingMedia(true);
+                showToast('⏳ Mengunggah berkas gambar ke server...');
+
+                AiAssistantService.uploadEditorMedia(sessionId, file)
+                  .then((mediaData) => {
+                    const { schema } = view.state;
+                    const node = schema.nodes.image.create({ src: mediaData.url });
+                    const transaction = view.state.tr.replaceSelectionWith(node);
+                    view.dispatch(transaction);
+                    showToast('✅ Gambar berhasil disematkan!');
+                  })
+                  .catch((err) => {
+                    console.error('Gagal mengunggah media:', err);
+                    showToast(`⚠️ Gagal mengunggah gambar: ${err.message}`);
+                  })
+                  .finally(() => {
+                    setIsUploadingMedia(false);
+                  });
+
                 return true;
               }
             }
@@ -334,22 +350,31 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
         return false;
       },
       handleDrop: (view, event, slice, moved) => {
-        if (!moved && event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files.length > 0) {
+        if (!moved && event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files.length > 0 && sessionId) {
           const file = event.dataTransfer.files[0];
           if (file.type.startsWith('image/')) {
-            const reader = new FileReader();
-            reader.onload = (readerEvent) => {
-              const base64 = readerEvent.target?.result as string;
-              const { schema } = view.state;
-              const coordinates = view.posAtCoords({ left: event.clientX, top: event.clientY });
-              if (coordinates) {
-                const node = schema.nodes.image.create({ src: base64 });
-                const transaction = view.state.tr.insert(coordinates.pos, node);
-                view.dispatch(transaction);
-              }
-            };
-            reader.readAsDataURL(file);
             event.preventDefault();
+            const coordinates = view.posAtCoords({ left: event.clientX, top: event.clientY });
+            setIsUploadingMedia(true);
+            showToast('⏳ Mengunggah berkas gambar ke server...');
+
+            AiAssistantService.uploadEditorMedia(sessionId, file)
+              .then((mediaData) => {
+                const { schema } = view.state;
+                const node = schema.nodes.image.create({ src: mediaData.url });
+                const pos = coordinates ? coordinates.pos : view.state.selection.from;
+                const transaction = view.state.tr.insert(pos, node);
+                view.dispatch(transaction);
+                showToast('✅ Gambar berhasil disematkan!');
+              })
+              .catch((err) => {
+                console.error('Gagal mengunggah media:', err);
+                showToast(`⚠️ Gagal mengunggah gambar: ${err.message}`);
+              })
+              .finally(() => {
+                setIsUploadingMedia(false);
+              });
+
             return true;
           }
         }
@@ -382,30 +407,11 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
     },
   });
 
-  useEffect(() => {
-    const el = document.getElementById('virtual-a4-page');
-    if (!el) return;
-
-    const observer = new ResizeObserver(() => {
-      const pageCount = el.querySelectorAll('.page').length;
-      const nextPages = Math.max(1, pageCount);
-      setTotalPages((prev) => (prev !== nextPages ? nextPages : prev));
-    });
-
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [editor, isLoading]);
+  // --- updatePages sekarang dikelola oleh onPageCountChange callback dari Canvas ---
+  // (tidak perlu useEffect terpisah di sini)
 
   useEffect(() => {
     const handleGlobalMouseUp = () => {
-      if (editor && !editor.isDestroyed) {
-        try {
-          editor.commands.enablePagination();
-        } catch (e) {
-          // Abaikan jika command belum siap
-        }
-      }
-
       if (tableResizeState && editor && !editor.isDestroyed) {
         const nextHtml = editor.view.dom.innerHTML;
         editor.commands.setContent(nextHtml, { emitUpdate: true });
@@ -457,54 +463,8 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
     return () => observer.disconnect();
   }, [activeTableElement]);
 
-  // =================================================================
-  // PERBAIKAN MARGIN: SINKRONISASI TIPTAP (ANTI INFINITE LOOP)
-  // =================================================================
-  useEffect(() => {
-    if (editor && !editor.isDestroyed) {
-      try {
-        const px = Math.round(marginCm * (96 / 2.54));
 
-        // 1. Mutasi ke opsi plugin internal agar algoritma matematika pagination sinkron dengan CSS
-        const paginationExt = editor.extensionManager.extensions.find(e => e.name === 'pagination');
-        if (paginationExt) {
-          paginationExt.options.marginTop = px;
-          paginationExt.options.marginBottom = px;
-          paginationExt.options.marginLeft = px;
-          paginationExt.options.marginRight = px;
-        }
 
-        // 2. Pancing reflow ProseMirror secara natural tanpa setMeta yang memicu infinite loop
-        setTimeout(() => {
-          if (editor && !editor.isDestroyed) {
-            // Ini akan memicu evaluasi ulang batas halaman secara aman
-            editor.view.dispatch(editor.state.tr);
-          }
-        }, 50);
-      } catch (err) {
-        console.error('Gagal memperbarui margin Tiptap:', err);
-      }
-    }
-  }, [editor, marginCm]);
-
-  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
-    const scrollTop = e.currentTarget.scrollTop;
-    const computedPageHeight = 1122;
-    const currentPage = Math.floor((scrollTop + computedPageHeight / 2) / computedPageHeight);
-    setActivePage(Math.min(totalPages - 1, Math.max(0, currentPage)));
-  };
-
-  const handleScrollToPage = (pageIdx: number) => {
-    const scrollContainer = document.getElementById('editor-scroll-container');
-    if (scrollContainer) {
-      const computedPageHeight = 1122;
-      scrollContainer.scrollTo({
-        top: pageIdx * computedPageHeight,
-        behavior: 'smooth',
-      });
-      setActivePage(pageIdx);
-    }
-  };
 
   useEffect(() => {
     if (!sessionId) {
@@ -519,7 +479,12 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
         const session = await AiAssistantService.getArticleSession(sessionId);
         setActiveSession(session);
 
-        const htmlContent = MarkupConverter.toHTML(session.fullArticleText || '');
+        // Jika naskah sudah memiliki representasi visual editorial (editorDocumentState), gunakan langsung.
+        // Jika sesi lama/baru pertama kali dibuka, kompilasi sekali dari fullArticleText via MarkupConverter.toHTML.
+        const htmlContent = session.editorDocumentState && session.editorDocumentState.trim().length > 0
+          ? session.editorDocumentState
+          : MarkupConverter.toHTML(session.fullArticleText || '');
+
         initSession(sessionId, session.articleTitle || session.title || '', htmlContent);
       } catch (err: any) {
         console.error('Gagal memuat sesi artikel:', err);
@@ -551,16 +516,21 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
   const handleSaveAndBack = async () => {
     if (!sessionId || !editor || isSaving) return;
 
+    if (isUploadingMedia) {
+      showToast('⏳ Mohon tunggu sampai proses unggah gambar selesai...');
+      return;
+    }
+
     if (!isDirty) {
       onBack();
       return;
     }
 
     setIsSaving(true);
-    showToast('⏳ Menyinkronkan perubahan naskah ke database...');
+    showToast('⏳ Menyinkronkan naskah visual ke database...');
     try {
-      const markdownContent = MarkupConverter.toMarkdown(editor.getHTML());
-      await AiAssistantService.updateArticleSessionContent(sessionId, articleTitle, markdownContent);
+      const editorStateHtml = editor.getHTML();
+      await AiAssistantService.updateArticleSessionContent(sessionId, articleTitle, editorStateHtml);
       markSaved();
       onBack();
     } catch (err: any) {
@@ -577,13 +547,19 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
       showToast('⚠️ Tidak ada naskah untuk dicetak.');
       return;
     }
+
+    if (isUploadingMedia) {
+      showToast('⏳ Mohon tunggu sampai proses unggah gambar selesai...');
+      return;
+    }
+
     setIsPrinting(true);
 
     if (isDirty && sessionId) {
       showToast('⏳ Menyimpan draf ke database sebelum mencetak...');
       try {
-        const markdownContent = MarkupConverter.toMarkdown(editor.getHTML());
-        await AiAssistantService.updateArticleSessionContent(sessionId, articleTitle, markdownContent);
+        const editorStateHtml = editor.getHTML();
+        await AiAssistantService.updateArticleSessionContent(sessionId, articleTitle, editorStateHtml);
         markSaved();
       } catch (e) {
         showToast('⚠️ Gagal menyimpan ke server. Tetap mencetak PDF dari versi layar...');
@@ -658,6 +634,29 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
     }
   }, [editor, setFormatting]);
 
+  const handleInsertImage = useCallback((file: File) => {
+    if (!sessionId || !editor || editor.isDestroyed) {
+      showToast('⚠️ Editor belum siap untuk menyisipkan gambar.');
+      return;
+    }
+
+    setIsUploadingMedia(true);
+    showToast('⏳ Mengunggah berkas gambar ke server...');
+
+    AiAssistantService.uploadEditorMedia(sessionId, file)
+      .then((mediaData) => {
+        editor.chain().focus().setImage({ src: mediaData.url }).run();
+        showToast('✅ Gambar berhasil disematkan ke naskah!');
+      })
+      .catch((err: any) => {
+        console.error('Gagal mengunggah gambar via toolbar:', err);
+        showToast(`⚠️ Gagal mengunggah gambar: ${err.message}`);
+      })
+      .finally(() => {
+        setIsUploadingMedia(false);
+      });
+  }, [sessionId, editor]);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-96 font-roboto bg-slate-50/50 border border-slate-300">
@@ -701,7 +700,7 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
 
       <ArticlePreviewEditorHeader
         editor={editor}
-        isSaving={isSaving}
+        isSaving={isSaving || isUploadingMedia}
         isPrinting={isPrinting}
         isDirty={isDirty}
         articleTitle={articleTitle}
@@ -710,6 +709,7 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
         fontSize={fontSize}
         lineSpacing={lineSpacing}
         fontSizePresets={FONT_SIZE_PRESETS}
+        zoomLevel={zoomLevel}
         onSaveAndBack={handleSaveAndBack}
         onPrint={handlePrint}
         onFontFamilyChange={handleFontFamilyChange}
@@ -722,6 +722,8 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
         onUndo={() => editor?.chain().focus().undo().run()}
         onRedo={() => editor?.chain().focus().redo().run()}
         onInsertPageBreak={() => editor?.chain().focus().insertContent({ type: 'pageBreak' }).run()}
+        onInsertImage={handleInsertImage}
+        onZoomChange={setZoomLevel}
       />
 
       {/* MAIN WORKSPACE SPLIT CONTAINER */}
@@ -740,13 +742,15 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
           activeTableElement={activeTableElement}
           onScroll={handleScroll}
           onStartTableResize={startTableResize}
-          isSaving={isSaving}
+          isSaving={isSaving || isUploadingMedia}
           isPrinting={isPrinting}
           isDirty={isDirty}
           onSaveAndBack={handleSaveAndBack}
           onPrint={handlePrint}
           fontSize={fontSize}
           fontFamily={fontFamily}
+          zoomLevel={zoomLevel}
+          onPageCountChange={handlePageCountChange}
         />
 
       </div>

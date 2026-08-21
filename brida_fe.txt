@@ -197,6 +197,14 @@ import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
+  server: {
+    proxy: {
+      '/uploads': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+      },
+    },
+  },
   plugins: [
     react(),
     tailwindcss(),
@@ -4411,27 +4419,12 @@ export const ArticlePreviewCanvas: React.FC<ArticlePreviewCanvasProps> = ({
         >
             <div className="relative h-fit mb-12">
                 <style>{`
-          .page {
-            background-color: transparent !important;
-            border: none !important;
-            box-shadow: none !important;
-            box-sizing: border-box !important;
-            margin-bottom: 0px !important;
-          }
-          .rm-pages-wrapper {
-            background: transparent !important;
-          }
-          .ProseMirror.rm-with-pagination {
-            background-color: white !important;
-            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
-            border: 1px solid #cbd5e1 !important;
-            box-sizing: border-box !important;
-            line-height: ${lineSpacing} !important;
-          }
           .ProseMirror {
             outline: none !important;
             white-space: pre-wrap !important;
             tab-size: 48px !important;
+            min-height: calc(1123px - ${marginCm * 2}cm);
+            line-height: ${lineSpacing} !important;
           }
           .ProseMirror p {
             line-height: ${lineSpacing} !important;
@@ -4501,54 +4494,46 @@ export const ArticlePreviewCanvas: React.FC<ArticlePreviewCanvasProps> = ({
           }
           .ProseMirror img {
             max-width: 100% !important;
+            max-height: 850px !important;
             height: auto !important;
-            display: block !important;
-            margin: 16px auto !important;
           }
-          .page-break-gap {
-            height: 20px;
-            background-color: #f1f5f9 !important;
-            border-top: 1px solid #cbd5e1;
-            border-bottom: 1px solid #cbd5e1;
-            margin-top: 20px;
-            margin-bottom: 20px;
-            margin-left: -${marginCm}cm !important;
-            margin-right: -${marginCm}cm !important;
+          .page-break-indicator {
+            height: 22px;
+            background-color: #f0fdfa !important;
+            border-top: 1px dashed #0d9488;
+            border-bottom: 1px dashed #0d9488;
+            margin-top: 24px;
+            margin-bottom: 24px;
             position: relative;
             pointer-events: none;
-            display: block;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-sizing: border-box;
+            user-select: none;
           }
-          .page-break-gap::after {
-            content: 'POTONGAN HALAMAN (PDF BREAK)';
-            position: absolute;
-            left: 50%;
-            top: 50%;
-            transform: translate(-50%, -50%);
-            font-size: 7px;
+          .page-break-indicator::after {
+            content: '✂️ BATAS HALAMAN CETAK (PAGE BREAK)';
+            font-size: 8px;
             font-family: 'Roboto', sans-serif;
             font-weight: 900;
-            color: #64748b;
+            color: #0f766e;
             letter-spacing: 0.15em;
-            background-color: #f1f5f9;
-            padding: 1px 8px;
+            background-color: #f0fdfa;
+            padding: 0 12px;
           }
         `}</style>
 
                 <div
                     id="virtual-a4-page"
-                    className="text-slate-800 text-left prose max-w-none prose-slate prose-xs focus:outline-none transition-all relative"
+                    className="text-slate-800 text-left prose max-w-none prose-slate prose-xs focus:outline-none transition-all relative bg-white border border-slate-300 shadow-md rounded-none"
                     style={{
                         width: '794px',
-                        background: 'transparent',
-                        border: 'none',
-                        boxShadow: 'none',
-                        padding: 0,
+                        minHeight: '1123px',
+                        padding: `${marginCm}cm`,
+                        boxSizing: 'border-box',
                         fontFamily: `${fontFamily}, sans-serif`,
                         fontSize: `${fontSize}pt`,
-                        ['--rm-margin-left' as any]: `${Math.round(marginCm * (96 / 2.54))}px`,
-                        ['--rm-margin-right' as any]: `${Math.round(marginCm * (96 / 2.54))}px`,
-                        ['--rm-margin-top' as any]: `${Math.round(marginCm * (96 / 2.54))}px`,
-                        ['--rm-margin-bottom' as any]: `${Math.round(marginCm * (96 / 2.54))}px`,
                     }}
                 >
                     <EditorContent editor={editor} className="h-full focus:outline-none text-slate-800" />
@@ -4616,7 +4601,7 @@ export const ArticlePreviewCanvas: React.FC<ArticlePreviewCanvasProps> = ({
 };
 
 --- FILE: src\modules\ai-assistant\components\article-preview-editor\article-preview-editor-header.component.tsx ---
-import React from 'react';
+import React, { useRef } from 'react';
 import type { Editor } from '@tiptap/react';
 import {
     Loader2,
@@ -4634,6 +4619,7 @@ import {
     Undo,
     Redo,
     LayoutGrid,
+    Image as ImageIcon,
 } from 'lucide-react';
 import type { FontFamilyKey } from '../../store/useEditorStore';
 
@@ -4660,6 +4646,7 @@ interface ArticlePreviewEditorHeaderProps {
     onUndo: () => void;
     onRedo: () => void;
     onInsertPageBreak: () => void;
+    onInsertImage: (file: File) => void;
 }
 
 export const ArticlePreviewEditorHeader: React.FC<ArticlePreviewEditorHeaderProps> = ({
@@ -4685,9 +4672,19 @@ export const ArticlePreviewEditorHeader: React.FC<ArticlePreviewEditorHeaderProp
     onUndo,
     onRedo,
     onInsertPageBreak,
+    onInsertImage,
 }) => {
+    const fileInputRef = useRef<HTMLInputElement>(null);
     const currentFontSize = parseInt(fontSize, 10);
     const isFontSizePreset = fontSizePresets.includes(currentFontSize);
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            onInsertImage(file);
+            e.target.value = '';
+        }
+    };
 
     return (
         <div className="bg-white border-b border-slate-350 flex flex-col shrink-0 no-print z-20 shadow-xs">
@@ -4896,6 +4893,26 @@ export const ArticlePreviewEditorHeader: React.FC<ArticlePreviewEditorHeaderProp
                         <LayoutGrid size={12} className="text-teal-700" />
                         <span className="text-[9px] font-black text-slate-500 uppercase tracking-wider">Potong Halaman</span>
                     </button>
+
+                    <div className="w-px h-3.5 bg-slate-300 mx-0.5" />
+
+                    <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={isSaving || isPrinting}
+                        className="p-1.5 hover:bg-slate-200 text-slate-700 transition-colors cursor-pointer inline-flex items-center gap-1 rounded-none border border-transparent hover:border-slate-300 disabled:opacity-50"
+                        title="Sisipkan Berkas Gambar dari Komputer"
+                    >
+                        <ImageIcon size={12} className="text-teal-700" />
+                        <span className="text-[9px] font-black text-slate-500 uppercase tracking-wider">Sisipkan Gambar</span>
+                    </button>
+                    <input
+                        type="file"
+                        ref={fileInputRef}
+                        accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
+                        onChange={handleFileChange}
+                        className="hidden"
+                    />
                 </div>
             </div>
         </div>
@@ -5019,37 +5036,167 @@ export const CitationUrlNode = Node.create({
 
 });
 
---- FILE: src\modules\ai-assistant\components\article-preview-editor\resizable-image.extension.tsx ---
-import React, { useRef, useState } from 'react';
-import { NodeViewWrapper, ReactNodeViewRenderer } from '@tiptap/react';
-import Image from '@tiptap/extension-image';
+--- FILE: src\modules\ai-assistant\components\article-preview-editor\resizable-image.component.tsx ---
+import React, { useRef, useState, useCallback, useEffect } from 'react';
+import { NodeViewWrapper } from '@tiptap/react';
+import type { NodeViewProps } from '@tiptap/react';
+import {
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  Trash2,
+  Subtitles,
+  Check,
+} from 'lucide-react';
 
-export const ResizableImageComponent: React.FC<any> = ({ node, updateAttributes, selected }) => {
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
+
+const getDisplaySrc = (src?: string): string => {
+  if (!src) return '';
+  if (src.startsWith('http://') || src.startsWith('https://') || src.startsWith('data:')) {
+    return src;
+  }
+  const cleanBase = API_BASE_URL.replace(/\/+$/, '');
+  const cleanPath = src.startsWith('/') ? src : `/${src}`;
+  return `${cleanBase}${cleanPath}`;
+};
+
+export type ImageAlignment = 'left' | 'center' | 'right' | 'float-left' | 'float-right';
+
+export const ResizableImageComponent: React.FC<NodeViewProps> = ({
+  node,
+  updateAttributes,
+  selected,
+  deleteNode,
+}) => {
   const imageRef = useRef<HTMLImageElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [isResizing, setIsResizing] = useState(false);
+  const [resizeDimensions, setResizeDimensions] = useState<{ widthPx: number; heightPx: number; widthPct: string } | null>(null);
+  const [isEditingCaption, setIsEditingCaption] = useState(false);
+  const [captionText, setCaptionText] = useState(node.attrs.caption || '');
 
-  const onMouseDown = (event: React.MouseEvent) => {
+  const align: ImageAlignment = node.attrs.align || 'center';
+  const width: string = node.attrs.width || '100%';
+
+  useEffect(() => {
+    setCaptionText(node.attrs.caption || '');
+  }, [node.attrs.caption]);
+
+  const getWrapperStyle = (): React.CSSProperties => {
+    const baseStyle: React.CSSProperties = {
+      width: width,
+      maxWidth: '100%',
+      position: 'relative',
+      userSelect: 'none',
+      contain: 'layout paint style',
+      isolation: 'isolate',
+      boxSizing: 'border-box',
+    };
+
+    switch (align) {
+      case 'float-left':
+        return {
+          ...baseStyle,
+          float: 'left',
+          margin: '8px 24px 12px 0',
+          display: 'inline-block',
+          clear: 'none',
+        };
+      case 'float-right':
+        return {
+          ...baseStyle,
+          float: 'right',
+          margin: '8px 0 12px 24px',
+          display: 'inline-block',
+          clear: 'none',
+        };
+      case 'left':
+        return {
+          ...baseStyle,
+          display: 'block',
+          marginLeft: '0',
+          marginRight: 'auto',
+          marginTop: '16px',
+          marginBottom: '16px',
+          clear: 'both',
+        };
+      case 'right':
+        return {
+          ...baseStyle,
+          display: 'block',
+          marginLeft: 'auto',
+          marginRight: '0',
+          marginTop: '16px',
+          marginBottom: '16px',
+          clear: 'both',
+        };
+      case 'center':
+      default:
+        return {
+          ...baseStyle,
+          display: 'block',
+          marginLeft: 'auto',
+          marginRight: 'auto',
+          marginTop: '16px',
+          marginBottom: '16px',
+          clear: 'both',
+        };
+    }
+  };
+
+  const handleResizeStart = (
+    event: React.MouseEvent,
+    direction: 'se' | 'sw' | 'ne' | 'nw'
+  ) => {
     event.preventDefault();
     event.stopPropagation();
     setIsResizing(true);
 
     const startX = event.clientX;
-    const startWidth = imageRef.current?.getBoundingClientRect().width || 100;
+    const startY = event.clientY;
+    const imgEl = imageRef.current;
+    if (!imgEl) return;
 
-    const parentWidth = imageRef.current?.parentElement?.getBoundingClientRect().width || 1;
+    const startWidth = imgEl.getBoundingClientRect().width;
+    const startHeight = imgEl.getBoundingClientRect().height;
+    const aspectRatio = startHeight / (startWidth || 1);
+
+    const parentWidth = imgEl.closest('.rm-pages-wrapper, .ProseMirror, .page')?.getBoundingClientRect().width
+      || imgEl.parentElement?.getBoundingClientRect().width
+      || 700;
+
+    let finalPct = width;
 
     const onMouseMove = (moveEvent: MouseEvent) => {
       const deltaX = moveEvent.clientX - startX;
-      let newWidth = startWidth + deltaX;
+      let newWidth = startWidth;
 
-      newWidth = Math.max(40, Math.min(newWidth, parentWidth));
+      if (direction === 'se' || direction === 'ne') {
+        newWidth = startWidth + deltaX;
+      } else {
+        newWidth = startWidth - deltaX;
+      }
 
-      const widthPct = `${Math.round((newWidth / parentWidth) * 100)}%`;
-      updateAttributes({ width: widthPct });
+      const clampedWidth = Math.max(50, Math.min(newWidth, parentWidth));
+      const calculatedPct = `${Math.round((clampedWidth / parentWidth) * 100)}%`;
+      finalPct = calculatedPct;
+
+      setResizeDimensions({
+        widthPx: Math.round(clampedWidth),
+        heightPx: Math.round(clampedWidth * aspectRatio),
+        widthPct: calculatedPct,
+      });
+
+      if (containerRef.current) {
+        containerRef.current.style.width = calculatedPct;
+      }
     };
 
     const onMouseUp = () => {
       setIsResizing(false);
+      setResizeDimensions(null);
+      updateAttributes({ width: finalPct });
       document.removeEventListener('mousemove', onMouseMove);
       document.removeEventListener('mouseup', onMouseUp);
     };
@@ -5058,66 +5205,268 @@ export const ResizableImageComponent: React.FC<any> = ({ node, updateAttributes,
     document.addEventListener('mouseup', onMouseUp);
   };
 
+  const handleSetAlign = useCallback((newAlign: ImageAlignment) => {
+    updateAttributes({ align: newAlign });
+  }, [updateAttributes]);
+
+  const handleSetPresetWidth = useCallback((presetPct: string) => {
+    updateAttributes({ width: presetPct });
+  }, [updateAttributes]);
+
+  const handleSaveCaption = () => {
+    updateAttributes({ caption: captionText.trim() });
+    setIsEditingCaption(false);
+  };
+
   return (
     <NodeViewWrapper
-      className={`relative inline-block my-4 mx-auto group ${selected ? 'ring-2 ring-teal-500' : ''}`}
-      style={{
-        width: node.attrs.width || '100%',
-        display: 'block',
-        textAlign: 'center'
-      }}
+      ref={containerRef}
+      className={`relative inline-block group font-roboto ${selected ? 'outline-2 outline-teal-600 outline-offset-2' : ''}`}
+      style={getWrapperStyle()}
     >
+      {}
+      {selected && (
+        <div
+          className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-full mb-1 z-40 bg-slate-900/95 backdrop-blur-xs text-white px-2 py-1 flex items-center gap-1.5 shadow-2xl border border-slate-700 rounded-none no-print select-none animate-in fade-in zoom-in-95 duration-150 pointer-events-auto"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {}
+          <div className="flex items-center gap-0.5 border-r border-slate-700 pr-1.5">
+            <button
+              type="button"
+              onClick={() => handleSetAlign('left')}
+              className={`p-1 transition-colors rounded-none cursor-pointer ${align === 'left' ? 'bg-teal-600 text-white font-bold' : 'text-slate-300 hover:bg-slate-800'}`}
+              title="Rata Kiri (Block)"
+            >
+              <AlignLeft size={13} />
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSetAlign('center')}
+              className={`p-1 transition-colors rounded-none cursor-pointer ${align === 'center' ? 'bg-teal-600 text-white font-bold' : 'text-slate-300 hover:bg-slate-800'}`}
+              title="Rata Tengah (Block)"
+            >
+              <AlignCenter size={13} />
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSetAlign('right')}
+              className={`p-1 transition-colors rounded-none cursor-pointer ${align === 'right' ? 'bg-teal-600 text-white font-bold' : 'text-slate-300 hover:bg-slate-800'}`}
+              title="Rata Kanan (Block)"
+            >
+              <AlignRight size={13} />
+            </button>
+          </div>
+
+          {}
+          <div className="flex items-center gap-0.5 border-r border-slate-700 pr-1.5">
+            <button
+              type="button"
+              onClick={() => handleSetAlign('float-left')}
+              className={`px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider rounded-none cursor-pointer transition-colors ${align === 'float-left' ? 'bg-teal-600 text-white' : 'text-slate-300 hover:bg-slate-800'}`}
+              title="Bungkus Teks di Kanan (Float Kiri)"
+            >
+              Wrap Kiri
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSetAlign('float-right')}
+              className={`px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider rounded-none cursor-pointer transition-colors ${align === 'float-right' ? 'bg-teal-600 text-white' : 'text-slate-300 hover:bg-slate-800'}`}
+              title="Bungkus Teks di Kiri (Float Kanan)"
+            >
+              Wrap Kanan
+            </button>
+          </div>
+
+          {}
+          <div className="flex items-center gap-0.5 border-r border-slate-700 pr-1.5">
+            {['25%', '50%', '75%', '100%'].map((preset) => (
+              <button
+                key={preset}
+                type="button"
+                onClick={() => handleSetPresetWidth(preset)}
+                className={`px-1.5 py-0.5 text-[9px] font-bold rounded-none cursor-pointer transition-colors ${width === preset ? 'bg-teal-700 text-white font-black' : 'text-slate-300 hover:bg-slate-800'}`}
+                title={`Ubah ukuran ke ${preset}`}
+              >
+                {preset}
+              </button>
+            ))}
+          </div>
+
+          {}
+          <div className="flex items-center gap-0.5">
+            <button
+              type="button"
+              onClick={() => setIsEditingCaption((prev) => !prev)}
+              className={`p-1 transition-colors rounded-none cursor-pointer ${node.attrs.caption || isEditingCaption ? 'text-teal-400 bg-slate-800' : 'text-slate-300 hover:bg-slate-800'}`}
+              title="Tambah / Ubah Keterangan Gambar"
+            >
+              <Subtitles size={13} />
+            </button>
+            <button
+              type="button"
+              onClick={() => deleteNode()}
+              className="p-1 text-red-400 hover:bg-red-950 hover:text-red-300 transition-colors rounded-none cursor-pointer"
+              title="Hapus Gambar"
+            >
+              <Trash2 size={13} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {}
+      {isResizing && resizeDimensions && (
+        <div className="absolute top-2 left-2 z-50 bg-slate-950/90 text-teal-400 px-2 py-1 text-[10px] font-mono font-bold tracking-wider border border-teal-500/50 shadow-lg select-none no-print rounded-none">
+          {resizeDimensions.widthPx} × {resizeDimensions.heightPx} px ({resizeDimensions.widthPct})
+        </div>
+      )}
+
+      {}
       <img
         ref={imageRef}
-        src={node.attrs.src}
-        alt={node.attrs.alt}
-        title={node.attrs.title}
+        src={getDisplaySrc(node.attrs.src)}
+        alt={node.attrs.alt || ''}
+        title={node.attrs.title || ''}
+        className="block w-full h-auto select-none transition-all duration-75 object-contain"
         style={{
           width: '100%',
-          height: 'auto',
+          maxHeight: '850px',
           display: 'block',
+          boxSizing: 'border-box',
+        }}
+        onError={(e) => {
+          console.error('[ResizableImage] Gagal memuat gambar dari URL:', node.attrs.src, e);
         }}
       />
+
       {}
-      <div
-        onMouseDown={onMouseDown}
-        className="absolute bottom-1 right-1 w-4 h-4 bg-teal-700 cursor-se-resize flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity border border-white shadow-md rounded-none select-none no-print"
-        style={{ zIndex: 10 }}
-        title="Geser untuk mengubah ukuran gambar"
-      >
-        <svg width="8" height="8" viewBox="0 0 8 8" fill="white">
-          <path d="M6 0h2v8H0V6h6V0z"/>
-        </svg>
-      </div>
+      {selected && (
+        <>
+          {}
+          <div
+            onMouseDown={(e) => handleResizeStart(e, 'nw')}
+            className="absolute top-0 left-0 -translate-x-1/2 -translate-y-1/2 w-3 h-3 bg-teal-700 border border-white shadow-md cursor-nwse-resize z-30 rounded-none no-print hover:scale-125 transition-transform"
+            title="Tarik untuk ubah ukuran"
+          />
+          {}
+          <div
+            onMouseDown={(e) => handleResizeStart(e, 'ne')}
+            className="absolute top-0 right-0 translate-x-1/2 -translate-y-1/2 w-3 h-3 bg-teal-700 border border-white shadow-md cursor-nesw-resize z-30 rounded-none no-print hover:scale-125 transition-transform"
+            title="Tarik untuk ubah ukuran"
+          />
+          {}
+          <div
+            onMouseDown={(e) => handleResizeStart(e, 'sw')}
+            className="absolute bottom-0 left-0 -translate-x-1/2 translate-y-1/2 w-3 h-3 bg-teal-700 border border-white shadow-md cursor-nesw-resize z-30 rounded-none no-print hover:scale-125 transition-transform"
+            title="Tarik untuk ubah ukuran"
+          />
+          {}
+          <div
+            onMouseDown={(e) => handleResizeStart(e, 'se')}
+            className="absolute bottom-0 right-0 translate-x-1/2 translate-y-1/2 w-3 h-3 bg-teal-700 border border-white shadow-md cursor-nwse-resize z-30 rounded-none no-print hover:scale-125 transition-transform"
+            title="Tarik untuk ubah ukuran"
+          />
+        </>
+      )}
+
+      {}
+      {isEditingCaption ? (
+        <div className="mt-1.5 flex items-center gap-1.5 no-print select-none" onClick={(e) => e.stopPropagation()}>
+          <input
+            type="text"
+            value={captionText}
+            onChange={(e) => setCaptionText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleSaveCaption();
+              if (e.key === 'Escape') setIsEditingCaption(false);
+            }}
+            placeholder="Tulis keterangan gambar (e.g. Gambar 1.1)..."
+            className="flex-1 text-[10px] px-2 py-1 bg-white border border-teal-600 focus:outline-none rounded-none text-slate-800 font-medium"
+            autoFocus
+          />
+          <button
+            type="button"
+            onClick={handleSaveCaption}
+            className="p-1 bg-teal-700 text-white rounded-none hover:bg-teal-800 cursor-pointer"
+            title="Simpan Keterangan"
+          >
+            <Check size={12} />
+          </button>
+        </div>
+      ) : (
+        node.attrs.caption && (
+          <figcaption
+            onClick={() => setIsEditingCaption(true)}
+            className="text-center text-[10px] text-slate-500 font-medium italic mt-1.5 cursor-pointer hover:text-teal-700 transition-colors"
+            title="Klik untuk mengedit keterangan"
+          >
+            {node.attrs.caption}
+          </figcaption>
+        )
+      )}
     </NodeViewWrapper>
   );
 };
 
+--- FILE: src\modules\ai-assistant\components\article-preview-editor\resizable-image.extension.ts ---
+import { ReactNodeViewRenderer } from '@tiptap/react';
+import Image from '@tiptap/extension-image';
+import { ResizableImageComponent } from './resizable-image.component';
+
 export const ResizableImage = Image.extend({
+  name: 'image',
+
   addAttributes() {
     return {
       ...this.parent?.(),
       width: {
         default: '100%',
-        renderHTML: attributes => {
+        renderHTML: (attributes) => {
           if (!attributes.width) return {};
           return {
-            width: attributes.width,
-            style: `width: ${attributes.width}; max-width: 100%;`
+            'data-width': attributes.width,
+            style: `width: ${attributes.width}; max-width: 100%; height: auto;`,
           };
         },
-        parseHTML: element => element.getAttribute('width') || element.style.width || '100%',
+        parseHTML: (element) => {
+          return element.getAttribute('data-width')
+            || element.style.width
+            || element.getAttribute('width')
+            || '100%';
+        },
       },
       height: {
         default: 'auto',
-        renderHTML: attributes => {
-          if (!attributes.height) return {};
+        renderHTML: (attributes) => {
+          if (!attributes.height || attributes.height === 'auto') return {};
           return {
             height: attributes.height,
-            style: `height: ${attributes.height}`
           };
         },
-        parseHTML: element => element.getAttribute('height') || element.style.height || 'auto',
+        parseHTML: (element) => element.getAttribute('height') || 'auto',
+      },
+      align: {
+        default: 'center',
+        renderHTML: (attributes) => {
+          const align = attributes.align || 'center';
+          return {
+            'data-align': align,
+          };
+        },
+        parseHTML: (element) => {
+          return element.getAttribute('data-align') || 'center';
+        },
+      },
+      caption: {
+        default: '',
+        renderHTML: (attributes) => {
+          if (!attributes.caption) return {};
+          return {
+            'data-caption': attributes.caption,
+          };
+        },
+        parseHTML: (element) => element.getAttribute('data-caption') || '',
       },
     };
   },
@@ -6757,8 +7106,6 @@ import { TableCell } from '@tiptap/extension-table-cell';
 
 import { CitationUrlNode } from '../components/article-preview-editor/citation-url.extension';
 
-import { PaginationPlus } from 'tiptap-pagination-plus';
-
 import { AiAssistantService } from '../../../services/ai-assistant.service';
 import type { ArticleSessionDetail } from '../../../services/ai-assistant.service';
 import { PdfExportService } from '../../../services/pdf-export.service';
@@ -6842,8 +7189,7 @@ const PageBreakExtension = Node.create({
       'div',
       mergeAttributes(HTMLAttributes, {
         'data-type': 'page-break',
-        class: 'page-break-gap no-print',
-        style: 'page-break-after: always;',
+        class: 'page-break-indicator no-print',
       }),
     ];
   },
@@ -6903,17 +7249,6 @@ const TIPTAP_EXTENSIONS = [
   TabKeyExtension,
 
   ResizableImage,
-
-  PaginationPlus.configure({
-    pageHeight: 1123,
-    pageWidth: 794,
-    pageGap: 24,
-    pageBreakBackground: '#f1f5f9',
-    marginTop: 94,
-    marginBottom: 94,
-    marginLeft: 94,
-    marginRight: 94,
-  }),
 ];
 
 export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> = ({
@@ -6939,11 +7274,13 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [isPrinting, setIsPrinting] = useState<boolean>(false);
+  const [isUploadingMedia, setIsUploadingMedia] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const loadedSessionIdRef = useRef<string | null>(null);
 
   const [totalPages, setTotalPages] = useState<number>(1);
   const [activePage, setActivePage] = useState<number>(0);
+  const lastPageCountRef = useRef<number>(1);
   const [activeTableElement, setActiveTableElement] = useState<HTMLTableElement | null>(null);
   const [tableResizeState, setTableResizeState] = useState<{
     mode: 'column' | 'row';
@@ -7036,35 +7373,37 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
           } else {
             setActiveTableElement(null);
           }
-
-          if (isTableClick || isResizeHandle) {
-            try {
-              (view as any).editor.commands.disablePagination();
-            } catch (e) {
-              console.warn('[Pagination Freeze] Gagal menonaktifkan pagination:', e);
-            }
-          }
           return false;
         }
       },
       handlePaste: (view, event) => {
         const items = event.clipboardData?.items;
-        if (items) {
+        if (items && sessionId) {
           for (let i = 0; i < items.length; i++) {
             const item = items[i];
             if (item.type.indexOf('image') === 0) {
               const file = item.getAsFile();
               if (file) {
-                const reader = new FileReader();
-                reader.onload = (readerEvent) => {
-                  const base64 = readerEvent.target?.result as string;
-                  const { schema } = view.state;
-                  const node = schema.nodes.image.create({ src: base64 });
-                  const transaction = view.state.tr.replaceSelectionWith(node);
-                  view.dispatch(transaction);
-                };
-                reader.readAsDataURL(file);
                 event.preventDefault();
+                setIsUploadingMedia(true);
+                showToast('⏳ Mengunggah berkas gambar ke server...');
+
+                AiAssistantService.uploadEditorMedia(sessionId, file)
+                  .then((mediaData) => {
+                    const { schema } = view.state;
+                    const node = schema.nodes.image.create({ src: mediaData.url });
+                    const transaction = view.state.tr.replaceSelectionWith(node);
+                    view.dispatch(transaction);
+                    showToast('✅ Gambar berhasil disematkan!');
+                  })
+                  .catch((err) => {
+                    console.error('Gagal mengunggah media:', err);
+                    showToast(`⚠️ Gagal mengunggah gambar: ${err.message}`);
+                  })
+                  .finally(() => {
+                    setIsUploadingMedia(false);
+                  });
+
                 return true;
               }
             }
@@ -7073,22 +7412,31 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
         return false;
       },
       handleDrop: (view, event, slice, moved) => {
-        if (!moved && event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files.length > 0) {
+        if (!moved && event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files.length > 0 && sessionId) {
           const file = event.dataTransfer.files[0];
           if (file.type.startsWith('image/')) {
-            const reader = new FileReader();
-            reader.onload = (readerEvent) => {
-              const base64 = readerEvent.target?.result as string;
-              const { schema } = view.state;
-              const coordinates = view.posAtCoords({ left: event.clientX, top: event.clientY });
-              if (coordinates) {
-                const node = schema.nodes.image.create({ src: base64 });
-                const transaction = view.state.tr.insert(coordinates.pos, node);
-                view.dispatch(transaction);
-              }
-            };
-            reader.readAsDataURL(file);
             event.preventDefault();
+            const coordinates = view.posAtCoords({ left: event.clientX, top: event.clientY });
+            setIsUploadingMedia(true);
+            showToast('⏳ Mengunggah berkas gambar ke server...');
+
+            AiAssistantService.uploadEditorMedia(sessionId, file)
+              .then((mediaData) => {
+                const { schema } = view.state;
+                const node = schema.nodes.image.create({ src: mediaData.url });
+                const pos = coordinates ? coordinates.pos : view.state.selection.from;
+                const transaction = view.state.tr.insert(pos, node);
+                view.dispatch(transaction);
+                showToast('✅ Gambar berhasil disematkan!');
+              })
+              .catch((err) => {
+                console.error('Gagal mengunggah media:', err);
+                showToast(`⚠️ Gagal mengunggah gambar: ${err.message}`);
+              })
+              .finally(() => {
+                setIsUploadingMedia(false);
+              });
+
             return true;
           }
         }
@@ -7122,29 +7470,24 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
   });
 
   useEffect(() => {
-    const el = document.getElementById('virtual-a4-page');
-    if (!el) return;
+    if (isLoading || !editor || editor.isDestroyed) return;
 
-    const observer = new ResizeObserver(() => {
-      const pageCount = el.querySelectorAll('.page').length;
-      const nextPages = Math.max(1, pageCount);
-      setTotalPages((prev) => (prev !== nextPages ? nextPages : prev));
-    });
+    const updatePages = () => {
+      const el = document.getElementById('virtual-a4-page');
+      if (!el) return;
+      const height = el.scrollHeight;
+      const calculatedPages = Math.max(1, Math.ceil(height / 1123));
+      if (calculatedPages !== lastPageCountRef.current) {
+        lastPageCountRef.current = calculatedPages;
+        setTotalPages(calculatedPages);
+      }
+    };
 
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [editor, isLoading]);
+    updatePages();
+  }, [editor, isLoading, draftContent, marginCm, fontSize, lineSpacing]);
 
   useEffect(() => {
     const handleGlobalMouseUp = () => {
-      if (editor && !editor.isDestroyed) {
-        try {
-          editor.commands.enablePagination();
-        } catch (e) {
-
-        }
-      }
-
       if (tableResizeState && editor && !editor.isDestroyed) {
         const nextHtml = editor.view.dom.innerHTML;
         editor.commands.setContent(nextHtml, { emitUpdate: true });
@@ -7196,44 +7539,23 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
     return () => observer.disconnect();
   }, [activeTableElement]);
 
-  useEffect(() => {
-    if (editor && !editor.isDestroyed) {
-      try {
-        const px = Math.round(marginCm * (96 / 2.54));
-
-        const paginationExt = editor.extensionManager.extensions.find(e => e.name === 'pagination');
-        if (paginationExt) {
-          paginationExt.options.marginTop = px;
-          paginationExt.options.marginBottom = px;
-          paginationExt.options.marginLeft = px;
-          paginationExt.options.marginRight = px;
-        }
-
-        setTimeout(() => {
-          if (editor && !editor.isDestroyed) {
-
-            editor.view.dispatch(editor.state.tr);
-          }
-        }, 50);
-      } catch (err) {
-        console.error('Gagal memperbarui margin Tiptap:', err);
-      }
-    }
-  }, [editor, marginCm]);
-
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
-    const scrollTop = e.currentTarget.scrollTop;
-    const computedPageHeight = 1122;
-    const currentPage = Math.floor((scrollTop + computedPageHeight / 2) / computedPageHeight);
-    setActivePage(Math.min(totalPages - 1, Math.max(0, currentPage)));
+    const container = e.currentTarget;
+    const scrollTop = container.scrollTop;
+    const scrollHeight = container.scrollHeight;
+    const calculatedPages = Math.max(1, Math.ceil(scrollHeight / 1123));
+    if (calculatedPages !== totalPages) {
+      setTotalPages(calculatedPages);
+    }
+    const currentPage = Math.floor((scrollTop + 400) / 1123);
+    setActivePage(Math.min(calculatedPages - 1, Math.max(0, currentPage)));
   };
 
   const handleScrollToPage = (pageIdx: number) => {
     const scrollContainer = document.getElementById('editor-scroll-container');
     if (scrollContainer) {
-      const computedPageHeight = 1122;
       scrollContainer.scrollTo({
-        top: pageIdx * computedPageHeight,
+        top: pageIdx * 1123,
         behavior: 'smooth',
       });
       setActivePage(pageIdx);
@@ -7253,7 +7575,10 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
         const session = await AiAssistantService.getArticleSession(sessionId);
         setActiveSession(session);
 
-        const htmlContent = MarkupConverter.toHTML(session.fullArticleText || '');
+        const htmlContent = session.editorDocumentState && session.editorDocumentState.trim().length > 0
+          ? session.editorDocumentState
+          : MarkupConverter.toHTML(session.fullArticleText || '');
+
         initSession(sessionId, session.articleTitle || session.title || '', htmlContent);
       } catch (err: any) {
         console.error('Gagal memuat sesi artikel:', err);
@@ -7285,16 +7610,21 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
   const handleSaveAndBack = async () => {
     if (!sessionId || !editor || isSaving) return;
 
+    if (isUploadingMedia) {
+      showToast('⏳ Mohon tunggu sampai proses unggah gambar selesai...');
+      return;
+    }
+
     if (!isDirty) {
       onBack();
       return;
     }
 
     setIsSaving(true);
-    showToast('⏳ Menyinkronkan perubahan naskah ke database...');
+    showToast('⏳ Menyinkronkan naskah visual ke database...');
     try {
-      const markdownContent = MarkupConverter.toMarkdown(editor.getHTML());
-      await AiAssistantService.updateArticleSessionContent(sessionId, articleTitle, markdownContent);
+      const editorStateHtml = editor.getHTML();
+      await AiAssistantService.updateArticleSessionContent(sessionId, articleTitle, editorStateHtml);
       markSaved();
       onBack();
     } catch (err: any) {
@@ -7311,13 +7641,19 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
       showToast('⚠️ Tidak ada naskah untuk dicetak.');
       return;
     }
+
+    if (isUploadingMedia) {
+      showToast('⏳ Mohon tunggu sampai proses unggah gambar selesai...');
+      return;
+    }
+
     setIsPrinting(true);
 
     if (isDirty && sessionId) {
       showToast('⏳ Menyimpan draf ke database sebelum mencetak...');
       try {
-        const markdownContent = MarkupConverter.toMarkdown(editor.getHTML());
-        await AiAssistantService.updateArticleSessionContent(sessionId, articleTitle, markdownContent);
+        const editorStateHtml = editor.getHTML();
+        await AiAssistantService.updateArticleSessionContent(sessionId, articleTitle, editorStateHtml);
         markSaved();
       } catch (e) {
         showToast('⚠️ Gagal menyimpan ke server. Tetap mencetak PDF dari versi layar...');
@@ -7390,6 +7726,29 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
     }
   }, [editor, setFormatting]);
 
+  const handleInsertImage = useCallback((file: File) => {
+    if (!sessionId || !editor || editor.isDestroyed) {
+      showToast('⚠️ Editor belum siap untuk menyisipkan gambar.');
+      return;
+    }
+
+    setIsUploadingMedia(true);
+    showToast('⏳ Mengunggah berkas gambar ke server...');
+
+    AiAssistantService.uploadEditorMedia(sessionId, file)
+      .then((mediaData) => {
+        editor.chain().focus().setImage({ src: mediaData.url }).run();
+        showToast('✅ Gambar berhasil disematkan ke naskah!');
+      })
+      .catch((err: any) => {
+        console.error('Gagal mengunggah gambar via toolbar:', err);
+        showToast(`⚠️ Gagal mengunggah gambar: ${err.message}`);
+      })
+      .finally(() => {
+        setIsUploadingMedia(false);
+      });
+  }, [sessionId, editor]);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-96 font-roboto bg-slate-50/50 border border-slate-300">
@@ -7433,7 +7792,7 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
 
       <ArticlePreviewEditorHeader
         editor={editor}
-        isSaving={isSaving}
+        isSaving={isSaving || isUploadingMedia}
         isPrinting={isPrinting}
         isDirty={isDirty}
         articleTitle={articleTitle}
@@ -7454,6 +7813,7 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
         onUndo={() => editor?.chain().focus().undo().run()}
         onRedo={() => editor?.chain().focus().redo().run()}
         onInsertPageBreak={() => editor?.chain().focus().insertContent({ type: 'pageBreak' }).run()}
+        onInsertImage={handleInsertImage}
       />
 
       {}
@@ -7472,7 +7832,7 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
           activeTableElement={activeTableElement}
           onScroll={handleScroll}
           onStartTableResize={startTableResize}
-          isSaving={isSaving}
+          isSaving={isSaving || isUploadingMedia}
           isPrinting={isPrinting}
           isDirty={isDirty}
           onSaveAndBack={handleSaveAndBack}
@@ -17034,6 +17394,7 @@ export interface ArticleSessionDetail {
     createdAt: string;
   }>;
   fullArticleText?: string;
+  editorDocumentState?: string;
 }
 
 async function safeFetch(url: string, options: RequestInit): Promise<any> {
@@ -17173,15 +17534,35 @@ export const AiAssistantService = {
     return result.data;
   },
 
+  async uploadEditorMedia(
+    sessionId: string,
+    file: File,
+  ): Promise<{
+    assetId: string;
+    url: string;
+    fileName: string;
+    fileSizeBytes: number;
+  }> {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const result = await safeFetch(`${API_BASE_URL}/assistant/sessions/${sessionId}/media`, {
+      method: 'POST',
+      body: formData,
+    });
+    return result.data;
+  },
+
   async updateArticleSessionContent(
     sessionId: string,
     articleTitle: string,
-    fullArticleText: string,
+    editorState?: string,
+    fullArticleText?: string,
   ): Promise<ArticleSessionDetail> {
     const result = await safeFetch(`${API_BASE_URL}/assistant/article/sessions/${sessionId}/content`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ articleTitle, fullArticleText }),
+      body: JSON.stringify({ articleTitle, editorState, fullArticleText }),
     });
     return result.data;
   },

@@ -77,6 +77,7 @@ export interface ArticleSessionDetail {
     createdAt: string;
   }>;
   fullArticleText?: string;
+  editorDocumentState?: string;
 }
 
 /**
@@ -242,18 +243,42 @@ export const AiAssistantService = {
   },
 
   /**
-   * Menyinkronkan konten hasil suntingan manual naskah draf artikel ke database (Two-Way Sync) [1].
-   * Menjamin kesalahan jaringan tertangkap secara terpadu oleh AiServiceException [5].
+   * Mengunggah berkas gambar editorial (paste/drop di TipTap canvas) secara asinkron ke server.
+   * Menghasilkan URL publik server yang ringan untuk mencegah Base64 inline payload bloat.
+   */
+  async uploadEditorMedia(
+    sessionId: string,
+    file: File,
+  ): Promise<{
+    assetId: string;
+    url: string;
+    fileName: string;
+    fileSizeBytes: number;
+  }> {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const result = await safeFetch(`${API_BASE_URL}/assistant/sessions/${sessionId}/media`, {
+      method: 'POST',
+      body: formData,
+    });
+    return result.data;
+  },
+
+  /**
+   * Menyinkronkan konten hasil suntingan manual naskah editorial ke database (Two-Way Sync) [1].
+   * Mendukung transmisi langsung editorState (HTML visual) tanpa degradasi serialisasi Turndown.
    */
   async updateArticleSessionContent(
     sessionId: string,
     articleTitle: string,
-    fullArticleText: string,
+    editorState?: string,
+    fullArticleText?: string,
   ): Promise<ArticleSessionDetail> {
     const result = await safeFetch(`${API_BASE_URL}/assistant/article/sessions/${sessionId}/content`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ articleTitle, fullArticleText }),
+      body: JSON.stringify({ articleTitle, editorState, fullArticleText }),
     });
     return result.data;
   },
