@@ -841,7 +841,7 @@ export default function AdminConsoleView() {
                             type="button"
                             onClick={() => {
                               const current = formData.images ? formData.images.split(",").map((s: string) => s.trim()).filter(Boolean) : [];
-                              const updated = current.filter((_, i) => i !== idx).join(", ");
+                              const updated = current.filter((_: string, i: number) => i !== idx).join(", ");
                               setFormData({ ...formData, images: updated });
                             }}
                             className="absolute top-1 right-1 p-1 bg-red-600 text-white hover:bg-red-800 transition-colors opacity-0 group-hover:opacity-100 rounded-none shadow-md cursor-pointer"
@@ -945,7 +945,7 @@ export default function AdminConsoleView() {
                               type="button"
                               onClick={() => {
                                 const current = formData.suggestions ? formData.suggestions.split(",").map((s: string) => s.trim()).filter(Boolean) : [];
-                                const updated = current.filter((_, i) => i !== idx).join(", ");
+                                const updated = current.filter((_: string, i: number) => i !== idx).join(", ");
                                 setFormData({ ...formData, suggestions: updated });
                               }}
                               className="text-teal-600 hover:text-teal-900 font-bold cursor-pointer ml-1 text-xs"
@@ -1013,7 +1013,7 @@ export default function AdminConsoleView() {
                               type="button"
                               onClick={() => {
                                 const current = formData.aliases ? formData.aliases.split(",").map((s: string) => s.trim()).filter(Boolean) : [];
-                                const updated = current.filter((_, i) => i !== idx).join(", ");
+                                const updated = current.filter((_: string, i: number) => i !== idx).join(", ");
                                 setFormData({ ...formData, aliases: updated });
                               }}
                               className="text-slate-500 hover:text-slate-800 font-bold cursor-pointer ml-1 text-xs"

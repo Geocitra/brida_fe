@@ -32,6 +32,8 @@ import {
   AlertCircle,
   Send,
   X,
+  Link2,
+  CheckCheck,
 } from 'lucide-react';
 import { AdminService } from '../../../services/admin.service';
 import { ArticlePreviewEditorHeader } from '../components/article-preview-editor/article-preview-editor-header.component';
@@ -198,6 +200,7 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
   const [selectedContactId, setSelectedContactId] = useState('');
   const [waMessage, setWaMessage] = useState('');
   const [loadingContacts, setLoadingContacts] = useState(false);
+  const [copyLinkSuccess, setCopyLinkSuccess] = useState(false);
   const [isUploadingMedia, setIsUploadingMedia] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const loadedSessionIdRef = useRef<string | null>(null);
@@ -523,28 +526,40 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
     }
   }, [editor, isLoading, storeSessionId, sessionId, draftContent]);
 
-  const getDefaultWaMessage = (receiverName: string, titleStr: string, sessionUUID: string, draftHtml: string) => {
+  const getDefaultWaMessage = (
+    receiverName: string,
+    receiverRole: string,
+    titleStr: string,
+    sessionUUID: string,
+    draftHtml: string
+  ) => {
     // Bersihkan HTML tag untuk summary
     const tempDiv = document.createElement('div');
     tempDiv.innerHTML = draftHtml;
-    const plainText = tempDiv.textContent || tempDiv.innerText || '';
-    const cleanSummary = plainText.substring(0, 300) + '...';
-    
+    const plainText = (tempDiv.textContent || tempDiv.innerText || '').replace(/\s+/g, ' ').trim();
+    const cleanSummary = plainText.substring(0, 280).trim() + '...';
+
     const origin = window.location.origin;
     const shareUrl = `${origin}/share/article/${sessionUUID}`;
-    
-    return `Yth. ${receiverName},
 
-Berikut dikirimkan naskah artikel publikasi resmi dari Badan Riset dan Inovasi Daerah (BRIDA) Kabupaten Mimika:
+    return `Yth. Bapak/Ibu ${receiverName},
+Selaku ${receiverRole}.
 
-* Judul: ${titleStr}
-* Ringkasan: ${cleanSummary}
+Assalamu'alaikum Wr. Wb.
 
-Naskah lengkap (Format Cetak PDF Resmi) dapat diakses dan diunduh langsung melalui tautan BRIDA berikut:
+Dengan hormat, bersama surat ini kami sampaikan naskah artikel publikasi resmi dari Badan Riset dan Inovasi Daerah (BRIDA) Kabupaten Mimika untuk dapat dijadikan bahan pertimbangan:
+
+Judul    : ${titleStr}
+Ringkasan: ${cleanSummary}
+
+Naskah lengkap beserta dokumen resmi dalam format PDF dapat diakses dan diunduh melalui tautan berikut:
 ${shareUrl}
 
-Teria kasih.
-Badan Riset dan Inovasi Daerah (BRIDA) Kabupaten Mimika.`;
+Atas perhatian dan kerja sama Bapak/Ibu, kami ucapkan terima kasih.
+
+Hormat kami,
+Badan Riset dan Inovasi Daerah (BRIDA)
+Kabupaten Mimika`;
   };
 
   const handleOpenWaModal = async () => {
@@ -556,24 +571,32 @@ Badan Riset dan Inovasi Daerah (BRIDA) Kabupaten Mimika.`;
         AdminService.getOpds(),
         AdminService.getPublicSettings().catch(() => []),
       ]);
-      
-      const bupatiName = settingsList.find((s: any) => s.key === 'BUPATI_NAME')?.value || 'Darius Sabon Rain, S.E., M.Ec.Dev. (Pjs. Bupati)';
+
+      const bupatiName = settingsList.find((s: any) => s.key === 'BUPATI_NAME')?.value || 'Darius Sabon Rain, S.E., M.Ec.Dev.';
       const bupatiPhone = settingsList.find((s: any) => s.key === 'BUPATI_PHONE')?.value || '628123456789';
-      
+
       const contacts = [
-        { id: 'bupati', name: `${bupatiName} (Pimpinan Daerah)`, phone: bupatiPhone },
+        { id: 'bupati', displayName: bupatiName, role: 'Bupati Mimika', label: `${bupatiName} – Bupati Mimika`, phone: bupatiPhone },
         ...opdsList
           .filter((o: any) => o.headName && o.headPhone)
           .map((o: any) => ({
             id: o.id,
-            name: `${o.headName} (Kepala ${o.code})`,
-            phone: o.headPhone
+            displayName: o.headName,
+            role: `Kepala ${o.name || o.code}`,
+            label: `${o.headName} – Kepala ${o.code}`,
+            phone: o.headPhone,
           }))
       ];
       setWaContacts(contacts);
       if (contacts.length > 0) {
         setSelectedContactId(contacts[0].id);
-        const msg = getDefaultWaMessage(contacts[0].name, articleTitle || 'Artikel Publikasi', sessionId, editor.getHTML());
+        const msg = getDefaultWaMessage(
+          contacts[0].displayName,
+          contacts[0].role,
+          articleTitle || 'Artikel Publikasi',
+          sessionId,
+          editor.getHTML()
+        );
         setWaMessage(msg);
       }
     } catch (err) {
@@ -586,12 +609,19 @@ Badan Riset dan Inovasi Daerah (BRIDA) Kabupaten Mimika.`;
 
   const handleContactChange = (contactId: string) => {
     setSelectedContactId(contactId);
-    const contact = waContacts.find(c => c.id === contactId);
+    const contact = waContacts.find((c: any) => c.id === contactId);
     if (contact && editor && sessionId) {
-      const msg = getDefaultWaMessage(contact.name, articleTitle || 'Artikel Publikasi', sessionId, editor.getHTML());
+      const msg = getDefaultWaMessage(
+        contact.displayName,
+        contact.role,
+        articleTitle || 'Artikel Publikasi',
+        sessionId,
+        editor.getHTML()
+      );
       setWaMessage(msg);
     }
   };
+
 
   const handleSendWaSubmit = () => {
     const contact = waContacts.find(c => c.id === selectedContactId);
@@ -601,6 +631,24 @@ Badan Riset dan Inovasi Daerah (BRIDA) Kabupaten Mimika.`;
     window.open(url, '_blank');
     setIsWaModalOpen(false);
     showToast(`Membuka WhatsApp untuk mengirim naskah ke ${contact.name}`);
+  };
+
+  const handleCopyArticleLink = () => {
+    if (!sessionId) return;
+    const shareUrl = `${window.location.origin}/share/article/${sessionId}`;
+    navigator.clipboard.writeText(shareUrl).then(() => {
+      setCopyLinkSuccess(true);
+      setTimeout(() => setCopyLinkSuccess(false), 2500);
+    }).catch(() => {
+      const ta = document.createElement('textarea');
+      ta.value = shareUrl;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      setCopyLinkSuccess(true);
+      setTimeout(() => setCopyLinkSuccess(false), 2500);
+    });
   };
 
   const handleSaveAndBack = async () => {
@@ -849,7 +897,7 @@ Badan Riset dan Inovasi Daerah (BRIDA) Kabupaten Mimika.`;
       {/* WhatsApp Share Modal (rounded-none border-slate-300 layout) */}
       {isWaModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-955/40 backdrop-blur-sm p-4 animate-in fade-in duration-100 no-print">
-          <div className="w-full max-w-lg bg-white border border-slate-350 shadow-2xl rounded-none flex flex-col max-h-[90vh]">
+          <div className="w-full max-w-2xl bg-white border border-slate-350 shadow-2xl rounded-none flex flex-col max-h-[90vh]">
             <div className="flex items-center justify-between border-b border-slate-205 px-6 py-4">
               <div>
                 <span className="text-[10px] font-black text-emerald-600 uppercase tracking-wider font-roboto">Berbagi Kajian</span>
@@ -884,9 +932,9 @@ Badan Riset dan Inovasi Daerah (BRIDA) Kabupaten Mimika.`;
                       onChange={(e) => handleContactChange(e.target.value)}
                       className="w-full px-3 py-2 text-xs border border-slate-300 rounded-none bg-slate-50 focus:bg-white focus:border-slate-900 outline-none font-bold text-slate-800 font-roboto"
                     >
-                      {waContacts.map((c) => (
+                      {waContacts.map((c: any) => (
                         <option key={c.id} value={c.id}>
-                          {c.name} - [{c.phone}]
+                          {c.label}
                         </option>
                       ))}
                     </select>
@@ -905,23 +953,33 @@ Badan Riset dan Inovasi Daerah (BRIDA) Kabupaten Mimika.`;
               )}
             </div>
 
-            <div className="border-t border-slate-205 px-6 py-4 flex justify-end gap-2 bg-slate-50">
+            <div className="border-t border-slate-205 px-6 py-4 flex justify-between items-center gap-2 bg-slate-50">
               <button
                 type="button"
-                onClick={() => setIsWaModalOpen(false)}
-                className="px-4 py-2 border border-slate-300 text-slate-700 font-semibold text-xs uppercase tracking-wider rounded-none hover:bg-slate-100 transition-colors cursor-pointer font-roboto"
+                onClick={handleCopyArticleLink}
+                className="flex items-center gap-1.5 px-3 py-2 border border-slate-300 text-slate-600 font-semibold text-xs uppercase tracking-wider rounded-none hover:bg-slate-100 transition-colors cursor-pointer font-roboto"
               >
-                Batal
+                {copyLinkSuccess ? <CheckCheck size={12} className="text-emerald-600" /> : <Link2 size={12} />}
+                <span>{copyLinkSuccess ? 'Link Tersalin!' : 'Salin Link Artikel'}</span>
               </button>
-              <button
-                type="button"
-                onClick={handleSendWaSubmit}
-                disabled={loadingContacts || waContacts.length === 0}
-                className="px-5 py-2.5 bg-emerald-700 hover:bg-emerald-800 disabled:bg-slate-300 text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-1.5 cursor-pointer border border-emerald-800 shadow-xs font-roboto"
-              >
-                <Send size={12} />
-                <span>Kirim via WhatsApp Web</span>
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsWaModalOpen(false)}
+                  className="px-4 py-2 border border-slate-300 text-slate-700 font-semibold text-xs uppercase tracking-wider rounded-none hover:bg-slate-100 transition-colors cursor-pointer font-roboto"
+                >
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSendWaSubmit}
+                  disabled={loadingContacts || waContacts.length === 0}
+                  className="px-5 py-2.5 bg-emerald-700 hover:bg-emerald-800 disabled:bg-slate-300 text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-1.5 cursor-pointer border border-emerald-800 shadow-xs font-roboto"
+                >
+                  <Send size={12} />
+                  <span>Kirim via WhatsApp Web</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>

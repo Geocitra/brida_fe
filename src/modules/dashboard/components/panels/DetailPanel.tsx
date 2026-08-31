@@ -423,7 +423,7 @@ export default function DetailPanel({
                             </p>
 
                             <div className="flex flex-col">
-                                {quickSuggestions.map((sug, i) => (
+                                {quickSuggestions.map((sug: string, i: number) => (
                                     <button
                                         key={i}
                                         onClick={() => handleSuggestionClick(sug)}

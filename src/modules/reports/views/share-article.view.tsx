@@ -7,6 +7,8 @@ import {
   AlertCircle,
   Building,
   Calendar,
+  Link2,
+  CheckCheck,
 } from 'lucide-react';
 
 export const ShareArticleView: React.FC = () => {
@@ -21,6 +23,24 @@ export const ShareArticleView: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const [copySuccess, setCopySuccess] = useState(false);
+
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(window.location.href).then(() => {
+      setCopySuccess(true);
+      setTimeout(() => setCopySuccess(false), 2500);
+    }).catch(() => {
+      // Fallback for browsers without clipboard API
+      const ta = document.createElement('textarea');
+      ta.value = window.location.href;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      setCopySuccess(true);
+      setTimeout(() => setCopySuccess(false), 2500);
+    });
+  };
 
   useEffect(() => {
     const fetchSharedArticle = async () => {
@@ -168,14 +188,23 @@ export const ShareArticleView: React.FC = () => {
               <h1 className="text-xs font-black text-slate-900 uppercase tracking-wider">Badan Riset &amp; Inovasi Daerah Mimika</h1>
             </div>
           </div>
-          <button
-            onClick={handleExportPdf}
-            disabled={isExportingPdf}
-            className="flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-teal-800 hover:bg-teal-900 disabled:bg-slate-300 transition-colors cursor-pointer rounded-none uppercase tracking-wider self-start sm:self-center"
-          >
-            {isExportingPdf ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
-            <span>{isExportingPdf ? 'Mencetak...' : 'Unduh PDF Resmi'}</span>
-          </button>
+          <div className="flex items-center gap-2 self-start sm:self-center flex-wrap">
+            <button
+              onClick={handleCopyLink}
+              className="flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-bold transition-colors cursor-pointer rounded-none uppercase tracking-wider border border-slate-300 bg-white hover:bg-slate-50 text-slate-700"
+            >
+              {copySuccess ? <CheckCheck size={12} className="text-emerald-600" /> : <Link2 size={12} />}
+              <span>{copySuccess ? 'Tersalin!' : 'Salin Link'}</span>
+            </button>
+            <button
+              onClick={handleExportPdf}
+              disabled={isExportingPdf}
+              className="flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-teal-800 hover:bg-teal-900 disabled:bg-slate-300 transition-colors cursor-pointer rounded-none uppercase tracking-wider"
+            >
+              {isExportingPdf ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
+              <span>{isExportingPdf ? 'Mencetak...' : 'Unduh PDF Resmi'}</span>
+            </button>
+          </div>
         </div>
 
         {/* Responsive Horizontal Scroll wrapper for A4 Canvas */}
