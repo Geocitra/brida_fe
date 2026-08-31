@@ -19,335 +19,7 @@ import ImageCarousel from "../../../../components/ui/ImageCarousel";
 import { DocumentService } from "../../../../services/document.service";
 import { AiAssistantService } from "../../../../services/ai-assistant.service";
 import { RichMessageRenderer } from "../../../ai-assistant/components/chat-panel.component";
-
-// ============================================================================
-// SOLID LOCAL SEEDING: Detail Drilldown 18 Distrik Kabupaten Mimika
-// Berisi data factual lengkap & rasional spasial sektoral Mimika [Fase 5]
-// ============================================================================
-const MOCK_DRILLDOWN_DETAILS: Record<number, {
-    district_id: number;
-    district_name: string;
-    profile: {
-        luas_wilayah: number;
-        jumlah_penduduk: number;
-        deskripsi: string;
-        batas_wilayah: string;
-        images: string[];
-    };
-    categories: Array<{
-        category_id: number;
-        name: string;
-        total: number;
-    }>;
-    last_updated: string;
-}> = {
-    1: {
-        district_id: 1,
-        district_name: "Mimika Baru",
-        profile: {
-            luas_wilayah: 2216,
-            jumlah_penduduk: 142000,
-            deskripsi: "Distrik Mimika Baru berpusat di kota Timika, berfungsi sebagai episentrum aktivitas perekonomian, perbankan, industri kreatif, serta pusat pemerintahan. Kepadatan infrastruktur dasar di distrik ini merupakan yang paling maju di seluruh kabupaten.",
-            batas_wilayah: "Utara: Kuala Kencana, Selatan: Wania, Barat: Iwaka, Timur: Mimika Timur",
-            images: ["/img/mimika%20baru/aerial%20view.jpg", "/img/mimika%20baru/Pasar-Sentral-Timika.jpg"]
-        },
-        categories: [
-            { category_id: 1, name: "Kesehatan & Pendidikan", total: 45 },
-            { category_id: 2, name: "Infrastruktur & Pekerjaan Umum", total: 32 },
-            { category_id: 3, name: "Sosial & Logistik", total: 18 }
-        ],
-        last_updated: "2026-07-28T09:00:00Z"
-    },
-    2: {
-        district_id: 2,
-        district_name: "Kuala Kencana",
-        profile: {
-            luas_wilayah: 840,
-            jumlah_penduduk: 28000,
-            deskripsi: "Distrik Kuala Kencana merupakan kota modern terencana yang dikelola secara eksklusif berkolaborasi dengan pihak swasta pertambangan. Memiliki tata kota ramah lingkungan, jaringan kabel bawah tanah, dan kualitas sanitasi berstandar internasional.",
-            batas_wilayah: "Utara: Tembagapura, Selatan: Mimika Baru, Barat: Iwaka, Timur: Kwamki Narama",
-            images: ["/img/kualakencana/images%20(1).jpg", "/img/kualakencana/images.jpg"]
-        },
-        categories: [
-            { category_id: 1, name: "Kesehatan & Pendidikan", total: 22 },
-            { category_id: 2, name: "Infrastruktur & Pekerjaan Umum", total: 15 },
-            { category_id: 3, name: "Sosial & Logistik", total: 9 }
-        ],
-        last_updated: "2026-07-28T09:00:00Z"
-    },
-    3: {
-        district_id: 3,
-        district_name: "Tembagapura",
-        profile: {
-            luas_wilayah: 1452,
-            jumlah_penduduk: 23000,
-            deskripsi: "Distrik Tembagapura terletak di wilayah pegunungan tinggi bersuhu dingin. Merupakan pusat operasi penambangan emas dan tembaga utama. Distrik ini memiliki tantangan geografis berupa lereng terjal dan risiko tanah longsor tinggi.",
-            batas_wilayah: "Utara: Kabupaten Puncak, Selatan: Kuala Kencana, Barat: Alama, Timur: Hoya",
-            images: ["/img/tembagapura/Grasberg_pano_(3200491589)_(cropped).jpg", "/img/tembagapura/Tembagapura_4.jpg"]
-        },
-        categories: [
-            { category_id: 1, name: "Kesehatan & Pendidikan", total: 14 },
-            { category_id: 2, name: "Infrastruktur & Pekerjaan Umum", total: 28 },
-            { category_id: 3, name: "Sosial & Logistik", total: 12 }
-        ],
-        last_updated: "2026-07-28T09:00:00Z"
-    },
-    4: {
-        district_id: 4,
-        district_name: "Wania",
-        profile: {
-            luas_wilayah: 195,
-            jumlah_penduduk: 61000,
-            deskripsi: "Distrik Wania dikembangkan sebagai kawasan penyangga pemukiman perkotaan Timika. Memiliki konsentrasi pemukiman transmigrasi yang padat, pasar sentral regional, dan perkembangan ruko komersial menengah yang sangat pesat.",
-            batas_wilayah: "Utara: Mimika Baru, Selatan: Mimika Timur, Barat: Iwaka, Timur: Mimika Tengah",
-            images: ["/img/wania/Pasar-Sentral-1-scaled.jpg", "/img/mimika%20baru/Indahhnya-Wisata-Timika.jpg"]
-        },
-        categories: [
-            { category_id: 1, name: "Kesehatan & Pendidikan", total: 31 },
-            { category_id: 2, name: "Infrastruktur & Pekerjaan Umum", total: 19 },
-            { category_id: 3, name: "Sosial & Logistik", total: 14 }
-        ],
-        last_updated: "2026-07-28T09:00:00Z"
-    },
-    5: {
-        district_id: 5,
-        district_name: "Iwaka",
-        profile: {
-            luas_wilayah: 742,
-            jumlah_penduduk: 12000,
-            deskripsi: "Distrik Iwaka didominasi dataran rendah subur yang dimanfaatkan sebagai kawasan perkebunan buah, penangkaran sagu lokal, serta menjadi area perlintasan utama koridor logistik berat menuju pelabuhan dan tambang.",
-            batas_wilayah: "Utara: Kuala Kencana, Selatan: Amar, Barat: Mimika Barat Tengah, Timur: Mimika Baru",
-            images: ["/img/iwaka/sagu-1-635c8e4408a8b57f2152e722.jpg", "/img/iwaka/WhatsApp-Image-2026-07-13-at-10.24.32.jpg"]
-        },
-        categories: [
-            { category_id: 1, name: "Kesehatan & Pendidikan", total: 15 },
-            { category_id: 2, name: "Infrastruktur & Pekerjaan Umum", total: 18 },
-            { category_id: 3, name: "Sosial & Logistik", total: 6 }
-        ],
-        last_updated: "2026-07-28T09:00:00Z"
-    },
-    6: {
-        district_id: 6,
-        district_name: "Kwamki Narama",
-        profile: {
-            luas_wilayah: 45,
-            jumlah_penduduk: 15000,
-            deskripsi: "Distrik Kwamki Narama merupakan kawasan pemukiman adat yang padat. Pemerintah daerah memprioritaskan distrik ini untuk program asimilasi sosial, peningkatan literasi pendidikan dasar, dan pemberdayaan perkebunan rakyat.",
-            batas_wilayah: "Utara: Kuala Kencana, Selatan: Mimika Baru, Barat: Kuala Kencana, Timur: Mimika Tengah",
-            images: ["/img/kwamki%20narama/prosesi-kremasi-jenazah-junius-m-janempa-di-kwamki-narama-rabu-142026-foto-cenderawasih-posmoh-wahyu-welerubun-xmAu6.webp", "/img/iwaka/traditional-honai-house-dani-tribe-260nw-2635906639.jpg"]
-        },
-        categories: [
-            { category_id: 1, name: "Kesehatan & Pendidikan", total: 24 },
-            { category_id: 2, name: "Infrastruktur & Pekerjaan Umum", total: 11 },
-            { category_id: 3, name: "Sosial & Logistik", total: 8 }
-        ],
-        last_updated: "2026-07-28T09:00:00Z"
-    },
-    7: {
-        district_id: 7,
-        district_name: "Mimika Timur",
-        profile: {
-            luas_wilayah: 211,
-            jumlah_penduduk: 11000,
-            deskripsi: "Distrik Mimika Timur merupakan pintu gerbang jalur logistik kelautan utama Mimika. Berpusat di Mapurujaya, distrik ini melayani operasional pelabuhan nasional Pomako dan industri pengolahan hasil laut laut.",
-            batas_wilayah: "Utara: Mimika Baru, Selatan: Laut Arafura, Barat: Wania, Timur: Mimika Timur Jauh",
-            images: ["/img/mimika%20timur/624e6c8c105e5.jpg", "/img/mimika%20timur/images.jpg"]
-        },
-        categories: [
-            { category_id: 1, name: "Kesehatan & Pendidikan", total: 19 },
-            { category_id: 2, name: "Infrastruktur & Pekerjaan Umum", total: 22 },
-            { category_id: 3, name: "Sosial & Logistik", total: 11 }
-        ],
-        last_updated: "2026-07-28T09:00:00Z"
-    },
-    8: {
-        district_id: 8,
-        district_name: "Mimika Tengah",
-        profile: {
-            luas_wilayah: 341,
-            jumlah_penduduk: 5500,
-            deskripsi: "Distrik Mimika Tengah didominasi oleh bentang alam perairan payau dan muara sungai pesisir selatan. Mata pencaharian utama penduduknya adalah nelayan kepiting bakau dan budidaya tambak ikan tradisional.",
-            batas_wilayah: "Utara: Kwamki Narama, Selatan: Laut Arafura, Barat: Wania, Timur: Jita",
-            images: ["/img/jita/Panoramic_view_of_dock_at_Kampung_Rawa,_2014-06-21.jpg", "/img/mimika%20barat/061348_64937_INDAH_mimika_dalam.jpg"]
-        },
-        categories: [
-            { category_id: 1, name: "Kesehatan & Pendidikan", total: 8 },
-            { category_id: 2, name: "Infrastruktur & Pekerjaan Umum", total: 14 },
-            { category_id: 3, name: "Sosial & Logistik", total: 5 }
-        ],
-        last_updated: "2026-07-28T09:00:00Z"
-    },
-    9: {
-        district_id: 9,
-        district_name: "Mimika Barat",
-        profile: {
-            luas_wilayah: 1021,
-            jumlah_penduduk: 4200,
-            deskripsi: "Distrik Mimika Barat berpusat di Kokonao. Merupakan kawasan administratif bersejarah yang menyimpan rekam jejak misionaris pendidikan awal di pesisir Papua. Fokus pada pelestarian peninggalan budaya lokal.",
-            batas_wilayah: "Utara: Mimika Barat Tengah, Selatan: Laut Arafura, Barat: Mimika Barat Jauh, Timur: Amar",
-            images: ["/img/mimika%20barat/061348_64937_INDAH_mimika_dalam.jpg", "/img/mimika%20barat/IMG-20250929-WA0041-scaled.webp"]
-        },
-        categories: [
-            { category_id: 1, name: "Kesehatan & Pendidikan", total: 13 },
-            { category_id: 2, name: "Infrastruktur & Pekerjaan Umum", total: 9 },
-            { category_id: 3, name: "Sosial & Logistik", total: 7 }
-        ],
-        last_updated: "2026-07-28T09:00:00Z"
-    },
-    10: {
-        district_id: 10,
-        district_name: "Agimuga",
-        profile: {
-            luas_wilayah: 4124,
-            jumlah_penduduk: 3800,
-            deskripsi: "Distrik Agimuga merupakan kawasan dataran rendah timur Mimika yang dilalui banyak aliran sungai besar. Pembangunan infrastruktur jalan darat penghubung terus diupayakan untuk mengikis isolasi logistik antar wilayah.",
-            batas_wilayah: "Utara: Jila, Selatan: Laut Arafura, Barat: Jita, Timur: Mimika Timur Jauh",
-            images: ["/img/agimuga/209.jpg", "/img/agimuga/7311.jpg"]
-        },
-        categories: [
-            { category_id: 1, name: "Kesehatan & Pendidikan", total: 11 },
-            { category_id: 2, name: "Infrastruktur & Pekerjaan Umum", total: 34 },
-            { category_id: 3, name: "Sosial & Logistik", total: 6 }
-        ],
-        last_updated: "2026-07-28T09:00:00Z"
-    },
-    11: {
-        district_id: 11,
-        district_name: "Jila",
-        profile: {
-            luas_wilayah: 6011,
-            jumlah_penduduk: 4500,
-            deskripsi: "Distrik Jila membentang luas di kaki jajaran pegunungan tengah Mimika. Topografi berbukit curam dan lereng batu mempersulit jaringan telekomunikasi dan pembangunan jalan trans-kabupaten.",
-            batas_wilayah: "Utara: Kabupaten Puncak, Selatan: Agimuga, Barat: Hoya, Timur: Jita",
-            images: ["/img/jila/615d4d4e6ff0c.jpg", "/img/jila/shutterstock_2362513197.jpg"]
-        },
-        categories: [
-            { category_id: 1, name: "Kesehatan & Pendidikan", total: 9 },
-            { category_id: 2, name: "Infrastruktur & Pekerjaan Umum", total: 18 },
-            { category_id: 3, name: "Sosial & Logistik", total: 5 }
-        ],
-        last_updated: "2026-07-28T09:00:00Z"
-    },
-    12: {
-        district_id: 12,
-        district_name: "Jita",
-        profile: {
-            luas_wilayah: 4121,
-            jumlah_penduduk: 2800,
-            deskripsi: "Distrik Jita merupakan kawasan pedalaman berawa di timur Mimika. Sirkulasi mobilitas masyarakat sangat bergantung pada transportasi sungai, perahu kayu tradisional (*perahu jonson*), dan pasang surut air laut.",
-            batas_wilayah: "Utara: Jila, Selatan: Laut Arafura, Barat: Mimika Tengah, Timur: Agimuga",
-            images: ["/img/jita/images.jpg", "/img/jita/Panoramic_view_of_dock_at_Kampung_Rawa,_2014-06-21.jpg"]
-        },
-        categories: [
-            { category_id: 1, name: "Kesehatan & Pendidikan", total: 7 },
-            { category_id: 2, name: "Infrastruktur & Pekerjaan Umum", total: 12 },
-            { category_id: 3, name: "Sosial & Logistik", total: 4 }
-        ],
-        last_updated: "2026-07-28T09:00:00Z"
-    },
-    13: {
-        district_id: 13,
-        district_name: "Mimika Timur Jauh",
-        profile: {
-            luas_wilayah: 2112,
-            jumlah_penduduk: 3200,
-            deskripsi: "Distrik Mimika Timur Jauh terletak di pesisir muara sungai ujung timur Mimika yang berbatasan langsung dengan Kabupaten Asmat. Mayoritas penduduk bekerja mencari ikan dan mengolah sagu hutan alami.",
-            batas_wilayah: "Utara: Agimuga, Selatan: Laut Arafura, Barat: Mimika Timur, Timur: Kabupaten Asmat",
-            images: ["/img/agimuga/7311.jpg", "/img/20170903_Papouasie_Baliem_valley_15.jpg"]
-        },
-        categories: [
-            { category_id: 1, name: "Kesehatan & Pendidikan", total: 12 },
-            { category_id: 2, name: "Infrastruktur & Pekerjaan Umum", total: 15 },
-            { category_id: 3, name: "Sosial & Logistik", total: 8 }
-        ],
-        last_updated: "2026-07-28T09:00:00Z"
-    },
-    14: {
-        district_id: 14,
-        district_name: "Mimika Barat Jauh",
-        profile: {
-            luas_wilayah: 2122,
-            jumlah_penduduk: 2100,
-            deskripsi: "Distrik Mimika Barat Jauh berpusat di rumpun pesisir pantai Yaraya-Ipaya. Terkenal dengan potensi pasir pantai putih kelapa rakyat, dan pemanfaatan kincir angin skala mikro untuk listrik kampung pesisir.",
-            batas_wilayah: "Utara: Mimika Barat Tengah, Selatan: Laut Arafura, Barat: Kabupaten Kaimana, Timur: Mimika Barat",
-            images: ["/img/mimika%20barat%20jauh/pantai-minajaya-sukabumi-1747457877972_169.jpeg", "/img/mimika%20barat/IMG-20250929-WA0041-scaled.webp"]
-        },
-        categories: [
-            { category_id: 1, name: "Kesehatan & Pendidikan", total: 10 },
-            { category_id: 2, name: "Infrastruktur & Pekerjaan Umum", total: 14 },
-            { category_id: 3, name: "Sosial & Logistik", total: 4 }
-        ],
-        last_updated: "2026-07-28T09:00:00Z"
-    },
-    15: {
-        district_id: 15,
-        district_name: "Mimika Barat Tengah",
-        profile: {
-            luas_wilayah: 1842,
-            jumlah_penduduk: 2400,
-            deskripsi: "Distrik Mimika Barat Tengah melayani rute penghubung transportasi laut logistik ringan antar pesisir barat. Memiliki bentang muara yang luas dan dilindungi ekosistem hutan bakau (*mangrove*) tebal alami.",
-            batas_wilayah: "Utara: Kabupaten Deiyai, Selatan: Mimika Barat, Barat: Mimika Barat Jauh, Timur: Iwaka",
-            images: ["/img/AMANNSAGOAOWA.jpg", "/img/mimika%20barat/061348_64937_INDAH_mimika_dalam.jpg"]
-        },
-        categories: [
-            { category_id: 1, name: "Kesehatan & Pendidikan", total: 11 },
-            { category_id: 2, name: "Infrastruktur & Pekerjaan Umum", total: 13 },
-            { category_id: 3, name: "Sosial & Logistik", total: 5 }
-        ],
-        last_updated: "2026-07-28T09:00:00Z"
-    },
-    16: {
-        district_id: 16,
-        district_name: "Amar",
-        profile: {
-            luas_wilayah: 1221,
-            jumlah_penduduk: 1800,
-            deskripsi: "Distrik Amar merupakan kawasan pesisir rawa dengan mayoritas vegetasi nipa dan hutan payau. Sentra andalan daerah untuk penangkapan kepiting bakau (*Scylla serrata*) berkualitas ekspor.",
-            batas_wilayah: "Utara: Iwaka, Selatan: Laut Arafura, Barat: Mimika Barat, Timur: Mimika Barat Tengah",
-            images: ["/img/jita/Panoramic_view_of_dock_at_Kampung_Rawa,_2014-06-21.jpg", "/img/Mimika-300x200.jpg"]
-        },
-        categories: [
-            { category_id: 1, name: "Kesehatan & Pendidikan", total: 6 },
-            { category_id: 2, name: "Infrastruktur & Pekerjaan Umum", total: 11 },
-            { category_id: 3, name: "Sosial & Logistik", total: 5 }
-        ],
-        last_updated: "2026-07-28T09:00:00Z"
-    },
-    17: {
-        district_id: 17,
-        district_name: "Hoya",
-        profile: {
-            luas_wilayah: 2450,
-            jumlah_penduduk: 1200,
-            deskripsi: "Distrik Hoya terletak jauh di lembah sempit terdalam pegunungan Mimika. Akses jalan darat sama sekali tidak tersedia, membuat wilayah ini memiliki tantangan keterisolasian yang tinggi dalam pemenuhan kesehatan, logistik dasar, dan guru ajar.",
-            batas_wilayah: "Utara: Kabupaten Intan Jaya, Selatan: Jila, Barat: Tembagapura, Timur: Alama",
-            images: ["/img/hoya/images.jpg", "/img/hoya/JembatanHoya%20(2).jpg"]
-        },
-        categories: [
-            { category_id: 1, name: "Kesehatan & Pendidikan", total: 14 },
-            { category_id: 2, name: "Infrastruktur & Pekerjaan Umum", total: 29 },
-            { category_id: 3, name: "Sosial & Logistik", total: 11 }
-        ],
-        last_updated: "2026-07-28T09:00:00Z"
-    },
-    18: {
-        district_id: 18,
-        district_name: "Alama",
-        profile: {
-            luas_wilayah: 4110,
-            jumlah_penduduk: 1600,
-            deskripsi: "Distrik Alama terletak di ujung timur laut pegunungan terjal Mimika. Memiliki kepadatan penduduk paling kecil dengan sebaran perkampungan adat tradisional di lembah-lembah perbukitan terpencil.",
-            batas_wilayah: "Utara: Kabupaten Lanny Jaya, Selatan: Jita, Barat: Hoya, Timur: Kabupaten Nduga",
-            images: ["/img/alama/97295c5df6d1.jpg", "/img/alama/Taman-Nasional-Lorentz-1024x679.jpg"]
-        },
-        categories: [
-            { category_id: 1, name: "Kesehatan & Pendidikan", total: 8 },
-            { category_id: 2, name: "Infrastruktur & Pekerjaan Umum", total: 15 },
-            { category_id: 3, name: "Sosial & Logistik", total: 4 }
-        ],
-        last_updated: "2026-07-28T09:00:00Z"
-    }
-};
+import { AdminService } from "../../../../services/admin.service";
 
 type TabType = "umum" | "analisis";
 
@@ -379,6 +51,7 @@ export default function DetailPanel({
     const [data, setData] = useState<any | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [districtsList, setDistrictsList] = useState<any[]>([]);
 
     // State Pengatur Tab Visual
     const [activeTab, setActiveTab] = useState<TabType>("umum");
@@ -428,7 +101,7 @@ export default function DetailPanel({
         loadLastSession();
     }, [activeTab, districtName]);
 
-    const quickSuggestions = [
+    const quickSuggestions = data?.suggestions || [
         "Analisis Stunting",
         "Kendala Jalan Darat",
         "Kondisi Pendidikan",
@@ -449,8 +122,10 @@ export default function DetailPanel({
             const docs = await DocumentService.listDocuments();
             const docIds = docs.filter(d => d.status === 'READY').map(d => d.id);
 
+            const comparedDistName = districtsList.find(d => d.id === compareDistrictId)?.name || "?";
+
             const sessionTitle = isCompareMode && compareDistrictId
-                ? `Komparasi Spasial: ${districtName} vs ${MOCK_DRILLDOWN_DETAILS[Number(compareDistrictId)]?.district_name}`
+                ? `Komparasi Spasial: ${districtName} vs ${comparedDistName}`
                 : `Analisis Spasial: ${districtName}`;
 
             let sessionId = activeSessionId;
@@ -465,12 +140,11 @@ export default function DetailPanel({
 
             const districtsToQuery = [districtName];
             if (isCompareMode && compareDistrictId) {
-                const compName = MOCK_DRILLDOWN_DETAILS[Number(compareDistrictId)]?.district_name;
-                if (compName) districtsToQuery.push(compName);
+                districtsToQuery.push(comparedDistName);
             }
 
             const promptSuffix = isCompareMode && compareDistrictId
-                ? ` [Komparasi Wilayah: ${districtName} dan ${MOCK_DRILLDOWN_DETAILS[Number(compareDistrictId)]?.district_name || '?'}]`
+                ? ` [Komparasi Wilayah: ${districtName} dan ${comparedDistName}]`
                 : ` [Konteks Wilayah: ${districtName}]`;
 
             const fullPrompt = `${aiPrompt}${promptSuffix}`;
@@ -499,29 +173,57 @@ export default function DetailPanel({
         }
     };
 
-    // Memuat profil detail wilayah instan secara lokal
+    // Memuat profil detail wilayah secara dinamis dari database
     useEffect(() => {
         let isMounted = true;
         setLoading(true);
         setError(null);
 
-        const timer = setTimeout(() => {
-            if (!isMounted) return;
+        const loadDistrictData = async () => {
+            try {
+                const list = await AdminService.getDistrictsPublic();
+                if (!isMounted) return;
 
-            const matchedData = MOCK_DRILLDOWN_DETAILS[Number(districtId)];
-            if (matchedData) {
-                setData(matchedData);
-            } else {
-                setError("Data profil distrik tidak terdaftar di database.");
+                setDistrictsList(list);
+
+                const matched = list.find(
+                    (d: any) => d.name.toLowerCase() === districtName.toLowerCase()
+                );
+                if (matched) {
+                    // Map matched db schema fields to DetailPanel expected format
+                    const formatted = {
+                        district_id: matched.id,
+                        district_name: matched.name,
+                        profile: {
+                            luas_wilayah: matched.luasWilayah,
+                            jumlah_penduduk: matched.jumlahPenduduk,
+                            deskripsi: matched.deskripsi,
+                            batas_wilayah: matched.batasWilayah,
+                            images: matched.images || [],
+                        },
+                        suggestions: matched.suggestions || ["Analisis Stunting", "Kendala Jalan Darat", "Kondisi Pendidikan"],
+                        last_updated: matched.updatedAt
+                    };
+                    setData(formatted);
+                } else {
+                    setError(`Data profil distrik "${districtName}" tidak ditemukan di database.`);
+                }
+            } catch (err: any) {
+                if (isMounted) {
+                    setError(err.message || "Gagal memuat data distrik dari database.");
+                }
+            } finally {
+                if (isMounted) {
+                    setLoading(false);
+                }
             }
-            setLoading(false);
-        }, 120);
+        };
 
+        loadDistrictData();
         return () => {
             isMounted = false;
-            clearTimeout(timer);
         };
-    }, [districtId]);
+    }, [districtName]);
 
 
     if (loading) {
@@ -703,10 +405,10 @@ export default function DetailPanel({
                                         className="w-full bg-white border border-slate-300 text-slate-800 text-[11px] font-semibold px-2.5 py-1.5 rounded-none focus:outline-none focus:border-teal-600"
                                     >
                                         <option value="">-- Pilih Wilayah --</option>
-                                        {Object.entries(MOCK_DRILLDOWN_DETAILS)
-                                            .filter(([id]) => Number(id) !== Number(districtId))
-                                            .map(([id, item]) => (
-                                                <option key={id} value={id}>{item.district_name}</option>
+                                        {districtsList
+                                            .filter((item) => item.name.toLowerCase() !== districtName.toLowerCase())
+                                            .map((item) => (
+                                                <option key={item.id} value={item.id}>{item.name}</option>
                                             ))
                                         }
                                     </select>
@@ -775,7 +477,7 @@ export default function DetailPanel({
                     <div className="flex items-center gap-1.5 px-1">
                         <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 bg-teal-800 text-white rounded-none">
                             {isCompareMode && compareDistrictId
-                                ? `Komparasi: ${districtName} vs ${MOCK_DRILLDOWN_DETAILS[Number(compareDistrictId)]?.district_name || '?'}`
+                                ? `Komparasi: ${districtName} vs ${districtsList.find(d => d.id === compareDistrictId)?.name || '?'}`
                                 : `Fokus: Distrik ${districtName}`}
                         </span>
                     </div>
@@ -786,7 +488,7 @@ export default function DetailPanel({
                             onChange={(e) => setAiPrompt(e.target.value)}
                             disabled={aiLoading}
                             placeholder={isCompareMode && compareDistrictId
-                                ? `Bandingkan ${districtName} & ${MOCK_DRILLDOWN_DETAILS[Number(compareDistrictId)]?.district_name || '?'}`
+                                ? `Bandingkan ${districtName} & ${districtsList.find(d => d.id === compareDistrictId)?.name || '?'}`
                                 : `Tanyakan kondisi di ${districtName}...`}
                             className="flex-1 bg-white border border-slate-200 rounded-none py-1.5 px-3 text-[12px] font-medium text-slate-700 placeholder:text-slate-400 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 transition-all disabled:opacity-50"
                         />

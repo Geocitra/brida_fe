@@ -18,7 +18,7 @@ export const AppFooter: React.FC = () => {
             </span>
           </div>
           <p className="text-[11px] text-slate-500 font-normal mt-1">
-            Aplikasi Analisa Kebijakan &amp; Laporan Strategis — © {currentYear} Geo Analisis. All rights reserved.
+            Analisa Kebijakan &amp; Laporan Strategis — © {currentYear} Geo Analisis. All rights reserved.
           </p>
         </div>
 

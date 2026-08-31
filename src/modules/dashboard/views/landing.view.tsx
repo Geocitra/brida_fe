@@ -127,7 +127,7 @@ export const LandingView: React.FC<LandingViewProps> = ({ onNavigate, isAuthenti
               <span className="text-blue-600 ml-1">Platform</span>
             </h1>
             <span className="text-[12px] text-slate-500 font-semibold mt-1">
-              Aplikasi Analisa Kebijakan &amp; Laporan Strategis
+              Analisa Kebijakan &amp; Laporan Strategis
             </span>
           </div>
         </div>
@@ -178,7 +178,7 @@ export const LandingView: React.FC<LandingViewProps> = ({ onNavigate, isAuthenti
               className="text-4xl md:text-5xl font-black tracking-tight text-white! uppercase leading-none mb-4 font-roboto"
               style={{ textShadow: '0 2px 10px rgba(0, 0, 0, 0.8)' }}
             >
-              Aplikasi Analisa Kebijakan <br className="hidden md:inline" /> &amp; Laporan Strategis
+              Analisa Kebijakan <br className="hidden md:inline" /> &amp; Laporan Strategis
             </h1>
             <p 
               className="text-sm md:text-base text-slate-100! max-w-4xl font-medium leading-relaxed mb-4"

@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { EditorContent } from '@tiptap/react';
 import type { Editor } from '@tiptap/react';
-import { Loader2, Download } from 'lucide-react';
+import { Loader2, Download, Send } from 'lucide-react';
 
 interface ArticlePreviewCanvasProps {
     editor: Editor | null;
@@ -20,6 +20,7 @@ interface ArticlePreviewCanvasProps {
     isDirty: boolean;
     onSaveAndBack: () => void;
     onPrint: () => void;
+    onShareWa?: () => void;
     fontSize: string;
     fontFamily: string;
     zoomLevel: number;
@@ -219,6 +220,7 @@ export const ArticlePreviewCanvas: React.FC<ArticlePreviewCanvasProps> = ({
     isDirty,
     onSaveAndBack,
     onPrint,
+    onShareWa,
     fontSize,
     fontFamily,
     zoomLevel,
@@ -532,7 +534,7 @@ export const ArticlePreviewCanvas: React.FC<ArticlePreviewCanvasProps> = ({
                     )}
                 </div>
 
-                {/* Tombol Cetak PDF (bawah dokumen, tidak tercetak) */}
+                {/* Tombol Cetak PDF & Bagikan ke WA (bawah dokumen, tidak tercetak) */}
                 <div
                     className="no-print"
                     style={{
@@ -542,6 +544,7 @@ export const ArticlePreviewCanvas: React.FC<ArticlePreviewCanvasProps> = ({
                         width:      '100%',
                         display:    'flex',
                         justifyContent: 'center',
+                        gap:        '12px',
                         fontFamily: 'Roboto, sans-serif',
                     }}
                 >
@@ -558,6 +561,19 @@ export const ArticlePreviewCanvas: React.FC<ArticlePreviewCanvasProps> = ({
                         }
                         <span>Cetak PDF Resmi</span>
                     </button>
+
+                    {onShareWa && (
+                      <button
+                          type="button"
+                          onClick={onShareWa}
+                          disabled={isSaving || isPrinting}
+                          style={{ border: '1px solid #065f46' }}
+                          className="px-6 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white font-extrabold text-xs uppercase tracking-wider cursor-pointer transition-colors disabled:opacity-50 inline-flex items-center gap-1.5 shadow"
+                      >
+                          <Send size={12} />
+                          <span>Bagikan ke WA</span>
+                      </button>
+                    )}
                 </div>
             </div>
         </div>

@@ -8,6 +8,7 @@ import {
   PenTool,
   LogOut,
   Atom,
+  Settings,
 } from 'lucide-react';
 
 
@@ -18,12 +19,19 @@ interface TopHeaderProps {
 }
 
 export const TopHeader: React.FC<TopHeaderProps> = ({ activeRoute, onNavigate, onLogout }) => {
+  const role = sessionStorage.getItem('brida_user_role') || 'USER';
+
   const navItems = [
+    ...(role === 'ADMIN' ? [
+      { id: 'admin-console', label: 'Admin Console', icon: Settings },
+    ] : []),
     { id: 'dashboard', label: 'Dashboard Spasial', icon: LayoutDashboard },
-    { id: 'generator', label: 'Artikel Generator', icon: PenTool },
-    { id: 'ai-request', label: 'AI Chat', icon: MessageSquareCode },
-    { id: 'analytics', label: 'Analisa Kebijakan', icon: BarChart3 },
-    { id: 'reports', label: 'Laporan', icon: FileText },
+    ...(role === 'USER' ? [
+      { id: 'generator', label: 'Artikel Generator', icon: PenTool },
+      { id: 'ai-request', label: 'AI Chat', icon: MessageSquareCode },
+      { id: 'analytics', label: 'Analisa Kebijakan', icon: BarChart3 },
+      { id: 'reports', label: 'Laporan', icon: FileText },
+    ] : []),
     { id: 'knowledge-hub', label: 'Repositori Dokumen', icon: FolderOpen },
   ];
 
@@ -43,7 +51,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({ activeRoute, onNavigate, o
               AKLS
             </span>
             <span className="font-roboto text-[12px] text-slate-400 font-medium hidden sm:inline">
-              Aplikasi Analisa Kebijakan &amp; Laporan Strategis
+              Analisa Kebijakan &amp; Laporan Strategis
             </span>
           </div>
         </button>

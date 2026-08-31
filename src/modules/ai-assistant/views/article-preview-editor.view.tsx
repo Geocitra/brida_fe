@@ -30,7 +30,10 @@ import {
   ArrowLeft,
   CheckCircle2,
   AlertCircle,
+  Send,
+  X,
 } from 'lucide-react';
+import { AdminService } from '../../../services/admin.service';
 import { ArticlePreviewEditorHeader } from '../components/article-preview-editor/article-preview-editor-header.component';
 import { ArticlePreviewPageNavigator } from '../components/article-preview-editor/article-preview-page-navigator.component';
 import { ArticlePreviewCanvas } from '../components/article-preview-editor/article-preview-canvas.component';
@@ -188,6 +191,13 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [isPrinting, setIsPrinting] = useState<boolean>(false);
+
+  // WhatsApp Share State
+  const [isWaModalOpen, setIsWaModalOpen] = useState(false);
+  const [waContacts, setWaContacts] = useState<any[]>([]);
+  const [selectedContactId, setSelectedContactId] = useState('');
+  const [waMessage, setWaMessage] = useState('');
+  const [loadingContacts, setLoadingContacts] = useState(false);
   const [isUploadingMedia, setIsUploadingMedia] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const loadedSessionIdRef = useRef<string | null>(null);
@@ -513,6 +523,86 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
     }
   }, [editor, isLoading, storeSessionId, sessionId, draftContent]);
 
+  const getDefaultWaMessage = (receiverName: string, titleStr: string, sessionUUID: string, draftHtml: string) => {
+    // Bersihkan HTML tag untuk summary
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = draftHtml;
+    const plainText = tempDiv.textContent || tempDiv.innerText || '';
+    const cleanSummary = plainText.substring(0, 300) + '...';
+    
+    const origin = window.location.origin;
+    const shareUrl = `${origin}/share/article/${sessionUUID}`;
+    
+    return `Yth. ${receiverName},
+
+Berikut dikirimkan naskah artikel publikasi resmi dari Badan Riset dan Inovasi Daerah (BRIDA) Kabupaten Mimika:
+
+* Judul: ${titleStr}
+* Ringkasan: ${cleanSummary}
+
+Naskah lengkap (Format Cetak PDF Resmi) dapat diakses dan diunduh langsung melalui tautan BRIDA berikut:
+${shareUrl}
+
+Teria kasih.
+Badan Riset dan Inovasi Daerah (BRIDA) Kabupaten Mimika.`;
+  };
+
+  const handleOpenWaModal = async () => {
+    if (!editor || !sessionId) return;
+    setLoadingContacts(true);
+    setIsWaModalOpen(true);
+    try {
+      const [opdsList, settingsList] = await Promise.all([
+        AdminService.getOpds(),
+        AdminService.getPublicSettings().catch(() => []),
+      ]);
+      
+      const bupatiName = settingsList.find((s: any) => s.key === 'BUPATI_NAME')?.value || 'Darius Sabon Rain, S.E., M.Ec.Dev. (Pjs. Bupati)';
+      const bupatiPhone = settingsList.find((s: any) => s.key === 'BUPATI_PHONE')?.value || '628123456789';
+      
+      const contacts = [
+        { id: 'bupati', name: `${bupatiName} (Pimpinan Daerah)`, phone: bupatiPhone },
+        ...opdsList
+          .filter((o: any) => o.headName && o.headPhone)
+          .map((o: any) => ({
+            id: o.id,
+            name: `${o.headName} (Kepala ${o.code})`,
+            phone: o.headPhone
+          }))
+      ];
+      setWaContacts(contacts);
+      if (contacts.length > 0) {
+        setSelectedContactId(contacts[0].id);
+        const msg = getDefaultWaMessage(contacts[0].name, articleTitle || 'Artikel Publikasi', sessionId, editor.getHTML());
+        setWaMessage(msg);
+      }
+    } catch (err) {
+      console.error('Gagal memuat kontak WhatsApp:', err);
+      showToast('⚠️ Gagal mengambil daftar kontak dari database.');
+    } finally {
+      setLoadingContacts(false);
+    }
+  };
+
+  const handleContactChange = (contactId: string) => {
+    setSelectedContactId(contactId);
+    const contact = waContacts.find(c => c.id === contactId);
+    if (contact && editor && sessionId) {
+      const msg = getDefaultWaMessage(contact.name, articleTitle || 'Artikel Publikasi', sessionId, editor.getHTML());
+      setWaMessage(msg);
+    }
+  };
+
+  const handleSendWaSubmit = () => {
+    const contact = waContacts.find(c => c.id === selectedContactId);
+    if (!contact) return;
+    const cleanPhone = contact.phone.replace(/[^0-9]/g, '');
+    const url = `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(waMessage)}`;
+    window.open(url, '_blank');
+    setIsWaModalOpen(false);
+    showToast(`Membuka WhatsApp untuk mengirim naskah ke ${contact.name}`);
+  };
+
   const handleSaveAndBack = async () => {
     if (!sessionId || !editor || isSaving) return;
 
@@ -747,6 +837,7 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
           isDirty={isDirty}
           onSaveAndBack={handleSaveAndBack}
           onPrint={handlePrint}
+          onShareWa={handleOpenWaModal}
           fontSize={fontSize}
           fontFamily={fontFamily}
           zoomLevel={zoomLevel}
@@ -754,6 +845,87 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
         />
 
       </div>
+
+      {/* WhatsApp Share Modal (rounded-none border-slate-300 layout) */}
+      {isWaModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-955/40 backdrop-blur-sm p-4 animate-in fade-in duration-100 no-print">
+          <div className="w-full max-w-lg bg-white border border-slate-350 shadow-2xl rounded-none flex flex-col max-h-[90vh]">
+            <div className="flex items-center justify-between border-b border-slate-205 px-6 py-4">
+              <div>
+                <span className="text-[10px] font-black text-emerald-600 uppercase tracking-wider font-roboto">Berbagi Kajian</span>
+                <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider mt-0.5 font-roboto">
+                  Bagikan Naskah ke WhatsApp
+                </h3>
+              </div>
+              <button
+                onClick={() => setIsWaModalOpen(false)}
+                className="p-1 hover:bg-slate-100 text-slate-400 hover:text-slate-800 transition-colors cursor-pointer border border-transparent hover:border-slate-200"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+              {loadingContacts ? (
+                <div className="flex flex-col items-center justify-center py-10 space-y-2">
+                  <Loader2 size={24} className="text-emerald-700 animate-spin" />
+                  <span className="text-xs text-slate-500 font-bold uppercase tracking-wider font-roboto">Memuat Daftar Kontak...</span>
+                </div>
+              ) : waContacts.length === 0 ? (
+                <div className="text-center py-8 text-slate-500 text-xs font-roboto">
+                  Tidak ada kontak terdaftar dengan nomor WA aktif di database master. Silakan tambahkan nomor WA OPD di menu Admin Console.
+                </div>
+              ) : (
+                <>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-slate-500 tracking-wider block font-roboto">Pilih Kontak Tujuan</label>
+                    <select
+                      value={selectedContactId}
+                      onChange={(e) => handleContactChange(e.target.value)}
+                      className="w-full px-3 py-2 text-xs border border-slate-300 rounded-none bg-slate-50 focus:bg-white focus:border-slate-900 outline-none font-bold text-slate-800 font-roboto"
+                    >
+                      {waContacts.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name} - [{c.phone}]
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-slate-500 tracking-wider block font-roboto">Draf Pesan WhatsApp (Dapat Diedit)</label>
+                    <textarea
+                      value={waMessage}
+                      onChange={(e) => setWaMessage(e.target.value)}
+                      rows={10}
+                      className="w-full px-3 py-2 text-xs border border-slate-300 rounded-none bg-slate-50 focus:bg-white focus:border-slate-900 outline-none font-mono text-slate-750 resize-none"
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div className="border-t border-slate-205 px-6 py-4 flex justify-end gap-2 bg-slate-50">
+              <button
+                type="button"
+                onClick={() => setIsWaModalOpen(false)}
+                className="px-4 py-2 border border-slate-300 text-slate-700 font-semibold text-xs uppercase tracking-wider rounded-none hover:bg-slate-100 transition-colors cursor-pointer font-roboto"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleSendWaSubmit}
+                disabled={loadingContacts || waContacts.length === 0}
+                className="px-5 py-2.5 bg-emerald-700 hover:bg-emerald-800 disabled:bg-slate-300 text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-1.5 cursor-pointer border border-emerald-800 shadow-xs font-roboto"
+              >
+                <Send size={12} />
+                <span>Kirim via WhatsApp Web</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

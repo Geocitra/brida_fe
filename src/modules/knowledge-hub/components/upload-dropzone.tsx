@@ -1,6 +1,7 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { UploadCloud, FileText, AlertCircle, Loader2, Target, BarChart3, Newspaper } from 'lucide-react';
 import { DocumentService, type DocumentRecord } from '../../../services/document.service';
+import { AdminService } from '../../../services/admin.service';
 
 interface UploadDropzoneProps {
   onUploadSuccess: (newDoc: DocumentRecord) => void;
@@ -9,11 +10,42 @@ interface UploadDropzoneProps {
 export const UploadDropzone: React.FC<UploadDropzoneProps> = ({ onUploadSuccess }) => {
   const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState('');
-  const [category, setCategory] = useState('Perencanaan & Baseline Target');
-  const [docType, setDocType] = useState<'BASELINE' | 'REALIZATION' | 'GENERAL_REFERENCE'>('BASELINE');
+  const [category, setCategory] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Data Master States
+  const [categories, setCategories] = useState<any[]>([]);
+  const [opds, setOpds] = useState<any[]>([]);
+  const [selectedCategoryId, setSelectedCategoryId] = useState('');
+  const [selectedOpdId, setSelectedOpdId] = useState('');
+  const [selectedCategoryRole, setSelectedCategoryRole] = useState<string>('REFERENCE');
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchMasterData = async () => {
+      try {
+        const [cats, opdList] = await Promise.all([
+          AdminService.getCategories(),
+          AdminService.getOpds(),
+        ]);
+        if (isMounted) {
+          setCategories(cats);
+          setOpds(opdList);
+          if (cats.length > 0) {
+            setSelectedCategoryId(cats[0].id);
+            setCategory(cats[0].name);
+            setSelectedCategoryRole(cats[0].analyticalRole || 'REFERENCE');
+          }
+        }
+      } catch (err) {
+        console.warn('Gagal memuat data master OPD/Kategori di upload dropzone:', err);
+      }
+    };
+    fetchMasterData();
+    return () => { isMounted = false; };
+  }, []);
 
   const handleFileSelect = (selectedFile: File) => {
     setErrorMessage(null);
@@ -44,7 +76,14 @@ export const UploadDropzone: React.FC<UploadDropzoneProps> = ({ onUploadSuccess 
     setErrorMessage(null);
 
     try {
-      const uploadedDoc = await DocumentService.uploadDocument(file, title, category, docType);
+      const uploadedDoc = await DocumentService.uploadDocument(
+        file,
+        title,
+        category,
+        undefined, // docType auto-derived from categoryId at backend
+        selectedCategoryId || undefined,
+        selectedOpdId || undefined
+      );
       onUploadSuccess(uploadedDoc);
       setFile(null);
       setTitle('');
@@ -54,6 +93,14 @@ export const UploadDropzone: React.FC<UploadDropzoneProps> = ({ onUploadSuccess 
       setIsUploading(false);
     }
   };
+
+  const roleConfig: Record<string, { label: string; icon: any; className: string }> = {
+    TARGET: { label: 'Target / Sasaran (RPJMD / Renstra)', icon: Target, className: 'bg-teal-50 border-teal-200 text-teal-800' },
+    REALIZATION: { label: 'Capaian / Realisasi (LKPJ / Laporan)', icon: BarChart3, className: 'bg-sky-50 border-sky-200 text-sky-800' },
+    REFERENCE: { label: 'Referensi Umum / Kajian Pendukung', icon: Newspaper, className: 'bg-slate-50 border-slate-200 text-slate-700' },
+  };
+  const currentRole = roleConfig[selectedCategoryRole] || roleConfig['REFERENCE'];
+  const RoleIcon = currentRole.icon;
 
   return (
     <div className="bg-white border border-slate-200 p-6 rounded-none shadow-xs font-roboto">
@@ -68,72 +115,15 @@ export const UploadDropzone: React.FC<UploadDropzoneProps> = ({ onUploadSuccess 
         </div>
       )}
 
-      {/* Classification Selector Tabs (Flat Segmented Row - Zero Boxed Cards) */}
+      {/* Classification badge — derived from selected category's analyticalRole */}
       <div className="mb-5 space-y-1.5">
-        <label className="block text-sm font-bold text-slate-800">
-          Pilih Klasifikasi Jenis Dokumen Acuan:
+        <label className="block text-xs font-black uppercase text-slate-500 tracking-wider">
+          Klasifikasi Peran Analitik AI:
         </label>
-        <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-slate-200 border-y border-slate-200">
-          <button
-            type="button"
-            onClick={() => {
-              setDocType('BASELINE');
-              setCategory('Perencanaan & Baseline Target');
-            }}
-            className={`p-3 text-left transition-all cursor-pointer ${docType === 'BASELINE'
-              ? 'bg-teal-50/80 border-b-2 border-teal-700 text-teal-950 font-bold'
-              : 'hover:bg-slate-50 text-slate-700 border-b-2 border-transparent'
-              }`}
-          >
-            <div className="text-sm font-bold flex items-center gap-1.5 text-teal-800 mb-0.5">
-              <Target size={15} className="text-teal-600 shrink-0" />
-              <span>1. Target (Baseline)</span>
-            </div>
-            <p className="text-xs text-slate-500 font-normal">
-              RPJMD, Renstra OPD, Dokumen Target Indikator Makro.
-            </p>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              setDocType('REALIZATION');
-              setCategory('Laporan Realisasi Capaian');
-            }}
-            className={`p-3 text-left transition-all cursor-pointer ${docType === 'REALIZATION'
-              ? 'bg-teal-50/80 border-b-2 border-teal-700 text-teal-950 font-bold'
-              : 'hover:bg-slate-50 text-slate-700 border-b-2 border-transparent'
-              }`}
-          >
-            <div className="text-sm font-bold flex items-center gap-1.5 text-teal-800 mb-0.5">
-              <BarChart3 size={15} className="text-teal-600 shrink-0" />
-              <span>2. Capaian (Realisasi)</span>
-            </div>
-            <p className="text-xs text-slate-500 font-normal">
-              Laporan Fisik Bulanan, Capaian Triwulan, Laporan OPD.
-            </p>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              setDocType('GENERAL_REFERENCE');
-              setCategory('Referensi Umum & Kliping');
-            }}
-            className={`p-3 text-left transition-all cursor-pointer ${docType === 'GENERAL_REFERENCE'
-              ? 'bg-teal-50/80 border-b-2 border-teal-700 text-teal-950 font-bold'
-              : 'hover:bg-slate-50 text-slate-700 border-b-2 border-transparent'
-              }`}
-          >
-            <div className="text-sm font-bold flex items-center gap-1.5 text-teal-800 mb-0.5">
-              <Newspaper size={15} className="text-teal-600 shrink-0" />
-              <span>3. Umum / Referensi</span>
-            </div>
-            <p className="text-xs text-slate-500 font-normal">
-              Berita, Regulasi/Inpres, Kliping Media, Artikel Riset.
-            </p>
-          </button>
-        </div>
+        <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 border text-xs font-bold rounded-none ${currentRole.className}`}>
+          <RoleIcon size={14} />
+          <span>{currentRole.label}</span>
+        </span>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -170,9 +160,9 @@ export const UploadDropzone: React.FC<UploadDropzoneProps> = ({ onUploadSuccess 
         </div>
 
         {/* Form Inputs */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
-            <label className="block font-roboto text-sm font-bold text-slate-800 mb-1.5">
+            <label className="block font-roboto text-[11px] font-black uppercase text-slate-500 tracking-wider mb-1.5">
               Judul Dokumen / Laporan
             </label>
             <input
@@ -181,35 +171,56 @@ export const UploadDropzone: React.FC<UploadDropzoneProps> = ({ onUploadSuccess 
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Contoh: RPJMD Daerah 2026"
               required
-              className="w-full bg-white border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:border-teal-600 rounded-none"
+              className="w-full bg-white border border-slate-300 px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-teal-600 rounded-none"
             />
           </div>
+          
           <div>
-            <label className="block font-roboto text-sm font-bold text-slate-800 mb-1.5">
-              Kategori Dokumen
+            <label className="block font-roboto text-[11px] font-black uppercase text-slate-500 tracking-wider mb-1.5">
+              Kategori Dokumen (Data Master)
             </label>
             <select
-              value={category}
+              value={selectedCategoryId}
               onChange={(e) => {
-                const val = e.target.value;
-                setCategory(val);
-                if (val.includes('Baseline') || val.includes('Perencanaan')) {
-                  setDocType('BASELINE');
-                } else if (val.includes('Realisasi') || val.includes('Capaian')) {
-                  setDocType('REALIZATION');
-                } else {
-                  setDocType('GENERAL_REFERENCE');
+                const catId = e.target.value;
+                setSelectedCategoryId(catId);
+                const selectedCat = categories.find((c) => c.id === catId);
+                if (selectedCat) {
+                  setCategory(selectedCat.name);
+                  setSelectedCategoryRole(selectedCat.analyticalRole || 'REFERENCE');
                 }
               }}
-              className="w-full bg-slate-50 border border-slate-300 px-3 py-2 text-sm text-slate-900 font-medium focus:outline-none focus:border-teal-600 rounded-none"
+              className="w-full bg-slate-50 border border-slate-300 px-3 py-2 text-xs text-slate-900 font-bold focus:outline-none focus:border-teal-600 rounded-none"
             >
-              <option value="Perencanaan & Baseline Target">Perencanaan &amp; Baseline Target (Baseline)</option>
-              <option value="Laporan Realisasi Capaian">Laporan Realisasi Capaian (Realisasi)</option>
-              <option value="Referensi Umum & Kliping">Referensi Umum &amp; Kliping (Umum)</option>
+              {categories.map((c) => {
+                const cleanCode = c.code.replace(/_/g, ' ').toUpperCase();
+                return (
+                  <option key={c.id} value={c.id}>
+                    [{cleanCode}] {c.name}
+                  </option>
+                );
+              })}
+            </select>
+          </div>
+
+          <div>
+            <label className="block font-roboto text-[11px] font-black uppercase text-slate-500 tracking-wider mb-1.5">
+              Dinas Pemilik Data (OPD)
+            </label>
+            <select
+              value={selectedOpdId}
+              onChange={(e) => setSelectedOpdId(e.target.value)}
+              className="w-full bg-slate-50 border border-slate-300 px-3 py-2 text-xs text-slate-900 font-bold focus:outline-none focus:border-teal-600 rounded-none"
+            >
+              <option value="">-- Tanpa Dinas OPD (Umum) --</option>
+              {opds.map((o) => (
+                <option key={o.id} value={o.id}>
+                  [{o.code}] {o.name}
+                </option>
+              ))}
             </select>
           </div>
         </div>
-
 
         {/* Submit Action */}
         <div className="flex justify-end pt-2">
@@ -217,13 +228,13 @@ export const UploadDropzone: React.FC<UploadDropzoneProps> = ({ onUploadSuccess 
             type="submit"
             disabled={!file || !title || isUploading}
             className={`
-              px-6 py-2.5 font-roboto font-semibold text-sm text-white rounded-none flex items-center gap-2 transition-colors
+              px-6 py-2.5 font-roboto font-semibold text-xs text-white rounded-none flex items-center gap-2 transition-colors uppercase tracking-wider
               ${(!file || !title || isUploading)
                 ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
                 : 'bg-teal-700 hover:bg-teal-800'}
             `}
           >
-            {isUploading && <Loader2 size={16} className="animate-spin text-white" />}
+            {isUploading && <Loader2 size={14} className="animate-spin text-white" />}
             <span>{isUploading ? 'Memproses & Mengindeks Dokumen...' : `Unggah Dokumen`}</span>
           </button>
         </div>

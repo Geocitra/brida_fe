@@ -58,10 +58,26 @@ const formatError = (msg: any, fallback: string): string => {
   return String(msg);
 };
 
+async function fetchWithAuth(url: string, options: RequestInit = {}): Promise<Response> {
+  const token = sessionStorage.getItem('brida_auth_token');
+  const headers = {
+    ...(options.headers || {}),
+  } as Record<string, string>;
+
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  return fetch(url, {
+    ...options,
+    headers,
+  });
+}
+
 export const AnalysisService = {
   async getIndicatorMatrix(): Promise<IndicatorItem[]> {
     try {
-      const response = await fetch(`${API_BASE_URL}/analysis/indicators`);
+      const response = await fetchWithAuth(`${API_BASE_URL}/analysis/indicators`);
       const result = await response.json();
       if (!response.ok || !result.success) {
         throw new Error(formatError(result.message, 'Gagal memuat matriks indikator.'));
@@ -84,7 +100,7 @@ export const AnalysisService = {
     documentIds?: string[];
   }): Promise<DeviationCompareResult> {
     try {
-      const response = await fetch(`${API_BASE_URL}/analysis/compare`, {
+      const response = await fetchWithAuth(`${API_BASE_URL}/analysis/compare`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),

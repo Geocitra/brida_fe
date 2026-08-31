@@ -23,6 +23,7 @@ import {
 import { PdfExportService } from '../../../services/pdf-export.service';
 import { DocumentService, type DocumentRecord } from '../../../services/document.service';
 import { ReportService, type CheckCacheResponse } from '../../../services/report.service';
+import { AdminService } from '../../../services/admin.service';
 import { EmptyState } from '../../../components/common/empty-state.component';
 import {
   Download,
@@ -98,6 +99,10 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
   const [modalTargetValue, setModalTargetValue] = useState(100);
   const [modalRealizationValue, setModalRealizationValue] = useState(84.5);
   const [modalUnitSuffix, setModalUnitSuffix] = useState('%');
+
+  // State kategori dinamis dari master data
+  const [docCategories, setDocCategories] = useState<any[]>([]);
+  const [activeCategoryTab, setActiveCategoryTab] = useState<string>('all');
 
   const filteredSavedSessions = savedSessions.filter((session) => {
     // 1. Text Query Filter
@@ -241,6 +246,13 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
     loadInitialData();
   }, [initialSelectedDocIds]);
 
+  // Load kategori master dari backend
+  useEffect(() => {
+    AdminService.getCategories().then((cats) => {
+      setDocCategories(cats || []);
+    }).catch(() => {});
+  }, []);
+
   const saveSessionToStorage = (newSessions: SavedAnalysisSession[]) => {
     setSavedSessions(newSessions);
     localStorage.setItem('brida_saved_analysis_sessions', JSON.stringify(newSessions));
@@ -252,11 +264,12 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
     );
   };
 
-  const selectAllCategoryDocs = (docType: string) => {
-    const categoryDocIds = documents
-      .filter((d) => d.metadata?.docType === docType)
-      .map((d) => d.id);
-    const allSelected = categoryDocIds.every((id) => selectedDocIds.includes(id));
+  const selectAllCategoryDocs = (categoryId: string) => {
+    // Pilih semua dokumen dalam kategori tertentu (atau semua jika 'all')
+    const categoryDocIds = categoryId === 'all'
+      ? documents.map((d) => d.id)
+      : documents.filter((d) => d.metadata?.categoryId === categoryId).map((d) => d.id);
+    const allSelected = categoryDocIds.length > 0 && categoryDocIds.every((id) => selectedDocIds.includes(id));
     if (allSelected) {
       setSelectedDocIds((prev) => prev.filter((id) => !categoryDocIds.includes(id)));
     } else {
@@ -273,12 +286,15 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
       return;
     }
 
-    // Cari dokumen Baseline & Realisasi secara proaktif dari pilihan user
+    // Cari dokumen TARGET & REALIZATION secara proaktif dari pilihan user
+    // (support both new analyticalRole and legacy docType for backward-compat)
     const autoBaseline = documents.find(
-      (d) => selectedDocIds.includes(d.id) && d.metadata?.docType === 'BASELINE'
+      (d) => selectedDocIds.includes(d.id) &&
+        (d.metadata?.analyticalRole === 'TARGET' || d.metadata?.docType === 'BASELINE')
     );
     const autoRealization = documents.find(
-      (d) => selectedDocIds.includes(d.id) && d.metadata?.docType === 'REALIZATION'
+      (d) => selectedDocIds.includes(d.id) &&
+        (d.metadata?.analyticalRole === 'REALIZATION' || d.metadata?.docType === 'REALIZATION')
     );
     const firstSelected = documents.find((d) => selectedDocIds.includes(d.id));
 
@@ -418,16 +434,35 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
     }
   };
 
-  const baselineDocs = documents.filter((d) => d.metadata?.docType === 'BASELINE');
-  const realizationDocs = documents.filter((d) => d.metadata?.docType === 'REALIZATION');
-  const generalDocs = documents.filter((d) => d.metadata?.docType === 'GENERAL_REFERENCE' || !d.metadata?.docType);
+  // Kelompokkan dokumen berdasarkan kategori secara dinamis
+  const docsWithCategory = documents.filter((d) => d.metadata?.categoryId);
+  const docsWithoutCategory = documents.filter((d) => !d.metadata?.categoryId);
 
-  const isAllBaselineSelected = baselineDocs.length > 0 && baselineDocs.every((d) => selectedDocIds.includes(d.id));
-  const isAllRealizationSelected = realizationDocs.length > 0 && realizationDocs.every((d) => selectedDocIds.includes(d.id));
-  const isAllGeneralSelected = generalDocs.length > 0 && generalDocs.every((d) => selectedDocIds.includes(d.id));
+  // Hitung dokumen per kategori untuk ditampilkan di tab
+  const categoryDocCounts = docCategories.reduce<Record<string, number>>((acc, cat) => {
+    acc[cat.id] = documents.filter((d) => d.metadata?.categoryId === cat.id).length;
+    return acc;
+  }, {});
+
+  // Dokumen yang ditampilkan berdasarkan tab aktif
+  const visibleDocs = activeCategoryTab === 'all'
+    ? documents
+    : activeCategoryTab === 'uncategorized'
+      ? docsWithoutCategory
+      : documents.filter((d) => d.metadata?.categoryId === activeCategoryTab);
+
+  // Badge peran analitik per kategori
+  const roleStyle: Record<string, { badge: string; dot: string }> = {
+    TARGET: { badge: 'bg-teal-100 text-teal-800 border-teal-200', dot: 'bg-teal-500' },
+    REALIZATION: { badge: 'bg-sky-100 text-sky-800 border-sky-200', dot: 'bg-sky-500' },
+    REFERENCE: { badge: 'bg-slate-100 text-slate-600 border-slate-200', dot: 'bg-slate-400' },
+  };
 
   // Mendapatkan daftar dokumen terpilih untuk dropdown di dialog modal
   const selectedDocumentsList = documents.filter((d) => selectedDocIds.includes(d.id));
+
+  // Cek apakah semua visible doc sudah dipilih (untuk select-all toggle)
+  const isAllVisibleSelected = visibleDocs.length > 0 && visibleDocs.every((d) => selectedDocIds.includes(d.id));
 
   return (
     <div className="flex flex-col w-full bg-slate-100/70 p-6 space-y-6 font-roboto relative">
@@ -543,131 +578,99 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
                 )}
               />
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-slate-200 border-y border-slate-200 py-1">
-                {/* Group 1: Target (Baseline) */}
-                <div className="p-2 space-y-1.5">
-                  <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
-                    <span className="text-xs font-semibold text-slate-800 flex items-center gap-1.5">
-                      <Target size={14} className="text-teal-600 shrink-0" />
-                      1. Target (Baseline)
-                    </span>
+              <div className="space-y-0">
+                {/* Tab navigasi kategori dokumen — dinamis dari master data */}
+                <div className="flex items-center gap-0 overflow-x-auto border-b border-slate-200 no-scrollbar">
+                  <button
+                    type="button"
+                    onClick={() => setActiveCategoryTab('all')}
+                    className={`shrink-0 px-3 py-2 text-[11px] font-bold border-b-2 transition-all cursor-pointer whitespace-nowrap ${activeCategoryTab === 'all' ? 'border-teal-700 text-teal-900' : 'border-transparent text-slate-500 hover:text-slate-800'}`}
+                  >
+                    Semua ({documents.length})
+                  </button>
+                  {docCategories.map((cat) => {
+                    const count = categoryDocCounts[cat.id] || 0;
+                    const rs = roleStyle[cat.analyticalRole] || roleStyle['REFERENCE'];
+                    return (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        onClick={() => setActiveCategoryTab(cat.id)}
+                        className={`shrink-0 px-3 py-2 text-[11px] font-bold border-b-2 transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${activeCategoryTab === cat.id ? 'border-teal-700 text-teal-900' : 'border-transparent text-slate-500 hover:text-slate-800'}`}
+                      >
+                        <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-none border text-[9px] font-black uppercase ${rs.badge}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${rs.dot}`} />
+                          {cat.analyticalRole}
+                        </span>
+                        {cat.code}
+                        {count > 0 && <span className="text-slate-400 font-normal">({count})</span>}
+                      </button>
+                    );
+                  })}
+                  {docsWithoutCategory.length > 0 && (
                     <button
                       type="button"
-                      onClick={() => selectAllCategoryDocs('BASELINE')}
-                      className="text-slate-500 hover:text-teal-700 transition-colors cursor-pointer p-0.5"
-                      title={isAllBaselineSelected ? 'Batal Pilih Semua (Uncheck All)' : 'Pilih Semua (Check All)'}
+                      onClick={() => setActiveCategoryTab('uncategorized')}
+                      className={`shrink-0 px-3 py-2 text-[11px] font-bold border-b-2 transition-all cursor-pointer whitespace-nowrap ${activeCategoryTab === 'uncategorized' ? 'border-teal-700 text-teal-900' : 'border-transparent text-slate-500 hover:text-slate-800'}`}
                     >
-                      {isAllBaselineSelected ? (
-                        <CheckSquare size={16} className="text-teal-700" />
-                      ) : (
-                        <Square size={16} className="text-slate-400" />
-                      )}
+                      Lainnya ({docsWithoutCategory.length})
                     </button>
-                  </div>
-                  <div className="space-y-0.5 max-h-28 overflow-y-auto pr-1 custom-scrollbar">
-                    {baselineDocs.length === 0 ? (
-                      <p className="text-xs text-slate-400 italic py-1">Tidak ada dokumen Target Baseline.</p>
-                    ) : (
-                      baselineDocs.map((doc) => {
-                        const isSelected = selectedDocIds.includes(doc.id);
-                        return (
-                          <div
-                            key={doc.id}
-                            onClick={() => toggleDocumentSelection(doc.id)}
-                            className={`py-0.5 px-1.5 text-xs cursor-pointer flex items-start gap-2 transition-colors rounded-none ${isSelected ? 'bg-teal-50/80 font-semibold text-slate-900' : 'hover:bg-slate-50 text-slate-600'
-                              }`}
-                          >
-                            {isSelected ? <CheckSquare size={15} className="text-teal-700 shrink-0 mt-0.5" /> : <Square size={15} className="text-slate-400 shrink-0 mt-0.5" />}
-                            <span className="truncate">{doc.title}</span>
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
+                  )}
                 </div>
 
-                {/* Group 2: Realisasi (Capaian) */}
-                <div className="p-2 space-y-1.5">
-                  <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
-                    <span className="text-xs font-semibold text-slate-800 flex items-center gap-1.5">
-                      <BarChart3 size={14} className="text-teal-600 shrink-0" />
-                      2. Realisasi (Capaian)
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => selectAllCategoryDocs('REALIZATION')}
-                      className="text-slate-500 hover:text-teal-700 transition-colors cursor-pointer p-0.5"
-                      title={isAllRealizationSelected ? 'Batal Pilih Semua (Uncheck All)' : 'Pilih Semua (Check All)'}
-                    >
-                      {isAllRealizationSelected ? (
-                        <CheckSquare size={16} className="text-teal-700" />
-                      ) : (
-                        <Square size={16} className="text-slate-400" />
-                      )}
-                    </button>
-                  </div>
-                  <div className="space-y-0.5 max-h-28 overflow-y-auto pr-1 custom-scrollbar">
-                    {realizationDocs.length === 0 ? (
-                      <p className="text-xs text-slate-400 italic py-1">Tidak ada dokumen Realisasi.</p>
+                {/* Header baris pilih semua */}
+                <div className="flex items-center justify-between px-2 py-1.5 bg-slate-50 border-b border-slate-100">
+                  <span className="text-[10px] text-slate-500 font-medium uppercase tracking-wider">
+                    {visibleDocs.length} dokumen ditampilkan
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => selectAllCategoryDocs(activeCategoryTab)}
+                    className="text-slate-500 hover:text-teal-700 transition-colors cursor-pointer p-0.5 flex items-center gap-1 text-[10px] font-bold"
+                    title={isAllVisibleSelected ? 'Batal Pilih Semua' : 'Pilih Semua'}
+                  >
+                    {isAllVisibleSelected ? (
+                      <><CheckSquare size={14} className="text-teal-700" /><span className="text-teal-700">Batal Semua</span></>
                     ) : (
-                      realizationDocs.map((doc) => {
-                        const isSelected = selectedDocIds.includes(doc.id);
-                        return (
-                          <div
-                            key={doc.id}
-                            onClick={() => toggleDocumentSelection(doc.id)}
-                            className={`py-0.5 px-1.5 text-xs cursor-pointer flex items-start gap-2 transition-colors rounded-none ${isSelected ? 'bg-teal-50/80 font-semibold text-slate-900' : 'hover:bg-slate-50 text-slate-600'
-                              }`}
-                          >
-                            {isSelected ? <CheckSquare size={15} className="text-teal-700 shrink-0 mt-0.5" /> : <Square size={15} className="text-slate-400 shrink-0 mt-0.5" />}
-                            <span className="truncate">{doc.title}</span>
-                          </div>
-                        );
-                      })
+                      <><Square size={14} className="text-slate-400" /><span>Pilih Semua</span></>
                     )}
-                  </div>
+                  </button>
                 </div>
 
-                {/* Group 3: Referensi (Umum) */}
-                <div className="p-2 space-y-1.5">
-                  <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
-                    <span className="text-xs font-semibold text-slate-800 flex items-center gap-1.5">
-                      <Newspaper size={14} className="text-teal-600 shrink-0" />
-                      3. Referensi (Umum)
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => selectAllCategoryDocs('GENERAL_REFERENCE')}
-                      className="text-slate-500 hover:text-teal-700 transition-colors cursor-pointer p-0.5"
-                      title={isAllGeneralSelected ? 'Batal Pilih Semua (Uncheck All)' : 'Pilih Semua (Check All)'}
-                    >
-                      {isAllGeneralSelected ? (
-                        <CheckSquare size={16} className="text-teal-700" />
-                      ) : (
-                        <Square size={16} className="text-slate-400" />
-                      )}
-                    </button>
-                  </div>
-                  <div className="space-y-0.5 max-h-28 overflow-y-auto pr-1 custom-scrollbar">
-                    {generalDocs.length === 0 ? (
-                      <p className="text-xs text-slate-400 italic py-1">Tidak ada dokumen Referensi Umum.</p>
-                    ) : (
-                      generalDocs.map((doc) => {
-                        const isSelected = selectedDocIds.includes(doc.id);
-                        return (
-                          <div
-                            key={doc.id}
-                            onClick={() => toggleDocumentSelection(doc.id)}
-                            className={`py-0.5 px-1.5 text-xs cursor-pointer flex items-start gap-2 transition-colors rounded-none ${isSelected ? 'bg-teal-50/80 font-semibold text-slate-900' : 'hover:bg-slate-50 text-slate-600'
-                              }`}
-                          >
-                            {isSelected ? <CheckSquare size={15} className="text-teal-700 shrink-0 mt-0.5" /> : <Square size={15} className="text-slate-400 shrink-0 mt-0.5" />}
-                            <span className="truncate">{doc.title}</span>
+                {/* Daftar dokumen pada tab aktif */}
+                <div className="max-h-48 overflow-y-auto custom-scrollbar divide-y divide-slate-50">
+                  {visibleDocs.length === 0 ? (
+                    <p className="text-xs text-slate-400 italic py-4 text-center">Tidak ada dokumen dalam kategori ini.</p>
+                  ) : (
+                    visibleDocs.map((doc) => {
+                      const isSelected = selectedDocIds.includes(doc.id);
+                      const role = doc.metadata?.analyticalRole;
+                      const rs = role ? (roleStyle[role] || roleStyle['REFERENCE']) : null;
+                      return (
+                        <div
+                          key={doc.id}
+                          onClick={() => toggleDocumentSelection(doc.id)}
+                          className={`py-1.5 px-2 text-xs cursor-pointer flex items-center gap-2 transition-colors ${isSelected ? 'bg-teal-50/80 font-semibold text-slate-900' : 'hover:bg-slate-50 text-slate-600'}`}
+                        >
+                          {isSelected ? <CheckSquare size={14} className="text-teal-700 shrink-0" /> : <Square size={14} className="text-slate-400 shrink-0" />}
+                          <span className="flex-1 truncate">{doc.title}</span>
+                          <div className="flex items-center gap-1 shrink-0">
+                            {doc.metadata?.categoryName && (
+                              <span className="text-[9px] text-slate-400 font-medium">{doc.metadata.categoryName}</span>
+                            )}
+                            {doc.metadata?.opdName && (
+                              <span className="px-1 py-0.5 bg-slate-100 text-slate-500 text-[9px] font-bold">{doc.metadata.opdName}</span>
+                            )}
+                            {rs && (
+                              <span className={`px-1 py-0.5 border text-[9px] font-black uppercase rounded-none ${rs.badge}`}>
+                                {role}
+                              </span>
+                            )}
                           </div>
-                        );
-                      })
-                    )}
-                  </div>
+                        </div>
+                      );
+                    })
+                  )}
                 </div>
               </div>
             )}

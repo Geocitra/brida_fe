@@ -70,9 +70,25 @@ const formatError = (msg: any, fallback: string): string => {
   return String(msg);
 };
 
+async function fetchWithAuth(url: string, options: RequestInit = {}): Promise<Response> {
+  const token = sessionStorage.getItem('brida_auth_token');
+  const headers = {
+    ...(options.headers || {}),
+  } as Record<string, string>;
+
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  return fetch(url, {
+    ...options,
+    headers,
+  });
+}
+
 export const ReportService = {
   async generateReport(req: GenerateReportRequest): Promise<GenerateReportResponse> {
-    const response = await fetch(`${API_BASE_URL}/reports/generate`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/reports/generate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(req),
@@ -86,7 +102,7 @@ export const ReportService = {
   },
 
   async checkCache(documentIds: string[], reportType?: string): Promise<CheckCacheResponse> {
-    const response = await fetch(`${API_BASE_URL}/reports/check-cache`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/reports/check-cache`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ documentIds, reportType }),
@@ -96,7 +112,7 @@ export const ReportService = {
   },
 
   async listSavedReports(): Promise<GeneratedReportDetail[]> {
-    const response = await fetch(`${API_BASE_URL}/reports`);
+    const response = await fetchWithAuth(`${API_BASE_URL}/reports`);
     const result = await response.json();
     if (!response.ok || !result.success) {
       throw new Error(formatError(result.message, 'Gagal memuat riwayat laporan.'));
@@ -105,7 +121,7 @@ export const ReportService = {
   },
 
   async getSavedReport(id: string): Promise<GeneratedReportDetail> {
-    const response = await fetch(`${API_BASE_URL}/reports/${id}`);
+    const response = await fetchWithAuth(`${API_BASE_URL}/reports/${id}`);
     const result = await response.json();
     if (!response.ok || !result.success) {
       throw new Error(formatError(result.message, 'Gagal mengambil detail laporan tersimpan.'));
@@ -114,12 +130,30 @@ export const ReportService = {
   },
 
   async deleteSavedReport(id: string): Promise<void> {
-    const response = await fetch(`${API_BASE_URL}/reports/${id}`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/reports/${id}`, {
       method: 'DELETE',
     });
     const result = await response.json();
     if (!response.ok || !result.success) {
       throw new Error(formatError(result.message, 'Gagal menghapus laporan.'));
     }
+  },
+
+  async getPublicSharedReport(id: string): Promise<GeneratedReportDetail> {
+    const response = await fetch(`${API_BASE_URL}/reports/share/${id}`);
+    const result = await response.json();
+    if (!response.ok || !result.success) {
+      throw new Error(formatError(result.message, 'Gagal mengambil detail laporan publik.'));
+    }
+    return result.data;
+  },
+
+  async getPublicSharedArticle(id: string): Promise<any> {
+    const response = await fetch(`${API_BASE_URL}/assistant/article/share/${id}`);
+    const result = await response.json();
+    if (!response.ok || !result.success) {
+      throw new Error(formatError(result.message, 'Gagal mengambil detail artikel publik.'));
+    }
+    return result.data;
   },
 };

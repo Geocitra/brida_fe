@@ -7,6 +7,7 @@ export interface LoginResponse {
     executive: {
       nip: string;
       fullName: string;
+      role: 'ADMIN' | 'USER';
     };
   };
 }

@@ -4375,7 +4375,7 @@ export const SystemFallbackCard: React.FC<SystemFallbackCardProps> = ({
 };
 
 --- FILE: src\modules\ai-assistant\components\article-preview-editor\article-preview-canvas.component.tsx ---
-import React from 'react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { EditorContent } from '@tiptap/react';
 import type { Editor } from '@tiptap/react';
 import { Loader2, Download } from 'lucide-react';
@@ -4386,7 +4386,12 @@ interface ArticlePreviewCanvasProps {
     marginCm: number;
     activeTableElement: HTMLTableElement | null;
     onScroll: (event: React.UIEvent<HTMLDivElement>) => void;
-    onStartTableResize: (event: React.MouseEvent<HTMLDivElement>, mode: 'column' | 'row', index: number, tableElement: HTMLTableElement) => void;
+    onStartTableResize: (
+        event: React.MouseEvent<HTMLDivElement>,
+        mode: 'column' | 'row',
+        index: number,
+        tableElement: HTMLTableElement
+    ) => void;
     isSaving: boolean;
     isPrinting: boolean;
     isDirty: boolean;
@@ -4394,6 +4399,162 @@ interface ArticlePreviewCanvasProps {
     onPrint: () => void;
     fontSize: string;
     fontFamily: string;
+    zoomLevel: number;
+    onPageCountChange?: (count: number) => void;
+}
+
+const PAGE_W   = 794;
+const PAGE_H   = 1123;
+const PAGE_GAP = 28;
+
+function usePaginationEngine(
+    editor: Editor | null,
+    pageContentH: number,
+    marginPx: number,
+    onPagesCalculated?: (count: number) => void,
+) {
+    const isPaginatingRef = useRef(false);
+    const debounceRef     = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+    const runPagination = useCallback(() => {
+        if (isPaginatingRef.current || !editor || editor.isDestroyed) return;
+
+        const { state, view } = editor;
+        const pmEl = view.dom as HTMLElement;
+        if (!pmEl) return;
+
+        if (!state.schema.nodes.autoPageSpacer) {
+            console.warn('[PaginationEngine] autoPageSpacer node not found in schema.');
+            return;
+        }
+
+        isPaginatingRef.current = true;
+
+        try {
+
+            type BlockInfo = {
+                pos: number;
+                size: number;
+                isSpaced: boolean;
+                domH: number;
+            };
+            const blocks: BlockInfo[] = [];
+
+            state.doc.forEach((node, offset) => {
+                const isSpaced = node.type.name === 'autoPageSpacer';
+                let domH = 0;
+
+                if (!isSpaced) {
+                    try {
+                        const domInfo  = view.domAtPos(offset + 1);
+                        let el: HTMLElement | null =
+                            domInfo.node.nodeType === 1
+                                ? (domInfo.node as HTMLElement)
+                                : domInfo.node.parentElement;
+
+                        while (el && el.parentElement !== pmEl) {
+                            el = el.parentElement;
+                        }
+                        if (el) {
+                            const style = window.getComputedStyle(el);
+                            const marginTop = parseFloat(style.marginTop) || 0;
+                            const marginBottom = parseFloat(style.marginBottom) || 0;
+                            domH = (el.offsetHeight || el.getBoundingClientRect().height) + marginTop + marginBottom;
+                        } else {
+                            domH = 24;
+                        }
+                    } catch {
+                        domH = 24;
+                    }
+                }
+
+                blocks.push({ pos: offset, size: node.nodeSize, isSpaced, domH });
+            });
+
+            const realBlocks = blocks.filter((b) => !b.isSpaced);
+            const desired: { afterIdx: number; spacerH: number }[] = [];
+            let acc = 0;
+
+            for (let i = 0; i < realBlocks.length; i++) {
+                const rn = realBlocks[i];
+
+                if (i > 0 && acc + rn.domH > pageContentH) {
+
+                    const remaining = Math.max(0, pageContentH - acc);
+                    const spacerH   = Math.max(
+                        PAGE_GAP + 2 * marginPx,
+                        remaining + PAGE_GAP + 2 * marginPx,
+                    );
+                    desired.push({ afterIdx: i - 1, spacerH });
+                    acc = 0;
+                }
+
+                acc += rn.domH;
+            }
+
+            const calculatedPages = desired.length + 1;
+            onPagesCalculated?.(calculatedPages);
+
+            const existing = blocks.filter((b) => b.isSpaced);
+            const sameCount = existing.length === desired.length;
+
+            const sameHeight = sameCount && existing.every((sp, si) => {
+                const desiredH = desired[si]?.spacerH ?? 0;
+                const existingH = state.doc.nodeAt(sp.pos)?.attrs.height ?? 0;
+                return Math.abs(existingH - desiredH) < 20;
+            });
+
+            if (sameCount && sameHeight) return;
+
+            let tr = state.tr;
+
+            for (const sp of [...existing].reverse()) {
+                const from = tr.mapping.map(sp.pos);
+                const to   = tr.mapping.map(sp.pos + sp.size);
+                tr.delete(from, to);
+            }
+
+            for (const { afterIdx, spacerH } of desired) {
+                const rb       = realBlocks[afterIdx];
+                if (!rb) continue;
+                const insertAt = tr.mapping.map(rb.pos + rb.size);
+                const spacerNode = state.schema.nodes.autoPageSpacer.create({ height: spacerH });
+                if (spacerNode) tr.insert(insertAt, spacerNode);
+            }
+
+            tr.setMeta('addToHistory', false);
+            tr.setMeta('isPagination', true);
+            view.dispatch(tr);
+
+        } finally {
+            isPaginatingRef.current = false;
+        }
+    }, [editor, pageContentH, marginPx, onPagesCalculated]);
+
+    const schedulePagination = useCallback(() => {
+        clearTimeout(debounceRef.current);
+        debounceRef.current = setTimeout(() => requestAnimationFrame(runPagination), 400);
+    }, [runPagination]);
+
+    useEffect(() => {
+        if (!editor) return;
+
+        const handleUpdate = ({ transaction }: { transaction: any }) => {
+
+            if (transaction.getMeta('isPagination')) return;
+            schedulePagination();
+        };
+
+        editor.on('update', handleUpdate);
+
+        const initTimer = setTimeout(() => requestAnimationFrame(runPagination), 500);
+
+        return () => {
+            editor.off('update', handleUpdate);
+            clearTimeout(debounceRef.current);
+            clearTimeout(initTimer);
+        };
+    }, [editor, schedulePagination, runPagination]);
 }
 
 export const ArticlePreviewCanvas: React.FC<ArticlePreviewCanvasProps> = ({
@@ -4410,46 +4571,113 @@ export const ArticlePreviewCanvas: React.FC<ArticlePreviewCanvasProps> = ({
     onPrint,
     fontSize,
     fontFamily,
+    zoomLevel,
+    onPageCountChange,
 }) => {
+    const marginPx     = Math.round(marginCm * (96 / 2.54));
+    const pageContentH = PAGE_H - 2 * marginPx;
+    const wrapperRef   = useRef<HTMLDivElement>(null);
+    const [pageCount, setPageCount] = useState(1);
+    const lastNotifiedCountRef = useRef(1);
+
+    const updatePageCount = useCallback((count: number) => {
+        setPageCount(count);
+        if (lastNotifiedCountRef.current !== count) {
+            lastNotifiedCountRef.current = count;
+            requestAnimationFrame(() => {
+                onPageCountChange?.(count);
+            });
+        }
+    }, [onPageCountChange]);
+
+    usePaginationEngine(editor, pageContentH, marginPx, updatePageCount);
+
+    const recalcPages = useCallback(() => {
+        if (!wrapperRef.current) return;
+        const pmEl = wrapperRef.current.querySelector('.ProseMirror') as HTMLElement | null;
+        if (!pmEl) return;
+        const h     = pmEl.scrollHeight;
+        const count = Math.max(1, Math.ceil(h / (pageContentH + PAGE_GAP + 2 * marginPx)));
+        updatePageCount(count);
+    }, [pageContentH, marginPx, updatePageCount]);
+
+    useEffect(() => {
+        const el = wrapperRef.current;
+        if (!el) return;
+        let timer: ReturnType<typeof setTimeout>;
+        const ro = new ResizeObserver(() => {
+            clearTimeout(timer);
+            timer = setTimeout(recalcPages, 150);
+        });
+        ro.observe(el);
+        recalcPages();
+        return () => { clearTimeout(timer); ro.disconnect(); };
+    }, [recalcPages]);
+
+    useEffect(() => {
+        if (!editor) return;
+        const handler = () => requestAnimationFrame(recalcPages);
+        editor.on('update', handler);
+        return () => {
+            editor.off('update', handler);
+        };
+    }, [editor, recalcPages]);
+
+    const totalCanvasH = pageCount * PAGE_H + (pageCount - 1) * PAGE_GAP;
+
     return (
         <div
             id="editor-scroll-container"
             onScroll={onScroll}
-            className="flex-1 overflow-y-auto bg-slate-200/40 p-8 flex justify-center w-full min-h-150 select-text scroll-smooth"
+            className="flex-1 overflow-auto flex justify-center w-full select-text"
+            style={{
+                background: '#475569',
+                padding: `${40 * zoomLevel}px ${80 * zoomLevel}px`,
+            }}
         >
-            <div className="relative h-fit mb-12">
+            {}
+            <div
+                style={{
+                    transform: `scale(${zoomLevel})`,
+                    transformOrigin: 'top center',
+                    willChange: 'transform',
+                    width: `${PAGE_W}px`,
+                    height: `${totalCanvasH}px`,
+                    flexShrink: 0,
+                    position: 'relative',
+                    marginBottom: zoomLevel !== 1 ? `${(zoomLevel - 1) * totalCanvasH}px` : undefined,
+                }}
+            >
                 <style>{`
+          /* ── KUNCI UTAMA: ProseMirror transparan ──────────────────────────
+           * Kartu halaman putih di bawahnya terlihat sebagai latar konten.
+           * Spacer AutoPageSpacer memberikan jarak yang tepat antar halaman.
+           * ─────────────────────────────────────────────────────────────── */
           .ProseMirror {
             outline: none !important;
+            background: transparent !important;
             white-space: pre-wrap !important;
             tab-size: 48px !important;
-            min-height: calc(1123px - ${marginCm * 2}cm);
             line-height: ${lineSpacing} !important;
+            min-height: ${pageContentH}px;
           }
           .ProseMirror p {
             line-height: ${lineSpacing} !important;
-            margin-top: 0px !important;
-            margin-bottom: 16px !important;
+            margin-top: 0 !important;
+            margin-bottom: 14px !important;
           }
-          .ProseMirror td p,
-          .ProseMirror th p,
-          .ProseMirror li p {
-            margin-bottom: 0px !important;
-          }
+          .ProseMirror td p, .ProseMirror th p, .ProseMirror li p { margin-bottom: 0 !important; }
+          .ProseMirror h1 { font-size: 1.4em; font-weight: 700; margin: 20px 0 10px; }
+          .ProseMirror h2 { font-size: 1.2em; font-weight: 700; margin: 18px 0 8px; }
+          .ProseMirror h3 { font-size: 1.05em; font-weight: 600; margin: 14px 0 6px; }
           .ProseMirror table {
             border-collapse: collapse !important;
             table-layout: fixed !important;
             width: 100% !important;
-            margin-top: 16px !important;
-            margin-bottom: 32px !important;
+            margin: 16px 0 28px !important;
             overflow: hidden !important;
           }
-          .ProseMirror table + p,
-          .ProseMirror table + table {
-            margin-top: 32px !important;
-          }
-          .ProseMirror td,
-          .ProseMirror th {
+          .ProseMirror td, .ProseMirror th {
             min-width: 80px;
             border: 1px solid #cbd5e1;
             padding: 6px 10px;
@@ -4459,120 +4687,169 @@ export const ArticlePreviewCanvas: React.FC<ArticlePreviewCanvasProps> = ({
             word-break: normal;
             overflow-wrap: break-word;
           }
-          .ProseMirror th {
-            font-weight: bold;
-            text-align: left;
-            background-color: #f8fafc;
-          }
-          .ProseMirror tr {
-            page-break-inside: avoid !important;
-            break-inside: avoid !important;
-          }
+          .ProseMirror th { font-weight: 700; text-align: left; background: rgba(248,250,252,0.95); }
+          .ProseMirror tr { page-break-inside: avoid !important; break-inside: avoid !important; }
           .ProseMirror .column-resize-handle {
-            position: absolute;
-            right: -2px;
-            top: 0;
-            bottom: -2px;
-            width: 4px;
-            background-color: #0d9488;
-            pointer-events: none;
+            position: absolute; right: -2px; top: 0; bottom: -2px;
+            width: 4px; background: #0d9488; pointer-events: none;
           }
-          .ProseMirror.resize-cursor {
-            cursor: ew-resize !important;
-            cursor: col-resize !important;
-          }
+          .ProseMirror.resize-cursor { cursor: col-resize !important; }
           .ProseMirror .selectedCell:after {
-            z-index: 2;
-            position: absolute;
-            content: "";
+            z-index: 2; position: absolute; content: "";
             left: 0; right: 0; top: 0; bottom: 0;
-            background: rgba(200, 200, 255, 0.4);
-            pointer-events: none;
+            background: rgba(200,200,255,0.4); pointer-events: none;
           }
-          .ProseMirror .citation-url-node {
-            display: none !important;
+          .ProseMirror .citation-url-node { display: none !important; }
+          .ProseMirror img { max-width: 100% !important; max-height: 850px !important; height: auto !important; }
+          .ProseMirror ul { list-style-type: disc; padding-left: 1.5em; margin-bottom: 14px; }
+          .ProseMirror ol { list-style-type: decimal; padding-left: 1.5em; margin-bottom: 14px; }
+
+          /* ── Auto Page Spacer — visual indikator batas halaman ─────────── */
+          [data-auto-page-spacer] {
+            display: block;
+            background: transparent !important;
+            cursor: default;
           }
-          .ProseMirror img {
-            max-width: 100% !important;
-            max-height: 850px !important;
-            height: auto !important;
+          [data-auto-page-spacer]::before {
+            content: '';
+            display: block;
+            position: absolute;
+            left: -${marginPx}px;
+            right: -${marginPx}px;
+            top: 50%;
+            height: 0;
+            border-top: 1px dashed rgba(148,163,184,0.6);
           }
-          .page-break-indicator {
-            height: 22px;
-            background-color: #f0fdfa !important;
-            border-top: 1px dashed #0d9488;
-            border-bottom: 1px dashed #0d9488;
-            margin-top: 24px;
-            margin-bottom: 24px;
-            position: relative;
-            pointer-events: none;
+          [data-auto-page-spacer]::after {
+            content: '— batas halaman —';
             display: flex;
             align-items: center;
             justify-content: center;
-            box-sizing: border-box;
-            user-select: none;
-          }
-          .page-break-indicator::after {
-            content: '✂️ BATAS HALAMAN CETAK (PAGE BREAK)';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
             font-size: 8px;
             font-family: 'Roboto', sans-serif;
-            font-weight: 900;
-            color: #0f766e;
+            font-weight: 700;
+            color: rgba(148,163,184,0.8);
             letter-spacing: 0.15em;
-            background-color: #f0fdfa;
+            text-transform: uppercase;
+            background: white;
             padding: 0 12px;
+            pointer-events: none;
+            user-select: none;
           }
         `}</style>
 
+                {}
+                {Array.from({ length: pageCount }, (_, i) => (
+                    <div
+                        key={`page-${i}`}
+                        style={{
+                            position: 'absolute',
+                            top:    `${i * (PAGE_H + PAGE_GAP)}px`,
+                            left:   0,
+                            width:  `${PAGE_W}px`,
+                            height: `${PAGE_H}px`,
+                            background: 'white',
+                            boxShadow: [
+                                '0 1px 3px rgba(0,0,0,0.12)',
+                                '0 4px 16px rgba(0,0,0,0.18)',
+                                '0 12px 32px rgba(0,0,0,0.14)',
+                            ].join(', '),
+                            zIndex: 0,
+                        }}
+                    >
+                        {}
+                        <span
+                            className="no-print"
+                            style={{
+                                position:   'absolute',
+                                bottom:     10,
+                                right:      14,
+                                fontSize:   '7px',
+                                fontFamily: 'Roboto, sans-serif',
+                                fontWeight: 900,
+                                color:      '#d1d5db',
+                                letterSpacing: '0.1em',
+                                userSelect:    'none',
+                                pointerEvents: 'none',
+                            }}
+                        >
+                            {i + 1}
+                        </span>
+                    </div>
+                ))}
+
+                {}
                 <div
-                    id="virtual-a4-page"
-                    className="text-slate-800 text-left prose max-w-none prose-slate prose-xs focus:outline-none transition-all relative bg-white border border-slate-300 shadow-md rounded-none"
+                    ref={wrapperRef}
                     style={{
-                        width: '794px',
-                        minHeight: '1123px',
-                        padding: `${marginCm}cm`,
-                        boxSizing: 'border-box',
+                        position:   'absolute',
+                        top:        0,
+                        left:       0,
+                        right:      0,
+                        zIndex:     1,
+                        padding:    `${marginPx}px`,
                         fontFamily: `${fontFamily}, sans-serif`,
-                        fontSize: `${fontSize}pt`,
+                        fontSize:   `${fontSize}pt`,
+                        background: 'transparent',
+                        boxSizing:  'border-box',
+                        minHeight:  `${totalCanvasH}px`,
                     }}
                 >
-                    <EditorContent editor={editor} className="h-full focus:outline-none text-slate-800" />
+                    <EditorContent
+                        editor={editor}
+                        className="focus:outline-none"
+                        style={{ background: 'transparent' }}
+                    />
 
+                    {}
                     {activeTableElement && (
                         <div className="absolute inset-0 pointer-events-none">
-                            {Array.from({ length: Math.max(1, activeTableElement.rows[0]?.cells.length || 1) }).map((_, colIndex) => {
-                                const firstRowCell = activeTableElement.rows[0]?.cells[colIndex];
-                                if (!firstRowCell) return null;
-                                const rect = firstRowCell.getBoundingClientRect();
+                            {Array.from({
+                                length: Math.max(1, activeTableElement.rows[0]?.cells.length || 1),
+                            }).map((_, colIndex) => {
+                                const cell = activeTableElement.rows[0]?.cells[colIndex];
+                                if (!cell) return null;
+                                const rect      = cell.getBoundingClientRect();
                                 const tableRect = activeTableElement.getBoundingClientRect();
-                                const left = rect.left - tableRect.left + rect.width - 2;
-
+                                const left      = rect.left - tableRect.left + rect.width - 2;
                                 return (
                                     <div
-                                        key={`col-handle-${colIndex}`}
-                                        className="absolute w-2 h-5 rounded-sm bg-teal-600/80 cursor-col-resize pointer-events-auto shadow-sm"
-                                        style={{ left: `${Math.max(0, left)}px`, top: `${Math.max(0, rect.top - tableRect.top - 4)}px` }}
-                                        onMouseDown={(event) => onStartTableResize(event, 'column', colIndex, activeTableElement)}
-                                        title={`Ubah lebar kolom ${colIndex + 1}`}
+                                        key={`col-${colIndex}`}
+                                        className="absolute w-2 h-5 bg-teal-600/80 cursor-col-resize pointer-events-auto"
+                                        style={{
+                                            left: `${Math.max(0, left)}px`,
+                                            top:  `${Math.max(0, rect.top - tableRect.top - 4)}px`,
+                                        }}
+                                        onMouseDown={(e) =>
+                                            onStartTableResize(e, 'column', colIndex, activeTableElement)
+                                        }
                                     />
                                 );
                             })}
-
-                            {Array.from({ length: Math.max(1, activeTableElement.rows.length) }).map((_, rowIndex) => {
+                            {Array.from({
+                                length: Math.max(1, activeTableElement.rows.length),
+                            }).map((_, rowIndex) => {
                                 const row = activeTableElement.rows[rowIndex];
                                 if (!row) return null;
-                                const rect = row.getBoundingClientRect();
+                                const rect      = row.getBoundingClientRect();
                                 const tableRect = activeTableElement.getBoundingClientRect();
-                                const top = rect.top - tableRect.top + rect.height - 2;
+                                const top  = rect.top - tableRect.top + rect.height - 2;
                                 const left = rect.left - tableRect.left + 4;
-
                                 return (
                                     <div
-                                        key={`row-handle-${rowIndex}`}
-                                        className="absolute h-2 w-5 rounded-sm bg-amber-600/80 cursor-row-resize pointer-events-auto shadow-sm"
-                                        style={{ left: `${Math.max(0, left)}px`, top: `${Math.max(0, top)}px` }}
-                                        onMouseDown={(event) => onStartTableResize(event, 'row', rowIndex, activeTableElement)}
-                                        title={`Ubah tinggi baris ${rowIndex + 1}`}
+                                        key={`row-${rowIndex}`}
+                                        className="absolute h-2 w-5 bg-amber-600/80 cursor-row-resize pointer-events-auto"
+                                        style={{
+                                            left: `${Math.max(0, left)}px`,
+                                            top:  `${Math.max(0, top)}px`,
+                                        }}
+                                        onMouseDown={(e) =>
+                                            onStartTableResize(e, 'row', rowIndex, activeTableElement)
+                                        }
                                     />
                                 );
                             })}
@@ -4581,17 +4858,29 @@ export const ArticlePreviewCanvas: React.FC<ArticlePreviewCanvasProps> = ({
                 </div>
 
                 {}
-                <div className="w-[794px] mt-8 mb-12 flex justify-center no-print font-roboto select-none">
+                <div
+                    className="no-print"
+                    style={{
+                        position:   'absolute',
+                        top:        `${totalCanvasH + 24}px`,
+                        left:       0,
+                        width:      '100%',
+                        display:    'flex',
+                        justifyContent: 'center',
+                        fontFamily: 'Roboto, sans-serif',
+                    }}
+                >
                     <button
                         type="button"
-                        onClick={(e) => {
-                            console.log('[DEBUG] Tombol Cetak PDF Resmi di Canvas diklik!');
-                            onPrint();
-                        }}
+                        onClick={onPrint}
                         disabled={isSaving || isPrinting}
-                        className="px-6 py-2.5 bg-teal-700 hover:bg-teal-800 text-white font-extrabold text-xs uppercase tracking-wider border border-teal-800 rounded-none cursor-pointer transition-colors disabled:opacity-50 inline-flex items-center gap-1.5 shadow-sm"
+                        style={{ border: '1px solid #0f766e' }}
+                        className="px-6 py-2.5 bg-teal-700 hover:bg-teal-800 text-white font-extrabold text-xs uppercase tracking-wider cursor-pointer transition-colors disabled:opacity-50 inline-flex items-center gap-1.5 shadow"
                     >
-                        {isPrinting ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
+                        {isPrinting
+                            ? <Loader2 size={12} className="animate-spin" />
+                            : <Download size={12} />
+                        }
                         <span>Cetak PDF Resmi</span>
                     </button>
                 </div>
@@ -4620,8 +4909,16 @@ import {
     Redo,
     LayoutGrid,
     Image as ImageIcon,
+    ZoomIn,
+    ZoomOut,
 } from 'lucide-react';
 import type { FontFamilyKey } from '../../store/useEditorStore';
+
+const ZOOM_PRESETS = [0.5, 0.75, 0.9, 1.0, 1.25, 1.5, 2.0];
+const ZOOM_LABELS: Record<number, string> = {
+    0.5: '50%', 0.75: '75%', 0.9: '90%', 1.0: '100%',
+    1.25: '125%', 1.5: '150%', 2.0: '200%',
+};
 
 interface ArticlePreviewEditorHeaderProps {
     editor: Editor | null;
@@ -4634,6 +4931,7 @@ interface ArticlePreviewEditorHeaderProps {
     fontSize: string;
     lineSpacing: number;
     fontSizePresets: number[];
+    zoomLevel: number;
     onSaveAndBack: () => void;
     onPrint: () => void;
     onFontFamilyChange: (value: FontFamilyKey) => void;
@@ -4647,6 +4945,7 @@ interface ArticlePreviewEditorHeaderProps {
     onRedo: () => void;
     onInsertPageBreak: () => void;
     onInsertImage: (file: File) => void;
+    onZoomChange: (level: number) => void;
 }
 
 export const ArticlePreviewEditorHeader: React.FC<ArticlePreviewEditorHeaderProps> = ({
@@ -4660,6 +4959,7 @@ export const ArticlePreviewEditorHeader: React.FC<ArticlePreviewEditorHeaderProp
     fontSize,
     lineSpacing,
     fontSizePresets,
+    zoomLevel,
     onSaveAndBack,
     onPrint,
     onFontFamilyChange,
@@ -4673,7 +4973,16 @@ export const ArticlePreviewEditorHeader: React.FC<ArticlePreviewEditorHeaderProp
     onRedo,
     onInsertPageBreak,
     onInsertImage,
+    onZoomChange,
 }) => {
+    const zoomOut = () => {
+        const idx = ZOOM_PRESETS.indexOf(zoomLevel);
+        if (idx > 0) onZoomChange(ZOOM_PRESETS[idx - 1]);
+    };
+    const zoomIn = () => {
+        const idx = ZOOM_PRESETS.indexOf(zoomLevel);
+        if (idx < ZOOM_PRESETS.length - 1) onZoomChange(ZOOM_PRESETS[idx + 1]);
+    };
     const fileInputRef = useRef<HTMLInputElement>(null);
     const currentFontSize = parseInt(fontSize, 10);
     const isFontSizePreset = fontSizePresets.includes(currentFontSize);
@@ -4896,6 +5205,39 @@ export const ArticlePreviewEditorHeader: React.FC<ArticlePreviewEditorHeaderProp
 
                     <div className="w-px h-3.5 bg-slate-300 mx-0.5" />
 
+                    {}
+                    <div className="flex items-center gap-0.5">
+                        <button
+                            type="button"
+                            onClick={zoomOut}
+                            disabled={zoomLevel <= ZOOM_PRESETS[0]}
+                            className="flex items-center justify-center w-6 h-6 border border-slate-300 bg-white hover:bg-slate-100 disabled:opacity-30 cursor-pointer transition-colors"
+                            title="Perkecil tampilan (Zoom Out)"
+                        >
+                            <ZoomOut size={11} className="text-slate-600" />
+                        </button>
+                        <select
+                            value={zoomLevel}
+                            onChange={(e) => onZoomChange(parseFloat(e.target.value))}
+                            className="h-6 bg-white border-t border-b border-slate-300 text-[10px] font-bold px-1 focus:outline-none focus:border-teal-600 w-14 text-center cursor-pointer"
+                        >
+                            {ZOOM_PRESETS.map((z) => (
+                                <option key={z} value={z}>{ZOOM_LABELS[z]}</option>
+                            ))}
+                        </select>
+                        <button
+                            type="button"
+                            onClick={zoomIn}
+                            disabled={zoomLevel >= ZOOM_PRESETS[ZOOM_PRESETS.length - 1]}
+                            className="flex items-center justify-center w-6 h-6 border border-slate-300 bg-white hover:bg-slate-100 disabled:opacity-30 cursor-pointer transition-colors"
+                            title="Perbesar tampilan (Zoom In)"
+                        >
+                            <ZoomIn size={11} className="text-slate-600" />
+                        </button>
+                    </div>
+
+                    <div className="w-px h-3.5 bg-slate-300 mx-0.5" />
+
                     <button
                         type="button"
                         onClick={() => fileInputRef.current?.click()}
@@ -4978,6 +5320,68 @@ export const ArticlePreviewPageNavigator: React.FC<ArticlePreviewPageNavigatorPr
         </div>
     );
 };
+
+--- FILE: src\modules\ai-assistant\components\article-preview-editor\auto-page-spacer.extension.ts ---
+import { Node, mergeAttributes } from '@tiptap/core';
+
+export const AutoPageSpacer = Node.create({
+    name: 'autoPageSpacer',
+    group: 'block',
+    atom: true,
+    selectable: false,
+    draggable: false,
+    isolating: false,
+
+    addAttributes() {
+        return {
+            height: {
+                default: 100,
+                parseHTML: (el) => parseInt(el.getAttribute('data-spacer-h') || '100', 10),
+                renderHTML: (attrs) => ({ 'data-spacer-h': String(attrs.height) }),
+            },
+        };
+    },
+
+    parseHTML() {
+        return [{ tag: 'div[data-auto-page-spacer]' }];
+    },
+
+    renderHTML({ node, HTMLAttributes }) {
+        return [
+            'div',
+            mergeAttributes(HTMLAttributes, {
+                'data-auto-page-spacer': 'true',
+                class: 'no-print',
+                style: [
+                    `height: ${node.attrs.height}px`,
+                    'display: block',
+                    'pointer-events: none',
+                    'user-select: none',
+                    'background: transparent',
+                    'position: relative',
+                ].join('; '),
+            }),
+
+            [
+                'div',
+                {
+                    style: [
+                        'position: absolute',
+                        'top: 50%',
+                        'left: 0',
+                        'right: 0',
+                        'transform: translateY(-50%)',
+                        'display: flex',
+                        'align-items: center',
+                        'justify-content: center',
+                        'pointer-events: none',
+                        'user-select: none',
+                    ].join('; '),
+                },
+            ],
+        ];
+    },
+});
 
 --- FILE: src\modules\ai-assistant\components\article-preview-editor\citation-url.extension.ts ---
 import { Node, mergeAttributes } from '@tiptap/core';
@@ -5162,7 +5566,8 @@ export const ResizableImageComponent: React.FC<NodeViewProps> = ({
     const startHeight = imgEl.getBoundingClientRect().height;
     const aspectRatio = startHeight / (startWidth || 1);
 
-    const parentWidth = imgEl.closest('.rm-pages-wrapper, .ProseMirror, .page')?.getBoundingClientRect().width
+    const proseMirrorEl = imgEl.closest('.ProseMirror') as HTMLElement | null;
+    const parentWidth = proseMirrorEl?.getBoundingClientRect().width
       || imgEl.parentElement?.getBoundingClientRect().width
       || 700;
 
@@ -5754,6 +6159,16 @@ export class MarkupConverter {
 
                 return url ? `[${url}]` : '';
             },
+        });
+
+        service.addRule('autoPageSpacerRule', {
+            filter: (node: HTMLElement) => {
+                return (
+                    node.getAttribute('data-auto-page-spacer') !== null ||
+                    node.classList.contains('no-print') && node.hasAttribute('data-auto-page-spacer')
+                );
+            },
+            replacement: () => '',
         });
 
         service.addRule('textAlignRule', {
@@ -7098,6 +7513,7 @@ import TextAlign from '@tiptap/extension-text-align';
 import { TextStyle } from '@tiptap/extension-text-style';
 import { FontFamily } from '@tiptap/extension-font-family';
 import { ResizableImage } from '../components/article-preview-editor/resizable-image.extension';
+import { AutoPageSpacer } from '../components/article-preview-editor/auto-page-spacer.extension';
 
 import { Table } from '@tiptap/extension-table';
 import { TableRow } from '@tiptap/extension-table-row';
@@ -7249,6 +7665,8 @@ const TIPTAP_EXTENSIONS = [
   TabKeyExtension,
 
   ResizableImage,
+
+  AutoPageSpacer,
 ];
 
 export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> = ({
@@ -7290,6 +7708,27 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
     initialValue: number;
     tableElement: HTMLTableElement;
   } | null>(null);
+  const [zoomLevel, setZoomLevel] = useState<number>(1.0);
+
+  const handlePageCountChange = useCallback((count: number) => {
+    if (count !== lastPageCountRef.current) {
+      lastPageCountRef.current = count;
+      setTotalPages(count);
+    }
+  }, []);
+
+  const handleScroll = useCallback((event: React.UIEvent<HTMLDivElement>) => {
+    const scrollTop = event.currentTarget.scrollTop;
+    const page = Math.floor(scrollTop / (1123 * zoomLevel));
+    setActivePage(Math.max(0, page));
+  }, [zoomLevel]);
+
+  const handleScrollToPage = useCallback((pageIdx: number) => {
+    const container = document.getElementById('editor-scroll-container');
+    if (!container) return;
+    container.scrollTo({ top: pageIdx * 1123 * zoomLevel, behavior: 'smooth' });
+    setActivePage(pageIdx);
+  }, [zoomLevel]);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -7470,23 +7909,6 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
   });
 
   useEffect(() => {
-    if (isLoading || !editor || editor.isDestroyed) return;
-
-    const updatePages = () => {
-      const el = document.getElementById('virtual-a4-page');
-      if (!el) return;
-      const height = el.scrollHeight;
-      const calculatedPages = Math.max(1, Math.ceil(height / 1123));
-      if (calculatedPages !== lastPageCountRef.current) {
-        lastPageCountRef.current = calculatedPages;
-        setTotalPages(calculatedPages);
-      }
-    };
-
-    updatePages();
-  }, [editor, isLoading, draftContent, marginCm, fontSize, lineSpacing]);
-
-  useEffect(() => {
     const handleGlobalMouseUp = () => {
       if (tableResizeState && editor && !editor.isDestroyed) {
         const nextHtml = editor.view.dom.innerHTML;
@@ -7538,29 +7960,6 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
     observer.observe(activeTableElement);
     return () => observer.disconnect();
   }, [activeTableElement]);
-
-  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
-    const container = e.currentTarget;
-    const scrollTop = container.scrollTop;
-    const scrollHeight = container.scrollHeight;
-    const calculatedPages = Math.max(1, Math.ceil(scrollHeight / 1123));
-    if (calculatedPages !== totalPages) {
-      setTotalPages(calculatedPages);
-    }
-    const currentPage = Math.floor((scrollTop + 400) / 1123);
-    setActivePage(Math.min(calculatedPages - 1, Math.max(0, currentPage)));
-  };
-
-  const handleScrollToPage = (pageIdx: number) => {
-    const scrollContainer = document.getElementById('editor-scroll-container');
-    if (scrollContainer) {
-      scrollContainer.scrollTo({
-        top: pageIdx * 1123,
-        behavior: 'smooth',
-      });
-      setActivePage(pageIdx);
-    }
-  };
 
   useEffect(() => {
     if (!sessionId) {
@@ -7801,6 +8200,7 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
         fontSize={fontSize}
         lineSpacing={lineSpacing}
         fontSizePresets={FONT_SIZE_PRESETS}
+        zoomLevel={zoomLevel}
         onSaveAndBack={handleSaveAndBack}
         onPrint={handlePrint}
         onFontFamilyChange={handleFontFamilyChange}
@@ -7814,6 +8214,7 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
         onRedo={() => editor?.chain().focus().redo().run()}
         onInsertPageBreak={() => editor?.chain().focus().insertContent({ type: 'pageBreak' }).run()}
         onInsertImage={handleInsertImage}
+        onZoomChange={setZoomLevel}
       />
 
       {}
@@ -7839,6 +8240,8 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
           onPrint={handlePrint}
           fontSize={fontSize}
           fontFamily={fontFamily}
+          zoomLevel={zoomLevel}
+          onPageCountChange={handlePageCountChange}
         />
 
       </div>

@@ -14,8 +14,13 @@ export interface DocumentRecord {
     totalTokenCount: number;
     category: string;
     uploadedBy: string;
-    docType?: 'BASELINE' | 'REALIZATION' | string;
+    docType?: 'BASELINE' | 'REALIZATION' | 'GENERAL_REFERENCE' | string;
     sourceUrl?: string;
+    categoryId?: string;
+    categoryName?: string;
+    analyticalRole?: 'TARGET' | 'REALIZATION' | 'REFERENCE' | string;
+    opdId?: string;
+    opdName?: string;
   };
   chunkCount?: number;
   extractedLocationsCount?: number;
@@ -34,12 +39,30 @@ const formatError = (msg: any, fallback: string): string => {
   return String(msg);
 };
 
+async function fetchWithAuth(url: string, options: RequestInit = {}): Promise<Response> {
+  const token = sessionStorage.getItem('brida_auth_token');
+  const headers = {
+    ...(options.headers || {}),
+  } as Record<string, string>;
+
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  return fetch(url, {
+    ...options,
+    headers,
+  });
+}
+
 export const DocumentService = {
   async uploadDocument(
     file: File,
     title: string,
     category?: string,
     docType: string = 'REALIZATION',
+    categoryId?: string,
+    opdId?: string,
   ): Promise<DocumentRecord> {
     const formData = new FormData();
     formData.append('file', file);
@@ -47,8 +70,10 @@ export const DocumentService = {
     if (category) formData.append('category', category);
     formData.append('uploadedBy', 'Kepala BRIDA');
     formData.append('docType', docType);
+    if (categoryId) formData.append('categoryId', categoryId);
+    if (opdId) formData.append('opdId', opdId);
 
-    const response = await fetch(`${API_BASE_URL}/documents/upload`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/documents/upload`, {
       method: 'POST',
       body: formData,
     });
@@ -62,7 +87,7 @@ export const DocumentService = {
   },
 
   async listDocuments(): Promise<DocumentRecord[]> {
-    const response = await fetch(`${API_BASE_URL}/documents`);
+    const response = await fetchWithAuth(`${API_BASE_URL}/documents`);
     const result = await response.json();
     if (!response.ok || !result.success) {
       throw new Error(formatError(result.message, 'Gagal memuat daftar dokumen.'));
@@ -71,7 +96,7 @@ export const DocumentService = {
   },
 
   async getDocumentById(id: string): Promise<DocumentRecord> {
-    const response = await fetch(`${API_BASE_URL}/documents/${id}`);
+    const response = await fetchWithAuth(`${API_BASE_URL}/documents/${id}`);
     const result = await response.json();
     if (!response.ok || !result.success) {
       throw new Error(formatError(result.message, 'Gagal memuat detail dokumen.'));
@@ -80,7 +105,7 @@ export const DocumentService = {
   },
 
   async deleteDocument(id: string): Promise<void> {
-    const response = await fetch(`${API_BASE_URL}/documents/${id}`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/documents/${id}`, {
       method: 'DELETE',
     });
     const result = await response.json();

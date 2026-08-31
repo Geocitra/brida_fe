@@ -86,7 +86,19 @@ export interface ArticleSessionDetail {
  */
 async function safeFetch(url: string, options: RequestInit): Promise<any> {
   try {
-    const response = await fetch(url, options);
+    const token = sessionStorage.getItem('brida_auth_token');
+    const headers = {
+      ...(options.headers || {}),
+    } as Record<string, string>;
+
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(url, {
+      ...options,
+      headers,
+    });
     let result: any;
 
     try {

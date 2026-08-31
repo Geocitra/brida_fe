@@ -13,6 +13,9 @@ import { ArticlePreviewEditorView } from './modules/ai-assistant/views/article-p
 
 import GisExplorerView from './modules/dashboard/views/gis-explorer.view';
 import { LandingView } from './modules/dashboard/views/landing.view';
+import AdminConsoleView from './modules/admin/views/admin-console.view';
+import ShareReportView from './modules/reports/views/share-report.view';
+import ShareArticleView from './modules/reports/views/share-article.view';
 
 // [INTEGRASI BARU]: Memanggil Store untuk keperluan pembersihan memori saat Logout
 import { useEditorStore } from './modules/ai-assistant/store/useEditorStore';
@@ -32,10 +35,21 @@ export function App() {
 
   const [activeRoute, setActiveRoute] = useState<string>(() => {
     try {
+      const path = window.location.pathname;
+      if (path.startsWith('/share/report/')) {
+        return 'share-report';
+      }
+      if (path.startsWith('/share/article/')) {
+        return 'share-article';
+      }
       const isAuth = sessionStorage.getItem(AUTH_SESSION_KEY) === 'true';
       const savedRoute = sessionStorage.getItem('brida_active_route');
       if (isAuth) {
-        return savedRoute && savedRoute !== 'landing' ? savedRoute : 'dashboard';
+        const role = sessionStorage.getItem('brida_user_role');
+        if (savedRoute && savedRoute !== 'landing') {
+          return savedRoute;
+        }
+        return role === 'ADMIN' ? 'admin-console' : 'dashboard';
       }
       return 'landing';
     } catch {
@@ -111,6 +125,7 @@ export function App() {
     'ai-request': 'AI Request & Asisten Obrolan Q&A',
     generator: 'Collaborative Workspace & AI Co-Writer (A4 Canvas)',
     'article-editor': 'Pratinjau Cetak & Editor Manual',
+    'admin-console': 'Panel Konsol Admin - Master Data',
   };
 
   const handleLoginSuccess = () => {
@@ -128,6 +143,13 @@ export function App() {
       if (pendingRoute) {
         sessionStorage.removeItem(PENDING_ROUTE_KEY);
         setActiveRoute(pendingRoute);
+      } else {
+        const role = sessionStorage.getItem('brida_user_role');
+        if (role === 'ADMIN') {
+          setActiveRoute('admin-console');
+        } else {
+          setActiveRoute('dashboard');
+        }
       }
     } catch (e) {
       console.error('Gagal membaca pending route:', e);
@@ -141,6 +163,9 @@ export function App() {
       sessionStorage.removeItem(PENDING_ROUTE_KEY);
       sessionStorage.removeItem('brida_active_route');
       sessionStorage.removeItem('brida_last_activity');
+      sessionStorage.removeItem('brida_auth_token');
+      sessionStorage.removeItem('brida_executive_name');
+      sessionStorage.removeItem('brida_user_role');
     } catch (err) {
       console.warn('[Auth] Gagal membersihkan session saat logout:', err);
     }
@@ -203,8 +228,8 @@ export function App() {
 
 
   const handleNavigationAttempt = (route: string, sessionId?: string | null) => {
-    // Daftar rute publik yang bebas diakses tanpa login (Hanya landing page)
-    const publicRoutes = ['landing'];
+    // Daftar rute publik yang bebas diakses tanpa login
+    const publicRoutes = ['landing', 'share-report', 'share-article'];
 
     if (!publicRoutes.includes(route) && !isAuthenticated) {
       // Jika belum login dan mencoba akses modul privat, simpan tujuan & tampilkan login
@@ -359,6 +384,12 @@ export function App() {
             onBack={() => setActiveRoute('generator')}
           />
         );
+      case 'admin-console':
+        return <AdminConsoleView />;
+      case 'share-report':
+        return <ShareReportView />;
+      case 'share-article':
+        return <ShareArticleView />;
       default:
         return (
           <LandingView
@@ -380,7 +411,7 @@ export function App() {
     );
   }
 
-  if (activeRoute === 'gis-explorer' || activeRoute === 'landing') {
+  if (activeRoute === 'gis-explorer' || activeRoute === 'landing' || activeRoute === 'share-report' || activeRoute === 'share-article') {
     return renderContent();
   }
 

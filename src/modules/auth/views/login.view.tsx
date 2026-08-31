@@ -32,6 +32,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onClose })
 
       sessionStorage.setItem('brida_auth_token', response.data.accessToken);
       sessionStorage.setItem('brida_executive_name', response.data.executive.fullName);
+      sessionStorage.setItem('brida_user_role', response.data.executive.role);
 
       onLoginSuccess();
     } catch (err: any) {
