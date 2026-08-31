@@ -70,6 +70,13 @@ export const ShareArticleView: React.FC = () => {
       // Dapatkan naskah bersih tanpa Kop Surat mentah untuk mencegah duplikasi
       const cleanBody = stripCoverPage(article.content);
 
+      // Konversikan ke HTML resmi dan hapus citation-url-node agar PDF bersih
+      const rawHtml = MarkupConverter.toHTML(cleanBody);
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(rawHtml, 'text/html');
+      doc.querySelectorAll('.citation-url-node').forEach(node => node.remove());
+      const cleanHtmlBody = doc.body.innerHTML;
+
       // Siapkan HTML untuk diekspor ke PDF yang berisi isi naskah bersih langsung tanpa cover
       const printHtml = `
         <div style="font-family: 'Calibri', sans-serif; color: #1e293b; background: white; font-size: 11pt; line-height: 1.18; padding: 20px;">
@@ -85,7 +92,7 @@ export const ShareArticleView: React.FC = () => {
             ol { list-style-type: decimal; padding-left: 1.5em; margin-bottom: 14px; }
             .no-print { display: none !important; }
           </style>
-          ${cleanBody}
+          ${cleanHtmlBody}
         </div>
       `;
 
@@ -145,56 +152,84 @@ export const ShareArticleView: React.FC = () => {
   const PAGE_GAP = 24;
   const marginPx = Math.round(2.5 * (96 / 2.54)); // 94px for 2.5cm margin
 
-  // Bersihkan konten dari Kop Surat mentah, lalu konversi markdown ke HTML resmi (tanpa token sitasi)
+  // Bersihkan konten dari Kop Surat mentah, lalu konversi markdown ke HTML resmi dan hapus citation-url-node (Link 1, Link 2)
   const cleanContent = React.useMemo(() => {
     if (!article?.content) return '';
     const stripped = stripCoverPage(article.content);
-    return MarkupConverter.toHTML(stripped);
+    const rawHtml = MarkupConverter.toHTML(stripped);
+
+    try {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(rawHtml, 'text/html');
+      // Hapus citation-url-node dari tampilan web publik
+      doc.querySelectorAll('.citation-url-node').forEach(node => node.remove());
+      return doc.body.innerHTML;
+    } catch {
+      return rawHtml;
+    }
   }, [article?.content]);
 
   // Hitung halaman dinamis & sisipkan spacer di DOM agar melewati gap antar kertas
   useEffect(() => {
-    const container = contentRef.current;
-    if (!container || loading || !article) return;
+    const runPagination = () => {
+      const container = contentRef.current;
+      if (!container || loading || !article) return;
 
-    // Bersihkan spacer lama terlebih dahulu
-    const existingSpacers = container.querySelectorAll('.static-page-spacer');
-    existingSpacers.forEach(el => el.remove());
+      // Bersihkan spacer lama terlebih dahulu
+      const existingSpacers = container.querySelectorAll('.static-page-spacer');
+      existingSpacers.forEach(el => el.remove());
 
-    const usableH = PAGE_H - marginPx * 2;
-    const children = Array.from(container.children) as HTMLElement[];
-    
-    let accHeight = 0;
-    let computedPages = 1;
+      const usableH = PAGE_H - marginPx * 2;
+      const children = Array.from(container.children) as HTMLElement[];
+      
+      let accHeight = 0;
+      let computedPages = 1;
 
-    children.forEach((el) => {
-      const style = window.getComputedStyle(el);
-      const marginTop = parseFloat(style.marginTop) || 0;
-      const marginBottom = parseFloat(style.marginBottom) || 0;
-      const elHeight = el.offsetHeight + marginTop + marginBottom;
+      children.forEach((el) => {
+        if (el.classList.contains('static-page-spacer')) return;
 
-      if (accHeight + elHeight > usableH) {
-        // Meluap -> Sisipkan spacer agar paragraf melompati gap antar kertas A4
-        const remaining = Math.max(0, usableH - accHeight);
-        const spacerH = remaining + PAGE_GAP + 2 * marginPx;
+        const style = window.getComputedStyle(el);
+        const marginTop = parseFloat(style.marginTop) || 0;
+        const marginBottom = parseFloat(style.marginBottom) || 0;
+        const elHeight = el.offsetHeight + marginTop + marginBottom;
 
-        const spacer = document.createElement('div');
-        spacer.className = 'static-page-spacer';
-        spacer.style.height = `${spacerH}px`;
-        spacer.style.display = 'block';
-        spacer.style.background = 'transparent';
-        spacer.style.pointerEvents = 'none';
+        if (accHeight + elHeight > usableH) {
+          // Meluap -> Sisipkan spacer agar paragraf melompati gap antar kertas A4
+          const remaining = Math.max(0, usableH - accHeight);
+          const spacerH = remaining + PAGE_GAP + 2 * marginPx;
 
-        container.insertBefore(spacer, el);
+          const spacer = document.createElement('div');
+          spacer.className = 'static-page-spacer';
+          spacer.style.height = `${spacerH}px`;
+          spacer.style.display = 'block';
+          spacer.style.background = 'transparent';
+          spacer.style.pointerEvents = 'none';
 
-        accHeight = elHeight;
-        computedPages += 1;
-      } else {
-        accHeight += elHeight;
-      }
-    });
+          container.insertBefore(spacer, el);
 
-    setPageCount(computedPages);
+          accHeight = elHeight;
+          computedPages += 1;
+        } else {
+          accHeight += elHeight;
+        }
+      });
+
+      setPageCount(computedPages);
+    };
+
+    runPagination();
+
+    // Jalankan ulang setelah font selesai dimuat agar pengukuran tinggi baris presisi
+    if (document.fonts) {
+      document.fonts.ready.then(() => {
+        setTimeout(runPagination, 100);
+      });
+    }
+
+    window.addEventListener('resize', runPagination);
+    return () => {
+      window.removeEventListener('resize', runPagination);
+    };
   }, [cleanContent, loading, article, marginPx]);
 
   if (loading) {
