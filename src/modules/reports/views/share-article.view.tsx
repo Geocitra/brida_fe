@@ -155,6 +155,37 @@ export const ShareArticleView: React.FC = () => {
     }
   };
 
+  const PAGE_W = 794;
+  const PAGE_H = 1123;
+  const PAGE_GAP = 24;
+  const marginPx = Math.round(2.5 * (96 / 2.54)); // 94px for 2.5cm margin
+
+  // Bersihkan konten dari Kop Surat mentah, lalu konversi markdown jika perlu
+  const cleanContent = React.useMemo(() => {
+    if (!article?.content) return '';
+    const stripped = stripCoverPage(article.content);
+    return toHtml(stripped);
+  }, [article?.content]);
+
+  // Hitung halaman dinamis via ResizeObserver
+  useEffect(() => {
+    if (!contentRef.current || loading || !article) return;
+    const usableH = PAGE_H - marginPx * 2;
+    const measure = () => {
+      if (!contentRef.current) return;
+      const contentH = contentRef.current.scrollHeight;
+      // Cek juga jumlah page-spacer markers untuk konten TipTap asli
+      const spacerCount = (cleanContent.match(/data-auto-page-spacer/g) || []).length;
+      const pagesByHeight = Math.max(1, Math.ceil(contentH / usableH));
+      const pagesBySpacer = spacerCount + 1;
+      setPageCount(Math.max(pagesByHeight, pagesBySpacer));
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(contentRef.current);
+    return () => observer.disconnect();
+  }, [cleanContent, marginPx, loading, article]);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center font-roboto">
@@ -180,36 +211,6 @@ export const ShareArticleView: React.FC = () => {
       </div>
     );
   }
-
-  const PAGE_W = 794;
-  const PAGE_H = 1123;
-  const PAGE_GAP = 24;
-  const marginPx = Math.round(2.5 * (96 / 2.54)); // 94px for 2.5cm margin
-
-  // Bersihkan konten dari Kop Surat mentah, lalu konversi markdown jika perlu
-  const cleanContent = React.useMemo(() => {
-    const stripped = stripCoverPage(article.content);
-    return toHtml(stripped);
-  }, [article.content]);
-
-  // Hitung halaman dinamis via ResizeObserver
-  useEffect(() => {
-    if (!contentRef.current) return;
-    const usableH = PAGE_H - marginPx * 2;
-    const measure = () => {
-      if (!contentRef.current) return;
-      const contentH = contentRef.current.scrollHeight;
-      // Cek juga jumlah page-spacer markers untuk konten TipTap asli
-      const spacerCount = (cleanContent.match(/data-auto-page-spacer/g) || []).length;
-      const pagesByHeight = Math.max(1, Math.ceil(contentH / usableH));
-      const pagesBySpacer = spacerCount + 1;
-      setPageCount(Math.max(pagesByHeight, pagesBySpacer));
-    };
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(contentRef.current);
-    return () => observer.disconnect();
-  }, [cleanContent, marginPx]);
 
   const totalCanvasH = pageCount * PAGE_H + (pageCount - 1) * PAGE_GAP;
 
