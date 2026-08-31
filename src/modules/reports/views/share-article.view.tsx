@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { marked } from 'marked';
 import { ReportService } from '../../../services/report.service';
 import { PdfExportService } from '../../../services/pdf-export.service';
 import {
@@ -6,10 +7,24 @@ import {
   Loader2,
   AlertCircle,
   Building,
-  Calendar,
   Link2,
   CheckCheck,
 } from 'lucide-react';
+
+// Deteksi apakah konten adalah markdown mentah
+const isMarkdownContent = (content: string): boolean => {
+  return /^#{1,6}\s/m.test(content) || /^\|.+\|/m.test(content) || /^[*-]\s/m.test(content);
+};
+
+// Konversi markdown ke HTML jika perlu
+const toHtml = (content: string): string => {
+  if (!content) return '';
+  if (isMarkdownContent(content)) {
+    const rendered = marked.parse(content, { breaks: true });
+    return typeof rendered === 'string' ? rendered : content;
+  }
+  return content;
+};
 
 export const ShareArticleView: React.FC = () => {
   const id = React.useMemo(() => {
@@ -24,6 +39,8 @@ export const ShareArticleView: React.FC = () => {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
+  const [pageCount, setPageCount] = useState(1);
+  const contentRef = useRef<HTMLDivElement>(null);
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(window.location.href).then(() => {
@@ -169,10 +186,31 @@ export const ShareArticleView: React.FC = () => {
   const PAGE_GAP = 24;
   const marginPx = Math.round(2.5 * (96 / 2.54)); // 94px for 2.5cm margin
 
-  // Bersihkan konten dari Kop Surat mentah
-  const cleanContent = stripCoverPage(article.content);
+  // Bersihkan konten dari Kop Surat mentah, lalu konversi markdown jika perlu
+  const cleanContent = React.useMemo(() => {
+    const stripped = stripCoverPage(article.content);
+    return toHtml(stripped);
+  }, [article.content]);
 
-  const pageCount = (cleanContent.match(/data-auto-page-spacer/g) || []).length + 1;
+  // Hitung halaman dinamis via ResizeObserver
+  useEffect(() => {
+    if (!contentRef.current) return;
+    const usableH = PAGE_H - marginPx * 2;
+    const measure = () => {
+      if (!contentRef.current) return;
+      const contentH = contentRef.current.scrollHeight;
+      // Cek juga jumlah page-spacer markers untuk konten TipTap asli
+      const spacerCount = (cleanContent.match(/data-auto-page-spacer/g) || []).length;
+      const pagesByHeight = Math.max(1, Math.ceil(contentH / usableH));
+      const pagesBySpacer = spacerCount + 1;
+      setPageCount(Math.max(pagesByHeight, pagesBySpacer));
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(contentRef.current);
+    return () => observer.disconnect();
+  }, [cleanContent, marginPx]);
+
   const totalCanvasH = pageCount * PAGE_H + (pageCount - 1) * PAGE_GAP;
 
   return (
@@ -331,7 +369,8 @@ export const ShareArticleView: React.FC = () => {
                   user-select: none;
                 }
               `}} />
-              <div 
+              <div
+                ref={contentRef}
                 className="article-preview-content"
                 dangerouslySetInnerHTML={{ __html: cleanContent }}
               />
