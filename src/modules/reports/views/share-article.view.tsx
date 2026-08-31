@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { marked } from 'marked';
 import { ReportService } from '../../../services/report.service';
 import { PdfExportService } from '../../../services/pdf-export.service';
+import { MarkupConverter } from '../../ai-assistant/utils/markup-converter.util';
 import {
   Download,
   Loader2,
@@ -10,21 +10,6 @@ import {
   Link2,
   CheckCheck,
 } from 'lucide-react';
-
-// Deteksi apakah konten adalah markdown mentah
-const isMarkdownContent = (content: string): boolean => {
-  return /^#{1,6}\s/m.test(content) || /^\|.+\|/m.test(content) || /^[*-]\s/m.test(content);
-};
-
-// Konversi markdown ke HTML jika perlu
-const toHtml = (content: string): string => {
-  if (!content) return '';
-  if (isMarkdownContent(content)) {
-    const rendered = marked.parse(content, { breaks: true });
-    return typeof rendered === 'string' ? rendered : content;
-  }
-  return content;
-};
 
 export const ShareArticleView: React.FC = () => {
   const id = React.useMemo(() => {
@@ -160,31 +145,57 @@ export const ShareArticleView: React.FC = () => {
   const PAGE_GAP = 24;
   const marginPx = Math.round(2.5 * (96 / 2.54)); // 94px for 2.5cm margin
 
-  // Bersihkan konten dari Kop Surat mentah, lalu konversi markdown jika perlu
+  // Bersihkan konten dari Kop Surat mentah, lalu konversi markdown ke HTML resmi (tanpa token sitasi)
   const cleanContent = React.useMemo(() => {
     if (!article?.content) return '';
     const stripped = stripCoverPage(article.content);
-    return toHtml(stripped);
+    return MarkupConverter.toHTML(stripped);
   }, [article?.content]);
 
-  // Hitung halaman dinamis via ResizeObserver
+  // Hitung halaman dinamis & sisipkan spacer di DOM agar melewati gap antar kertas
   useEffect(() => {
-    if (!contentRef.current || loading || !article) return;
+    const container = contentRef.current;
+    if (!container || loading || !article) return;
+
+    // Bersihkan spacer lama terlebih dahulu
+    const existingSpacers = container.querySelectorAll('.static-page-spacer');
+    existingSpacers.forEach(el => el.remove());
+
     const usableH = PAGE_H - marginPx * 2;
-    const measure = () => {
-      if (!contentRef.current) return;
-      const contentH = contentRef.current.scrollHeight;
-      // Cek juga jumlah page-spacer markers untuk konten TipTap asli
-      const spacerCount = (cleanContent.match(/data-auto-page-spacer/g) || []).length;
-      const pagesByHeight = Math.max(1, Math.ceil(contentH / usableH));
-      const pagesBySpacer = spacerCount + 1;
-      setPageCount(Math.max(pagesByHeight, pagesBySpacer));
-    };
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(contentRef.current);
-    return () => observer.disconnect();
-  }, [cleanContent, marginPx, loading, article]);
+    const children = Array.from(container.children) as HTMLElement[];
+    
+    let accHeight = 0;
+    let computedPages = 1;
+
+    children.forEach((el) => {
+      const style = window.getComputedStyle(el);
+      const marginTop = parseFloat(style.marginTop) || 0;
+      const marginBottom = parseFloat(style.marginBottom) || 0;
+      const elHeight = el.offsetHeight + marginTop + marginBottom;
+
+      if (accHeight + elHeight > usableH) {
+        // Meluap -> Sisipkan spacer agar paragraf melompati gap antar kertas A4
+        const remaining = Math.max(0, usableH - accHeight);
+        const spacerH = remaining + PAGE_GAP + 2 * marginPx;
+
+        const spacer = document.createElement('div');
+        spacer.className = 'static-page-spacer';
+        spacer.style.height = `${spacerH}px`;
+        spacer.style.display = 'block';
+        spacer.style.background = 'transparent';
+        spacer.style.pointerEvents = 'none';
+
+        container.insertBefore(spacer, el);
+
+        accHeight = elHeight;
+        computedPages += 1;
+      } else {
+        accHeight += elHeight;
+      }
+    });
+
+    setPageCount(computedPages);
+  }, [cleanContent, loading, article, marginPx]);
 
   if (loading) {
     return (
@@ -215,7 +226,7 @@ export const ShareArticleView: React.FC = () => {
   const totalCanvasH = pageCount * PAGE_H + (pageCount - 1) * PAGE_GAP;
 
   return (
-    <div className="min-h-screen bg-slate-200/60 font-roboto py-8 px-4 sm:px-6">
+    <div className="min-h-screen bg-slate-700 font-roboto py-8 px-4 sm:px-6">
       <div className="max-w-4xl mx-auto space-y-6">
         
         {/* Header Action Bar */}
