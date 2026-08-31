@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ReportService } from '../../../services/report.service';
 import { PdfExportService } from '../../../services/pdf-export.service';
+import { A4DocumentSegmenter } from '../utils/a4-document-segmenter.util';
 import { MarkupConverter } from '../../ai-assistant/utils/markup-converter.util';
 import {
   Download,
@@ -24,8 +25,7 @@ export const ShareArticleView: React.FC = () => {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
-  const [pageCount, setPageCount] = useState(1);
-  const contentRef = useRef<HTMLDivElement>(null);
+  const [pages, setPages] = useState<string[]>([]);
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(window.location.href).then(() => {
@@ -149,7 +149,6 @@ export const ShareArticleView: React.FC = () => {
 
   const PAGE_W = 794;
   const PAGE_H = 1123;
-  const PAGE_GAP = 24;
   const marginPx = Math.round(2.5 * (96 / 2.54)); // 94px for 2.5cm margin
 
   // Bersihkan konten dari Kop Surat mentah, lalu konversi markdown ke HTML resmi dan hapus citation-url-node (Link 1, Link 2)
@@ -169,68 +168,30 @@ export const ShareArticleView: React.FC = () => {
     }
   }, [article?.content]);
 
-  // Hitung halaman dinamis & sisipkan spacer di DOM agar melewati gap antar kertas
+  // Hitung halaman dinamis dengan A4DocumentSegmenter (Pure Fabrication)
   useEffect(() => {
-    const runPagination = () => {
-      const container = contentRef.current;
-      if (!container || loading || !article) return;
+    if (loading || !article || !cleanContent) return;
 
-      // Bersihkan spacer lama terlebih dahulu
-      const existingSpacers = container.querySelectorAll('.static-page-spacer');
-      existingSpacers.forEach(el => el.remove());
-
-      const usableH = PAGE_H - marginPx * 2;
-      const children = Array.from(container.children) as HTMLElement[];
-      
-      let accHeight = 0;
-      let computedPages = 1;
-
-      children.forEach((el) => {
-        if (el.classList.contains('static-page-spacer')) return;
-
-        const style = window.getComputedStyle(el);
-        const marginTop = parseFloat(style.marginTop) || 0;
-        const marginBottom = parseFloat(style.marginBottom) || 0;
-        const elHeight = el.offsetHeight + marginTop + marginBottom;
-
-        if (accHeight + elHeight > usableH) {
-          // Meluap -> Sisipkan spacer agar paragraf melompati gap antar kertas A4
-          const remaining = Math.max(0, usableH - accHeight);
-          const spacerH = remaining + PAGE_GAP + 2 * marginPx;
-
-          const spacer = document.createElement('div');
-          spacer.className = 'static-page-spacer';
-          spacer.style.height = `${spacerH}px`;
-          spacer.style.display = 'block';
-          spacer.style.background = 'transparent';
-          spacer.style.pointerEvents = 'none';
-
-          container.insertBefore(spacer, el);
-
-          accHeight = elHeight;
-          computedPages += 1;
-        } else {
-          accHeight += elHeight;
+    let isMounted = true;
+    
+    const runSegmentation = async () => {
+      try {
+        const paginatedPages = await A4DocumentSegmenter.segmentHTML(cleanContent);
+        if (isMounted) {
+          setPages(paginatedPages);
         }
-      });
-
-      setPageCount(computedPages);
+      } catch (err) {
+        console.error('Failed to segment document:', err);
+      }
     };
 
-    runPagination();
+    runSegmentation();
 
-    // Jalankan ulang setelah font selesai dimuat agar pengukuran tinggi baris presisi
-    if (document.fonts) {
-      document.fonts.ready.then(() => {
-        setTimeout(runPagination, 100);
-      });
-    }
-
-    window.addEventListener('resize', runPagination);
+    // Re-run if images load or layout shifts (using ResizeObserver on the first loaded page container as a proxy could be done, but keeping simple for now)
     return () => {
-      window.removeEventListener('resize', runPagination);
+      isMounted = false;
     };
-  }, [cleanContent, loading, article, marginPx]);
+  }, [cleanContent, loading, article]);
 
   if (loading) {
     return (
@@ -258,7 +219,7 @@ export const ShareArticleView: React.FC = () => {
     );
   }
 
-  const totalCanvasH = pageCount * PAGE_H + (pageCount - 1) * PAGE_GAP;
+
 
   return (
     <div className="min-h-screen bg-slate-700 font-roboto py-8 px-4 sm:px-6">
@@ -294,134 +255,108 @@ export const ShareArticleView: React.FC = () => {
 
         {/* Responsive Horizontal Scroll wrapper for A4 Canvas */}
         <div className="w-full overflow-x-auto pb-6 flex justify-center">
-          <div 
-            className="relative select-none text-left shrink-0 animate-in fade-in duration-200"
-            style={{
-              width: `${PAGE_W}px`,
-              height: `${totalCanvasH}px`,
-            }}
-          >
-            {/* Layer 1: Page Sheets */}
-            {Array.from({ length: pageCount }).map((_, i) => (
-              <div
+          <div className="flex flex-col gap-6 animate-in fade-in duration-200">
+            {pages.length > 0 ? pages.map((pageHtml, i) => (
+              <div 
                 key={i}
-                className="absolute bg-white"
+                className="relative bg-white text-left shrink-0"
                 style={{
-                  left: 0,
-                  top: `${i * (PAGE_H + PAGE_GAP)}px`,
                   width: `${PAGE_W}px`,
                   height: `${PAGE_H}px`,
-                  boxShadow: [
-                    '0 1px 3px rgba(0,0,0,0.06)',
-                    '0 4px 16px rgba(0,0,0,0.08)',
-                    '0 12px 32px rgba(0,0,0,0.05)',
-                  ].join(', '),
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.08), 0 12px 32px rgba(0,0,0,0.05)',
                   border: '1px solid #cbd5e1',
-                  zIndex: 0,
                 }}
               >
+                <div
+                  className="article-preview-content h-full"
+                  style={{
+                    padding: `${marginPx}px`,
+                    boxSizing: 'border-box',
+                  }}
+                  dangerouslySetInnerHTML={{ __html: pageHtml }}
+                />
+                
                 {/* Page Number indicator */}
                 <span
                   className="absolute bottom-4 right-5 text-[8px] font-black text-slate-355 uppercase tracking-widest select-none pointer-events-none"
+                  style={{ color: '#94a3b8' }}
                 >
-                  HALAMAN {i + 1} dari {pageCount}
+                  HALAMAN {i + 1} dari {pages.length}
                 </span>
               </div>
-            ))}
-
-            {/* Layer 2: Transparent Article Text Content Overlay */}
-            <div
-              id="share-article-content-container"
-              className="absolute text-left"
-              style={{
-                left: 0,
-                top: 0,
-                width: `${PAGE_W}px`,
-                minHeight: `${totalCanvasH}px`,
-                padding: `${marginPx}px`,
-                boxSizing: 'border-box',
-                zIndex: 1,
-                background: 'transparent',
-              }}
-            >
-              <style dangerouslySetInnerHTML={{ __html: `
-                .article-preview-content {
-                  font-family: 'Calibri', sans-serif;
-                  font-size: 11pt;
-                  line-height: 1.18;
-                  color: #1e293b;
-                }
-                .article-preview-content p {
-                  line-height: 1.18 !important;
-                  margin-top: 0 !important;
-                  margin-bottom: 14px !important;
-                }
-                /* Mengatur spasi rapat khusus untuk baris Kop Surat (teks rata tengah) */
-                .article-preview-content p[style*="text-align: center"],
-                .article-preview-content p[style*="text-align:center"],
-                .article-preview-content div[style*="text-align: center"],
-                .article-preview-content div[style*="text-align:center"] {
-                  margin-bottom: 6px !important;
-                  line-height: 1.3 !important;
-                  letter-spacing: 0.02em;
-                }
-                .article-preview-content td p, 
-                .article-preview-content th p, 
-                .article-preview-content li p { 
-                  margin-bottom: 0 !important; 
-                }
-                .article-preview-content h1 { font-size: 1.4em; font-weight: 700; margin: 20px 0 10px !important; }
-                .article-preview-content h2 { font-size: 1.2em; font-weight: 700; margin: 18px 0 8px !important; }
-                .article-preview-content h3 { font-size: 1.05em; font-weight: 600; margin: 14px 0 6px !important; }
-                
-                /* Desain double-line Kop Surat Resmi Pemerintah */
-                .article-preview-content hr {
-                  border-top: 2.5px solid #0f172a !important;
-                  border-bottom: 0.75px solid #0f172a !important;
-                  height: 4.5px !important;
-                  border-left: none !important;
-                  border-right: none !important;
-                  margin: 12px 0 18px 0 !important;
-                  opacity: 1 !important;
-                  padding: 0 !important;
-                }
-                
-                .article-preview-content table {
-                  border-collapse: collapse !important;
-                  table-layout: fixed !important;
-                  width: 100% !important;
-                  margin: 16px 0 28px !important;
-                  overflow: hidden !important;
-                }
-                .article-preview-content td, 
-                .article-preview-content th {
-                  min-width: 80px;
-                  border: 1px solid #cbd5e1;
-                  padding: 6px 10px;
-                  vertical-align: top;
-                  box-sizing: border-box;
-                  word-break: normal;
-                  overflow-wrap: break-word;
-                }
-                .article-preview-content th { font-weight: 700; text-align: left; background: rgba(248,250,252,0.95); }
-                .article-preview-content tr { page-break-inside: avoid !important; break-inside: avoid !important; }
-                .article-preview-content img { max-width: 100% !important; height: auto !important; margin: 16px 0; border: 1px solid #cbd5e1; }
-                .article-preview-content ul { list-style-type: disc; padding-left: 1.5em; margin-bottom: 14px; }
-                .article-preview-content ol { list-style-type: decimal; padding-left: 1.5em; margin-bottom: 14px; }
-                [data-auto-page-spacer] {
-                  display: block;
-                  background: transparent !important;
-                  cursor: default;
-                  pointer-events: none;
-                  user-select: none;
-                }
-              `}} />
-              <div
-                ref={contentRef}
-                className="article-preview-content"
-                dangerouslySetInnerHTML={{ __html: cleanContent }}
-              />
-            </div>
+            )) : (
+              <div 
+                className="relative bg-white text-left shrink-0"
+                style={{ width: `${PAGE_W}px`, height: `${PAGE_H}px`, boxShadow: '0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.08), 0 12px 32px rgba(0,0,0,0.05)', border: '1px solid #cbd5e1' }}
+              >
+                <div className="flex items-center justify-center h-full text-slate-400 text-sm">
+                  Memproses dokumen...
+                </div>
+              </div>
+            )}
+            
+            {/* Global Styles for content */}
+            <style dangerouslySetInnerHTML={{ __html: `
+              .article-preview-content {
+                font-family: 'Calibri', sans-serif;
+                font-size: 11pt;
+                line-height: 1.18;
+                color: #1e293b;
+              }
+              .article-preview-content p {
+                line-height: 1.18 !important;
+                margin-top: 0 !important;
+                margin-bottom: 14px !important;
+              }
+              .article-preview-content p[style*="text-align: center"],
+              .article-preview-content p[style*="text-align:center"],
+              .article-preview-content div[style*="text-align: center"],
+              .article-preview-content div[style*="text-align:center"] {
+                margin-bottom: 6px !important;
+                line-height: 1.3 !important;
+                letter-spacing: 0.02em;
+              }
+              .article-preview-content td p, 
+              .article-preview-content th p, 
+              .article-preview-content li p { 
+                margin-bottom: 0 !important; 
+              }
+              .article-preview-content h1 { font-size: 1.4em; font-weight: 700; margin: 20px 0 10px !important; }
+              .article-preview-content h2 { font-size: 1.2em; font-weight: 700; margin: 18px 0 8px !important; }
+              .article-preview-content h3 { font-size: 1.05em; font-weight: 600; margin: 14px 0 6px !important; }
+              .article-preview-content hr {
+                border-top: 2.5px solid #0f172a !important;
+                border-bottom: 0.75px solid #0f172a !important;
+                height: 4.5px !important;
+                border-left: none !important;
+                border-right: none !important;
+                margin: 12px 0 18px 0 !important;
+                opacity: 1 !important;
+                padding: 0 !important;
+              }
+              .article-preview-content table {
+                border-collapse: collapse !important;
+                table-layout: fixed !important;
+                width: 100% !important;
+                margin: 16px 0 28px !important;
+                overflow: hidden !important;
+              }
+              .article-preview-content td, 
+              .article-preview-content th {
+                min-width: 80px;
+                border: 1px solid #cbd5e1;
+                padding: 6px 10px;
+                vertical-align: top;
+                box-sizing: border-box;
+                word-break: normal;
+                overflow-wrap: break-word;
+              }
+              .article-preview-content th { font-weight: 700; text-align: left; background: rgba(248,250,252,0.95); }
+              .article-preview-content tr { page-break-inside: avoid !important; break-inside: avoid !important; }
+              .article-preview-content img { max-width: 100% !important; height: auto !important; margin: 16px 0; border: 1px solid #cbd5e1; }
+              .article-preview-content ul { list-style-type: disc; padding-left: 1.5em; margin-bottom: 14px; }
+              .article-preview-content ol { list-style-type: decimal; padding-left: 1.5em; margin-bottom: 14px; }
+            `}} />
           </div>
         </div>
 
