@@ -12,15 +12,17 @@ import {
   CheckCircle2,
   X,
   Settings,
+  Landmark,
+  Save,
 } from "lucide-react";
 import { AdminService } from "../../../services/admin.service";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
 
-type ActiveTab = "opd" | "category" | "district" | "user" | "settings";
+type ActiveTab = "bupati" | "opd" | "category" | "district" | "user";
 
 export default function AdminConsoleView() {
-  const [activeTab, setActiveTab] = useState<ActiveTab>("opd");
+  const [activeTab, setActiveTab] = useState<ActiveTab>("bupati");
   const [loading, setLoading] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -72,12 +74,60 @@ export default function AdminConsoleView() {
         ]);
         setUsers(userData);
         setOpds(opdData); // Cache OPDs for user assignment dropdown
-      } else if (activeTab === "settings") {
+      } else if (activeTab === "bupati") {
         const settingData = await AdminService.getSettings();
         setSettings(settingData || []);
       }
     } catch (err: any) {
       setErrorMsg(err.message || "Gagal memuat data master.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getSettingVal = (key: string, defaultVal: string = '') => {
+    return settings.find((s: any) => s.key === key)?.value ?? defaultVal;
+  };
+
+  const setSettingVal = (key: string, val: string) => {
+    setSettings((prev: any[]) => {
+      const exists = prev.some((s) => s.key === key);
+      if (exists) {
+        return prev.map((s) => (s.key === key ? { ...s, value: val } : s));
+      }
+      return [...prev, { key, value: val }];
+    });
+  };
+
+  const handleSaveBupatiData = async () => {
+    setLoading(true);
+    setErrorMsg(null);
+    try {
+      const keysToSave = [
+        'BUPATI_NAME',
+        'BUPATI_TITLE',
+        'BUPATI_PHONE',
+        'BUPATI_PERIOD',
+        'WAKIL_BUPATI_NAME',
+        'WAKIL_BUPATI_PHONE',
+        'SEKDA_NAME',
+        'SEKDA_PHONE',
+      ];
+
+      for (const key of keysToSave) {
+        const val = getSettingVal(key, '');
+        if (key.includes('PHONE')) {
+          const cleanPhone = val.replace(/[^0-9]/g, '');
+          await AdminService.updateSetting(key, cleanPhone);
+        } else {
+          await AdminService.updateSetting(key, val);
+        }
+      }
+
+      setSuccessMsg("Data Pimpinan Daerah (Bupati, Wakil Bupati & Sekda) berhasil disimpan!");
+      await loadData();
+    } catch (err: any) {
+      setErrorMsg(err.message || "Gagal menyimpan data pimpinan daerah.");
     } finally {
       setLoading(false);
     }
@@ -254,11 +304,11 @@ export default function AdminConsoleView() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border border-slate-300 bg-white p-6 rounded-none gap-4">
         <div>
           <span className="text-[10px] font-black uppercase tracking-widest text-teal-600">Portal Utama Administrator</span>
-          <h1 className="text-xl font-bold text-slate-900 mt-1">Konsol Manajemen Data Master</h1>
-          <p className="text-xs text-slate-500 mt-0.5">Kelola data dasar wilayah spasial, OPD instansi dinas, klasifikasi kategori, dan pengguna sistem.</p>
+          <h1 className="text-xl font-bold text-slate-900 mt-1">Konsol Manajemen Data Master &amp; Pimpinan Daerah</h1>
+          <p className="text-xs text-slate-500 mt-0.5">Kelola data pimpinan daerah (Bupati &amp; Wakil Bupati), instansi dinas (OPD), klasifikasi kategori, dan wilayah spasial.</p>
         </div>
 
-        {activeTab !== "settings" && (
+        {activeTab !== "bupati" && (
           <button
             onClick={openCreateModal}
             className="flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-slate-900 hover:bg-teal-600 transition-colors cursor-pointer rounded-none self-start sm:self-center uppercase tracking-wider"
@@ -288,6 +338,15 @@ export default function AdminConsoleView() {
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
         {/* Menu Navigation Sidebar */}
         <div className="flex flex-col border border-slate-300 bg-white rounded-none divide-y divide-slate-200">
+          <button
+            onClick={() => setActiveTab("bupati")}
+            className={`flex items-center gap-3 px-5 py-4 text-xs font-bold transition-colors text-left rounded-none cursor-pointer ${
+              activeTab === "bupati" ? "bg-slate-900 text-white" : "text-slate-700 hover:bg-slate-100"
+            }`}
+          >
+            <Landmark size={16} />
+            <span>Pimpinan Daerah (Bupati)</span>
+          </button>
           <button
             onClick={() => setActiveTab("opd")}
             className={`flex items-center gap-3 px-5 py-4 text-xs font-bold transition-colors text-left rounded-none cursor-pointer ${
@@ -324,26 +383,17 @@ export default function AdminConsoleView() {
             <Users size={16} />
             <span>Hak Akses Pengguna</span>
           </button>
-          <button
-            onClick={() => setActiveTab("settings")}
-            className={`flex items-center gap-3 px-5 py-4 text-xs font-bold transition-colors text-left rounded-none cursor-pointer ${
-              activeTab === "settings" ? "bg-slate-900 text-white" : "text-slate-700 hover:bg-slate-100"
-            }`}
-          >
-            <Settings size={16} />
-            <span>Pengaturan Sistem</span>
-          </button>
         </div>
 
         {/* Dynamic Table Board (Spans 3 Columns) */}
         <div className="lg:col-span-3 border border-slate-300 bg-white rounded-none p-6">
           <div className="flex items-center justify-between border-b border-slate-200 pb-4 mb-4">
             <h2 className="text-xs font-black uppercase text-slate-800 tracking-wider">
+              {activeTab === "bupati" && "Profil & Data Kontak Pimpinan Daerah (Bupati Mimika)"}
               {activeTab === "opd" && "Daftar Instansi Dinas Resmi (OPD)"}
               {activeTab === "category" && "Daftar Kategori Laporan Daerah"}
               {activeTab === "district" && "Daftar Centroid Wilayah Administrasi"}
               {activeTab === "user" && "Daftar Akun Pengguna Terdaftar"}
-              {activeTab === "settings" && "Profil Pimpinan Daerah & Konfigurasi"}
             </h2>
             {loading && <Loader2 size={16} className="text-slate-500 animate-spin" />}
           </div>
@@ -555,69 +605,226 @@ export default function AdminConsoleView() {
               </table>
             )}
 
-            {activeTab === "settings" && (
-              <div className="space-y-6 max-w-xl">
-                <div className="bg-slate-50 border border-slate-200 p-4 rounded-none">
-                  <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-2">Profil Kepala Daerah / Bupati</h3>
-                  <div className="space-y-4">
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-black uppercase text-slate-500 tracking-wider">Nama Lengkap Bupati</label>
-                      <input
-                        type="text"
-                        value={settings.find(s => s.key === 'BUPATI_NAME')?.value || ''}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          setSettings(prev => prev.map(s => s.key === 'BUPATI_NAME' ? { ...s, value: val } : s));
-                        }}
-                        placeholder="Contoh: Darius Sabon Rain, S.E., M.Ec.Dev. (Pjs)"
-                        className="w-full px-3 py-2 text-xs border border-slate-300 rounded-none bg-white focus:border-slate-900 outline-none font-semibold text-slate-900"
-                      />
+            {/* 5. Pimpinan Daerah (Bupati) Manager */}
+            {activeTab === "bupati" && (
+              <div className="space-y-6">
+                {/* Status Ringkasan Eksekutif Aktif */}
+                <div className="border border-slate-300 bg-slate-50 p-5 rounded-none space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-200 pb-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-slate-900 text-teal-400 flex items-center justify-center font-bold text-sm rounded-none shrink-0">
+                        <Landmark size={20} />
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-black uppercase text-teal-600 tracking-wider">Pimpinan Daerah Terdaftar</span>
+                        <h3 className="text-sm font-bold text-slate-900 leading-tight">
+                          {getSettingVal('BUPATI_NAME', 'Johannes Rettob, S.Sos., M.M.')}
+                        </h3>
+                        <span className="text-[11px] text-slate-500 font-medium">
+                          {getSettingVal('BUPATI_TITLE', 'Bupati Mimika')} &bull; Periode {getSettingVal('BUPATI_PERIOD', '2025 - 2030')}
+                        </span>
+                      </div>
                     </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-black uppercase text-slate-500 tracking-wider">Nomor WhatsApp Bupati</label>
-                      <input
-                        type="text"
-                        value={settings.find(s => s.key === 'BUPATI_PHONE')?.value || ''}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          setSettings(prev => prev.map(s => s.key === 'BUPATI_PHONE' ? { ...s, value: val } : s));
-                        }}
-                        placeholder="Contoh: 628123456789"
-                        className="w-full px-3 py-2 text-xs border border-slate-300 rounded-none bg-white focus:border-slate-900 outline-none font-mono text-slate-700"
-                      />
-                      <p className="text-[8px] text-slate-400">Gunakan format internasional tanpa tanda + atau spasi (contoh: 628123456789)</p>
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 border border-emerald-300 text-emerald-700 text-[11px] font-bold rounded-none self-start sm:self-center">
+                      <CheckCircle2 size={13} />
+                      <span>Aktif di Modal WhatsApp &amp; Nota Dinas</span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                    <div className="border border-slate-200 bg-white p-3 rounded-none">
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">Nomor WhatsApp Resmi</span>
+                      <span className="font-mono font-bold text-slate-800">
+                        {getSettingVal('BUPATI_PHONE', '628123456789') ? `+${getSettingVal('BUPATI_PHONE', '628123456789')}` : '-'}
+                      </span>
+                    </div>
+                    <div className="border border-slate-200 bg-white p-3 rounded-none">
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">Wakil Bupati</span>
+                      <span className="font-semibold text-slate-800">
+                        {getSettingVal('WAKIL_BUPATI_NAME', 'Belum Diisi')}
+                      </span>
+                    </div>
+                    <div className="border border-slate-200 bg-white p-3 rounded-none">
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">Sekretaris Daerah (Sekda)</span>
+                      <span className="font-semibold text-slate-800">
+                        {getSettingVal('SEKDA_NAME', 'Belum Diisi')}
+                      </span>
                     </div>
                   </div>
                 </div>
 
-                <div className="pt-2">
+                {/* Form Input Data Pimpinan */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+                  {/* Kolom Kiri: Kepala Daerah (Bupati) */}
+                  <div className="border border-slate-200 bg-white p-5 rounded-none space-y-4">
+                    <div className="border-b border-slate-200 pb-2">
+                      <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                        1. Data Kepala Daerah (Bupati)
+                      </h4>
+                      <p className="text-[11px] text-slate-500 mt-0.5">
+                        Informasi ini digunakan sebagai tujuan utama pengiriman laporan kebijakan dan nota dinas.
+                      </p>
+                    </div>
+
+                    <div className="space-y-3">
+                      <div>
+                        <label className="text-[10px] font-black uppercase text-slate-600 tracking-wider block mb-1">
+                          Nama Lengkap &amp; Gelar Bupati <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={getSettingVal('BUPATI_NAME', '')}
+                          onChange={(e) => setSettingVal('BUPATI_NAME', e.target.value)}
+                          placeholder="Contoh: Johannes Rettob, S.Sos., M.M."
+                          className="w-full px-3 py-2 text-xs border border-slate-300 rounded-none bg-white focus:border-slate-900 outline-none font-semibold text-slate-900"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-[10px] font-black uppercase text-slate-600 tracking-wider block mb-1">
+                          Sebutan / Jabatan Resmi <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={getSettingVal('BUPATI_TITLE', 'Bupati Mimika')}
+                          onChange={(e) => setSettingVal('BUPATI_TITLE', e.target.value)}
+                          placeholder="Contoh: Bupati Mimika / Pj. Bupati Mimika"
+                          className="w-full px-3 py-2 text-xs border border-slate-300 rounded-none bg-white focus:border-slate-900 outline-none font-medium text-slate-800"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-[10px] font-black uppercase text-slate-600 tracking-wider block mb-1">
+                          Nomor WhatsApp Resmi Bupati <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={getSettingVal('BUPATI_PHONE', '')}
+                          onChange={(e) => setSettingVal('BUPATI_PHONE', e.target.value)}
+                          placeholder="Contoh: 628123456789"
+                          className="w-full px-3 py-2 text-xs border border-slate-300 rounded-none bg-white focus:border-slate-900 outline-none font-mono text-slate-800"
+                        />
+                        <span className="text-[10px] text-slate-400 mt-1 block">
+                          Format internasional tanpa tanda + atau spasi (contoh: 628123456789)
+                        </span>
+                      </div>
+
+                      <div>
+                        <label className="text-[10px] font-black uppercase text-slate-600 tracking-wider block mb-1">
+                          Periode Masa Jabatan
+                        </label>
+                        <input
+                          type="text"
+                          value={getSettingVal('BUPATI_PERIOD', '2025 - 2030')}
+                          onChange={(e) => setSettingVal('BUPATI_PERIOD', e.target.value)}
+                          placeholder="Contoh: 2025 - 2030"
+                          className="w-full px-3 py-2 text-xs border border-slate-300 rounded-none bg-white focus:border-slate-900 outline-none font-medium text-slate-800"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Kolom Kanan: Wakil Bupati & Sekda */}
+                  <div className="border border-slate-200 bg-white p-5 rounded-none space-y-4">
+                    <div className="border-b border-slate-200 pb-2">
+                      <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                        2. Pejabat Terkait (Wakil Bupati &amp; Sekda)
+                      </h4>
+                      <p className="text-[11px] text-slate-500 mt-0.5">
+                        Opsional. Jika diisi, otomatis muncul sebagai pilihan kontak di modal pengiriman WhatsApp.
+                      </p>
+                    </div>
+
+                    <div className="space-y-3">
+                      <div>
+                        <label className="text-[10px] font-black uppercase text-slate-600 tracking-wider block mb-1">
+                          Nama Lengkap Wakil Bupati
+                        </label>
+                        <input
+                          type="text"
+                          value={getSettingVal('WAKIL_BUPATI_NAME', '')}
+                          onChange={(e) => setSettingVal('WAKIL_BUPATI_NAME', e.target.value)}
+                          placeholder="Contoh: Emanuel Kemong"
+                          className="w-full px-3 py-2 text-xs border border-slate-300 rounded-none bg-white focus:border-slate-900 outline-none font-medium text-slate-800"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-[10px] font-black uppercase text-slate-600 tracking-wider block mb-1">
+                          Nomor WhatsApp Wakil Bupati
+                        </label>
+                        <input
+                          type="text"
+                          value={getSettingVal('WAKIL_BUPATI_PHONE', '')}
+                          onChange={(e) => setSettingVal('WAKIL_BUPATI_PHONE', e.target.value)}
+                          placeholder="Contoh: 628111222333"
+                          className="w-full px-3 py-2 text-xs border border-slate-300 rounded-none bg-white focus:border-slate-900 outline-none font-mono text-slate-800"
+                        />
+                      </div>
+
+                      <div className="pt-2 border-t border-slate-100">
+                        <label className="text-[10px] font-black uppercase text-slate-600 tracking-wider block mb-1">
+                          Nama Lengkap Sekretaris Daerah (Sekda)
+                        </label>
+                        <input
+                          type="text"
+                          value={getSettingVal('SEKDA_NAME', '')}
+                          onChange={(e) => setSettingVal('SEKDA_NAME', e.target.value)}
+                          placeholder="Contoh: Petrus Yumte, S.H., M.Si."
+                          className="w-full px-3 py-2 text-xs border border-slate-300 rounded-none bg-white focus:border-slate-900 outline-none font-medium text-slate-800"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-[10px] font-black uppercase text-slate-600 tracking-wider block mb-1">
+                          Nomor WhatsApp Sekda
+                        </label>
+                        <input
+                          type="text"
+                          value={getSettingVal('SEKDA_PHONE', '')}
+                          onChange={(e) => setSettingVal('SEKDA_PHONE', e.target.value)}
+                          placeholder="Contoh: 628444555666"
+                          className="w-full px-3 py-2 text-xs border border-slate-300 rounded-none bg-white focus:border-slate-900 outline-none font-mono text-slate-800"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Section Pratinjau Live Preview */}
+                <div className="border border-slate-200 bg-slate-50 p-5 rounded-none space-y-3">
+                  <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                    3. Pratinjau Tampilan Kontak di Sistem
+                  </h4>
+                  <p className="text-[11px] text-slate-500">
+                    Pratinjau bagaimana pimpinan daerah akan tampil pada pilihan dropdown kontak WhatsApp di halaman Laporan dan Artikel:
+                  </p>
+                  <div className="border border-slate-300 bg-white p-3 rounded-none font-mono text-xs text-slate-700 space-y-1">
+                    <div className="font-bold text-teal-700">
+                      &bull; {getSettingVal('BUPATI_NAME', 'Johannes Rettob, S.Sos., M.M.')} ({getSettingVal('BUPATI_TITLE', 'Bupati Mimika')})
+                    </div>
+                    {getSettingVal('WAKIL_BUPATI_NAME', '') && (
+                      <div className="text-slate-600">
+                        &bull; {getSettingVal('WAKIL_BUPATI_NAME', '')} (Wakil Bupati Mimika)
+                      </div>
+                    )}
+                    {getSettingVal('SEKDA_NAME', '') && (
+                      <div className="text-slate-600">
+                        &bull; {getSettingVal('SEKDA_NAME', '')} (Sekretaris Daerah)
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Tombol Simpan */}
+                <div className="flex items-center gap-3 pt-2">
                   <button
-                    onClick={async () => {
-                      setLoading(true);
-                      setErrorMsg(null);
-                      try {
-                        const nameObj = settings.find(s => s.key === 'BUPATI_NAME');
-                        const phoneObj = settings.find(s => s.key === 'BUPATI_PHONE');
-                        if (nameObj) {
-                          await AdminService.updateSetting('BUPATI_NAME', nameObj.value);
-                        }
-                        if (phoneObj) {
-                          // Clean phone number from +, spaces, hyphens
-                          const cleanPhone = phoneObj.value.replace(/[^0-9]/g, '');
-                          await AdminService.updateSetting('BUPATI_PHONE', cleanPhone);
-                        }
-                        setSuccessMsg("Konfigurasi sistem berhasil diperbarui.");
-                        loadData();
-                      } catch (err: any) {
-                        setErrorMsg(err.message || "Gagal menyimpan konfigurasi.");
-                      } finally {
-                        setLoading(false);
-                      }
-                    }}
+                    onClick={handleSaveBupatiData}
                     disabled={loading}
-                    className="px-5 py-2.5 bg-slate-900 hover:bg-teal-600 disabled:bg-slate-300 text-white font-bold text-xs uppercase tracking-wider rounded-none cursor-pointer transition-colors"
+                    className="px-6 py-3 bg-slate-900 hover:bg-teal-600 disabled:bg-slate-300 text-white font-bold text-xs uppercase tracking-wider rounded-none cursor-pointer transition-colors flex items-center gap-2"
                   >
-                    Simpan Perubahan
+                    {loading ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                    <span>Simpan Data Pimpinan Daerah</span>
                   </button>
                 </div>
               </div>

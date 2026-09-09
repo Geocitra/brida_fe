@@ -572,11 +572,20 @@ Kabupaten Mimika`;
         AdminService.getPublicSettings().catch(() => []),
       ]);
 
-      const bupatiName = settingsList.find((s: any) => s.key === 'BUPATI_NAME')?.value || 'Darius Sabon Rain, S.E., M.Ec.Dev.';
+      const bupatiName = settingsList.find((s: any) => s.key === 'BUPATI_NAME')?.value || 'Johannes Rettob, S.Sos., M.M.';
+      const bupatiTitle = settingsList.find((s: any) => s.key === 'BUPATI_TITLE')?.value || 'Bupati Mimika';
       const bupatiPhone = settingsList.find((s: any) => s.key === 'BUPATI_PHONE')?.value || '628123456789';
 
+      const wakilName = settingsList.find((s: any) => s.key === 'WAKIL_BUPATI_NAME')?.value;
+      const wakilPhone = settingsList.find((s: any) => s.key === 'WAKIL_BUPATI_PHONE')?.value;
+
+      const sekdaName = settingsList.find((s: any) => s.key === 'SEKDA_NAME')?.value;
+      const sekdaPhone = settingsList.find((s: any) => s.key === 'SEKDA_PHONE')?.value;
+
       const contacts = [
-        { id: 'bupati', displayName: bupatiName, role: 'Bupati Mimika', label: `${bupatiName} – Bupati Mimika`, phone: bupatiPhone },
+        { id: 'bupati', displayName: bupatiName, role: bupatiTitle, label: `${bupatiName} – ${bupatiTitle}`, phone: bupatiPhone },
+        ...(wakilName && wakilPhone ? [{ id: 'wakil_bupati', displayName: wakilName, role: 'Wakil Bupati Mimika', label: `${wakilName} – Wakil Bupati Mimika`, phone: wakilPhone }] : []),
+        ...(sekdaName && sekdaPhone ? [{ id: 'sekda', displayName: sekdaName, role: 'Sekretaris Daerah', label: `${sekdaName} – Sekretaris Daerah`, phone: sekdaPhone }] : []),
         ...opdsList
           .filter((o: any) => o.headName && o.headPhone)
           .map((o: any) => ({
