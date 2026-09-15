@@ -19,6 +19,7 @@ import {
     Image as ImageIcon,
     ZoomIn,
     ZoomOut,
+    Sparkles,
 } from 'lucide-react';
 import type { FontFamilyKey } from '../../store/useEditorStore';
 
@@ -54,6 +55,7 @@ interface ArticlePreviewEditorHeaderProps {
     onInsertPageBreak: () => void;
     onInsertImage: (file: File) => void;
     onZoomChange: (level: number) => void;
+    onConvertToInfographic?: () => void;
 }
 
 export const ArticlePreviewEditorHeader: React.FC<ArticlePreviewEditorHeaderProps> = ({
@@ -82,6 +84,7 @@ export const ArticlePreviewEditorHeader: React.FC<ArticlePreviewEditorHeaderProp
     onInsertPageBreak,
     onInsertImage,
     onZoomChange,
+    onConvertToInfographic,
 }) => {
     const zoomOut = () => {
         const idx = ZOOM_PRESETS.indexOf(zoomLevel);
@@ -127,6 +130,17 @@ export const ArticlePreviewEditorHeader: React.FC<ArticlePreviewEditorHeaderProp
                     </div>
                 </div>
 
+                {onConvertToInfographic && (
+                    <button
+                        type="button"
+                        onClick={onConvertToInfographic}
+                        className="px-3 py-1.5 bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-300 font-bold text-xs uppercase inline-flex items-center gap-1.5 rounded-none cursor-pointer transition-colors shadow-xs"
+                        title="Buat infografis dari artikel ini di Studio Infografis"
+                    >
+                        <Sparkles size={13} className="text-teal-600" />
+                        <span>Buat Infografis</span>
+                    </button>
+                )}
             </div>
 
             <div className="px-6 py-2 bg-slate-50 flex flex-wrap items-center justify-between gap-4 select-none">

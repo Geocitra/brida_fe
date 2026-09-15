@@ -77,6 +77,16 @@ export const ShareArticleView: React.FC = () => {
       doc.querySelectorAll('.citation-url-node').forEach(node => node.remove());
       const cleanHtmlBody = doc.body.innerHTML;
 
+      // Ekstrak judul dari <h1> naskah
+      const h1Text = doc.querySelector('h1')?.textContent?.trim();
+      const rawTitle = h1Text || article.title || 'Draf_Kebijakan_BRIDA_Mimika';
+      
+      const safeFilename = rawTitle
+        .replace(/[/\\?%*:|"<>#]/g, '')
+        .replace(/\s+/g, '_')
+        .replace(/_+/g, '_')
+        .substring(0, 100);
+
       // Siapkan HTML untuk diekspor ke PDF yang berisi isi naskah bersih langsung tanpa cover
       const printHtml = `
         <div style="font-family: 'Calibri', sans-serif; color: #1e293b; background: white; font-size: 11pt; line-height: 1.18; padding: 20px;">
@@ -104,7 +114,7 @@ export const ShareArticleView: React.FC = () => {
           lineSpacing: 1.18,
           marginCm: 2.5,
         },
-        `BRIDA_Artikel_${article.title.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`
+        `BRIDA_${safeFilename}.pdf`
       );
     } catch (err: any) {
       alert(`Gagal mengekspor PDF: ${err.message || 'Terjadi kesalahan'}`);

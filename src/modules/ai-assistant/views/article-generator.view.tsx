@@ -10,6 +10,7 @@ import type { StagedAttachment } from '../components/chat-input-bar.component'; 
 import { RichMessageRenderer } from '../components/chat-panel.component';
 import { AiErrorMapper } from '../utils/error-mapper.util';
 import { MarkupConverter } from '../utils/markup-converter.util'; // Impor utilitas konverter dua arah
+import { ClipboardFormatter } from '../utils/clipboard-formatter.util';
 import {
   MessageSquareCode,
   Sparkles,
@@ -17,6 +18,7 @@ import {
   PenTool,
   Loader2,
   Copy,
+  Check,
   CheckCircle2,
   History,
   Trash2,
@@ -182,6 +184,15 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [sessionError, setSessionError] = useState<string | null>(null);
   const [lastFailedQuery, setLastFailedQuery] = useState<string | null>(null);
+  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
+
+  const handleCopyChatMessage = async (msgText: string, msgId: string) => {
+    const success = await ClipboardFormatter.copyToClipboard(msgText);
+    if (success) {
+      setCopiedMessageId(msgId);
+      setTimeout(() => setCopiedMessageId(null), 2000);
+    }
+  };
 
   // Parameter Riwayat Sesi Artikel
   const [articleSessionsHistory, setArticleSessionsHistory] = useState<ArticleSessionDetail[]>([]);
@@ -699,6 +710,32 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
                             {msg.updatedArticle && (
                               <MiniAnchorCard title={msg.updatedArticle.title} />
                             )}
+
+                            {/* Tombol Salin di Panel Obrolan Kiri */}
+                            <div className="flex items-center justify-between pt-2 border-t border-slate-100 no-print">
+                              <button
+                                type="button"
+                                onClick={() => handleCopyChatMessage(msg.text, msg.id)}
+                                className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider transition-colors cursor-pointer border rounded-none ${
+                                  copiedMessageId === msg.id
+                                    ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                                    : 'bg-slate-50 hover:bg-slate-100 text-slate-600 hover:text-slate-900 border-slate-200'
+                                }`}
+                                title="Salin pesan bersih siap kirim"
+                              >
+                                {copiedMessageId === msg.id ? (
+                                  <>
+                                    <Check size={12} className="text-emerald-600" />
+                                    <span>Tersalin!</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Copy size={12} />
+                                    <span>Salin Pesan</span>
+                                  </>
+                                )}
+                              </button>
+                            </div>
                           </div>
                         )
                       ) : (

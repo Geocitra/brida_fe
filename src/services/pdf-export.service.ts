@@ -60,11 +60,17 @@ export const PdfExportService = {
     config: PDFFormatConfig,
     filename: string,
   ): Promise<{ fallback: boolean }> {
+    const token = sessionStorage.getItem('brida_auth_token');
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
     const response = await fetch(`${API_BASE_URL}/pdf/generate`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers,
       body: JSON.stringify({
         htmlContent: htmlText,
         fontFamily: config.fontFamily,

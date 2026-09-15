@@ -16,6 +16,8 @@ import {
   Sparkles,
   FileCheck,
   Globe,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { AiAssistantService, AiServiceException } from '../../../services/ai-assistant.service';
 import { EmptyState } from '../../../components/common/empty-state.component';
@@ -24,6 +26,7 @@ import { DocumentService } from '../../../services/document.service';
 import { RichMessageRenderer } from './rich-message-renderer.component';
 import { SuggestionChips } from './suggestion-chips.component';
 import { SystemFallbackCard } from './system-fallback-card.component';
+import { ClipboardFormatter } from '../utils/clipboard-formatter.util';
 
 // Re-export RichMessageRenderer for external components compatibility
 export { RichMessageRenderer } from './rich-message-renderer.component';
@@ -149,6 +152,15 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const [sessionError, setSessionError] = useState<string | null>(null);
 
   const [lastFailedQuery, setLastFailedQuery] = useState<string | null>(null);
+  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
+
+  const handleCopyAiMessage = async (msgText: string, msgId: string) => {
+    const success = await ClipboardFormatter.copyToClipboard(msgText);
+    if (success) {
+      setCopiedMessageId(msgId);
+      setTimeout(() => setCopiedMessageId(null), 2000);
+    }
+  };
 
   const [qaSessions, setQaSessions] = useState<QaSessionItem[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState<boolean>(false);
@@ -673,6 +685,37 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                           {msg.updatedArticle && (
                             <MiniAnchorCard title={msg.updatedArticle.title} />
                           )}
+
+                          {/* ── TOMBOL SALIN PESAN BERSIH (SIAP TEMPEL WA / WORD) ── */}
+                          <div className="flex items-center justify-between pt-2.5 mt-2 border-t border-slate-100 no-print">
+                            <button
+                              type="button"
+                              onClick={() => handleCopyAiMessage(msg.text, msg.id)}
+                              className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider transition-colors cursor-pointer border rounded-none ${
+                                copiedMessageId === msg.id
+                                  ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                                  : 'bg-slate-50 hover:bg-slate-100 text-slate-600 hover:text-slate-900 border-slate-200'
+                              }`}
+                              title="Salin isi pesan ini (otomatis dibersihkan dari kode mesin, siap kirim ke WhatsApp/Word)"
+                            >
+                              {copiedMessageId === msg.id ? (
+                                <>
+                                  <Check size={12} className="text-emerald-600" />
+                                  <span>Tersalin!</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Copy size={12} />
+                                  <span>Salin Pesan</span>
+                                </>
+                              )}
+                            </button>
+
+                            <span className="text-[9px] text-slate-400 font-medium hidden sm:inline">
+                              Format bersih siap kirim WhatsApp / Word
+                            </span>
+                          </div>
+
                           <SuggestionChips
                             suggestions={msg.suggestions}
                             onClick={(suggestion) => executeSendMessage(suggestion)}

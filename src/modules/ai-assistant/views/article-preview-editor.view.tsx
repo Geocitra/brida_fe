@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useEditor, EditorContent, Extension } from '@tiptap/react';
+import { useEditor, Extension } from '@tiptap/react';
 import { Node, mergeAttributes } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 import TextAlign from '@tiptap/extension-text-align';
@@ -8,20 +8,16 @@ import { FontFamily } from '@tiptap/extension-font-family';
 import { ResizableImage } from '../components/article-preview-editor/resizable-image.extension';
 import { AutoPageSpacer } from '../components/article-preview-editor/auto-page-spacer.extension';
 
-// --- Ekstensi Tabel Baru ---
 import { Table } from '@tiptap/extension-table';
 import { TableRow } from '@tiptap/extension-table-row';
 import { TableHeader } from '@tiptap/extension-table-header';
 import { TableCell } from '@tiptap/extension-table-cell';
 
-// --- Ekstensi Sitasi URL Interaktif ---
 import { CitationUrlNode } from '../components/article-preview-editor/citation-url.extension';
-
 import { AiAssistantService } from '../../../services/ai-assistant.service';
 import type { ArticleSessionDetail } from '../../../services/ai-assistant.service';
 import { PdfExportService } from '../../../services/pdf-export.service';
 import { MarkupConverter } from '../utils/markup-converter.util';
-
 import { useEditorStore } from '../store/useEditorStore';
 import type { FontFamilyKey, EditorFormatting } from '../store/useEditorStore';
 
@@ -43,13 +39,14 @@ import { ArticlePreviewCanvas } from '../components/article-preview-editor/artic
 interface ArticlePreviewEditorViewProps {
   sessionId: string | null;
   onBack: () => void;
+  onNavigateToInfographic?: (topic: string) => void;
 }
 
 const FONT_FAMILY_MAP: Record<string, string> = {
-  'Calibri': "'Calibri', 'Gill Sans', 'Trebuchet MS', sans-serif",
+  Calibri: "'Calibri', 'Gill Sans', 'Trebuchet MS', sans-serif",
   'Times New Roman': "'Times New Roman', Times, serif",
-  'Verdana': "'Verdana', Geneva, Tahoma, sans-serif",
-  'Arial': "'Arial', 'Helvetica Neue', Helvetica, sans-serif",
+  Verdana: "'Verdana', Geneva, Tahoma, sans-serif",
+  Arial: "'Arial', 'Helvetica Neue', Helvetica, sans-serif",
 };
 
 const CSS_TO_FONT_NAME: Record<string, FontFamilyKey> = Object.fromEntries(
@@ -57,6 +54,9 @@ const CSS_TO_FONT_NAME: Record<string, FontFamilyKey> = Object.fromEntries(
 );
 
 const FONT_SIZE_PRESETS = [8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 36, 48, 72];
+
+const PAGE_H = 1123;
+const PAGE_GAP = 28;
 
 const FontSizeExtension = Extension.create({
   name: 'fontSize',
@@ -70,8 +70,8 @@ const FontSizeExtension = Extension.create({
         attributes: {
           fontSize: {
             default: null,
-            parseHTML: element => element.style.fontSize?.replace('pt', ''),
-            renderHTML: attributes => {
+            parseHTML: (element) => element.style.fontSize?.replace('pt', ''),
+            renderHTML: (attributes) => {
               if (!attributes.fontSize) return {};
               return { style: `font-size: ${attributes.fontSize}pt` };
             },
@@ -89,6 +89,30 @@ const FontSizeExtension = Extension.create({
         return chain().setMark('textStyle', { fontSize: null }).run();
       },
     } as any;
+  },
+});
+
+const LineSpacingExtension = Extension.create({
+  name: 'lineSpacing',
+  addOptions() {
+    return { types: ['paragraph', 'heading'] };
+  },
+  addGlobalAttributes() {
+    return [
+      {
+        types: this.options.types,
+        attributes: {
+          lineHeight: {
+            default: null,
+            parseHTML: (element) => element.style.lineHeight,
+            renderHTML: (attributes) => {
+              if (!attributes.lineHeight) return {};
+              return { style: `line-height: ${attributes.lineHeight}` };
+            },
+          },
+        },
+      },
+    ];
   },
 });
 
@@ -121,8 +145,6 @@ const TabKeyExtension = Extension.create({
   addKeyboardShortcuts() {
     return {
       Tab: () => {
-        // Jika kursor berada di dalam tabel, daftar berbutir, atau daftar berangka,
-        // biarkan aksi default (navigasi sel atau indentasi daftar) berjalan normal.
         if (
           this.editor.isActive('table') ||
           this.editor.isActive('bulletList') ||
@@ -150,29 +172,75 @@ const TIPTAP_EXTENSIONS = [
     types: ['textStyle'],
   }),
   FontSizeExtension,
+  LineSpacingExtension,
   PageBreakExtension,
-  // --- Injeksi Ekstensi Tabel ---
   Table.configure({
     resizable: true,
-    cellMinWidth: 80,
-    handleWidth: 10,
   }),
   TableRow,
   TableHeader,
   TableCell,
-  // --- Injeksi Ekstensi Sitasi URL ---
   CitationUrlNode,
-  // --- Injeksi Ekstensi Tab Key ---
   TabKeyExtension,
-  // --- Ekstensi Gambar Baru ---
   ResizableImage,
-  // --- Injeksi Ekstensi Auto Page Spacer ---
   AutoPageSpacer,
 ];
+
+/**
+ * Mengekstrak teks judul asli dari tag <h1> pertama di dalam dokumen kanvas TipTap
+ */
+const extractTitleFromDocument = (htmlContent: string, fallbackTitle: string): string => {
+  if (!htmlContent) return fallbackTitle;
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(htmlContent, 'text/html');
+    const h1 = doc.querySelector('h1');
+    if (h1 && h1.textContent && h1.textContent.trim().length > 0) {
+      return h1.textContent.trim();
+    }
+    const h2 = doc.querySelector('h2');
+    if (h2 && h2.textContent && h2.textContent.trim().length > 0) {
+      return h2.textContent.trim();
+    }
+  } catch {
+    // Abaikan jika parsing gagal
+  }
+  return fallbackTitle;
+};
+
+/**
+ * Membersihkan judul agar menjadi nama berkas yang aman di Windows, macOS, dan Linux
+ */
+const sanitizeFilenameForDownload = (title: string, defaultName: string = 'Naskah_Kebijakan_BRIDA_Mimika'): string => {
+  if (!title || !title.trim()) return defaultName;
+
+  let clean = title.trim();
+
+  // Buang awalan Markdown # atau spasi
+  clean = clean.replace(/^#+\s*/, '');
+
+  // Buang tanda titik dua dari awalan umum (misal: "Policy Brief: Judul" -> "Policy_Brief_Judul")
+  clean = clean.replace(/^(?:Policy\s*Brief|Artikel|Laporan|Draf|Nota\s*Dinas)\s*:\s*/i, (m) => m.replace(':', '_'));
+
+  // Bersihkan karakter terlarang untuk nama berkas OS
+  clean = clean
+    .replace(/[/\\?%*:|"<>#]/g, '')
+    .replace(/\s+/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_+|_+$/g, '');
+
+  // Batasi panjang nama berkas maksimal 100 karakter agar tidak melebihi limit OS
+  if (clean.length > 100) {
+    clean = clean.substring(0, 100).replace(/_+$/, '');
+  }
+
+  return clean || defaultName;
+};
 
 export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> = ({
   sessionId,
   onBack,
+  onNavigateToInfographic,
 }) => {
   const {
     sessionId: storeSessionId,
@@ -194,7 +262,6 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [isPrinting, setIsPrinting] = useState<boolean>(false);
 
-  // WhatsApp Share State
   const [isWaModalOpen, setIsWaModalOpen] = useState(false);
   const [waContacts, setWaContacts] = useState<any[]>([]);
   const [selectedContactId, setSelectedContactId] = useState('');
@@ -208,18 +275,8 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
   const [totalPages, setTotalPages] = useState<number>(1);
   const [activePage, setActivePage] = useState<number>(0);
   const lastPageCountRef = useRef<number>(1);
-  const [activeTableElement, setActiveTableElement] = useState<HTMLTableElement | null>(null);
-  const [tableResizeState, setTableResizeState] = useState<{
-    mode: 'column' | 'row';
-    index: number;
-    startX: number;
-    startY: number;
-    initialValue: number;
-    tableElement: HTMLTableElement;
-  } | null>(null);
   const [zoomLevel, setZoomLevel] = useState<number>(1.0);
 
-  // Dipanggil oleh ArticlePreviewCanvas setiap kali tinggi konten berubah
   const handlePageCountChange = useCallback((count: number) => {
     if (count !== lastPageCountRef.current) {
       lastPageCountRef.current = count;
@@ -227,18 +284,20 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
     }
   }, []);
 
-  // Update activePage saat user menggulir dokumen
+  // Perhitungan posisi scroll yang presisi memperhitungkan PAGE_GAP (28px)
   const handleScroll = useCallback((event: React.UIEvent<HTMLDivElement>) => {
     const scrollTop = event.currentTarget.scrollTop;
-    const page = Math.floor(scrollTop / (1123 * zoomLevel));
+    const pageHeightWithGap = (PAGE_H + PAGE_GAP) * zoomLevel;
+    const page = Math.floor((scrollTop + 50) / pageHeightWithGap);
     setActivePage(Math.max(0, page));
   }, [zoomLevel]);
 
-  // Gulir ke halaman tertentu saat user klik thumbnail di navigator
+  // Navigasi klik halaman akurat untuk naskah panjang 4-6 halaman
   const handleScrollToPage = useCallback((pageIdx: number) => {
     const container = document.getElementById('editor-scroll-container');
     if (!container) return;
-    container.scrollTo({ top: pageIdx * 1123 * zoomLevel, behavior: 'smooth' });
+    const targetScrollTop = pageIdx * (PAGE_H + PAGE_GAP) * zoomLevel;
+    container.scrollTo({ top: targetScrollTop, behavior: 'smooth' });
     setActivePage(pageIdx);
   }, [zoomLevel]);
 
@@ -247,85 +306,11 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
     setTimeout(() => setToastMessage(null), 4000);
   };
 
-  const applyColumnWidth = useCallback((tableElement: HTMLTableElement, colIndex: number, widthPx: number) => {
-    const rows = Array.from(tableElement.rows);
-    const safeWidth = Math.max(72, Math.round(widthPx));
-
-    rows.forEach((row) => {
-      const cell = row.cells[colIndex];
-      if (!cell) return;
-      cell.style.width = `${safeWidth}px`;
-      cell.style.minWidth = `${safeWidth}px`;
-      cell.style.maxWidth = `${safeWidth}px`;
-    });
-
-    const colgroup = tableElement.querySelector('colgroup');
-    if (colgroup) {
-      const cols = colgroup.querySelectorAll('col');
-      const targetCol = cols[colIndex];
-      if (targetCol) {
-        targetCol.style.width = `${safeWidth}px`;
-      }
-    }
-  }, []);
-
-  const applyRowHeight = useCallback((tableElement: HTMLTableElement, rowIndex: number, heightPx: number) => {
-    const rows = Array.from(tableElement.rows);
-    const safeHeight = Math.max(28, Math.round(heightPx));
-
-    const targetRow = rows[rowIndex];
-    if (!targetRow) return;
-
-    targetRow.style.height = `${safeHeight}px`;
-    Array.from(targetRow.cells).forEach((cell) => {
-      cell.style.height = `${safeHeight}px`;
-      cell.style.minHeight = `${safeHeight}px`;
-    });
-  }, []);
-
-  const startTableResize = useCallback((event: React.MouseEvent, mode: 'column' | 'row', index: number, tableElement: HTMLTableElement) => {
-    event.preventDefault();
-    event.stopPropagation();
-
-    setActiveTableElement(tableElement);
-
-    const startX = event.clientX;
-    const startY = event.clientY;
-    const initialValue = mode === 'column'
-      ? Math.max(72, Math.round(tableElement.rows[0]?.cells[index]?.getBoundingClientRect().width || 72))
-      : Math.max(28, Math.round(tableElement.rows[index]?.getBoundingClientRect().height || 28));
-
-    setTableResizeState({
-      mode,
-      index,
-      startX,
-      startY,
-      initialValue,
-      tableElement,
-    });
-  }, []);
-
   const editor = useEditor({
     extensions: TIPTAP_EXTENSIONS,
     editorProps: {
       attributes: {
         class: 'focus:outline-none max-w-none min-h-[500px] outline-none h-full text-slate-900 leading-relaxed focus:bg-white selection:bg-teal-700 selection:text-white',
-      },
-      handleDOMEvents: {
-        mousedown: (view, event) => {
-          const target = event.target as HTMLElement;
-          const tableElement = target.closest('table') as HTMLTableElement | null;
-          const isTableClick = tableElement !== null;
-          const isResizeHandle = target.classList.contains('column-resize-handle') ||
-            target.classList.contains('column-resize-handle-active');
-
-          if (tableElement) {
-            setActiveTableElement(tableElement);
-          } else {
-            setActiveTableElement(null);
-          }
-          return false;
-        }
       },
       handlePaste: (view, event) => {
         const items = event.clipboardData?.items;
@@ -337,7 +322,7 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
               if (file) {
                 event.preventDefault();
                 setIsUploadingMedia(true);
-                showToast('⏳ Mengunggah berkas gambar ke server...');
+                showToast('Mengunggah gambar ke server...');
 
                 AiAssistantService.uploadEditorMedia(sessionId, file)
                   .then((mediaData) => {
@@ -345,11 +330,10 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
                     const node = schema.nodes.image.create({ src: mediaData.url });
                     const transaction = view.state.tr.replaceSelectionWith(node);
                     view.dispatch(transaction);
-                    showToast('✅ Gambar berhasil disematkan!');
+                    showToast('Gambar berhasil disematkan!');
                   })
                   .catch((err) => {
-                    console.error('Gagal mengunggah media:', err);
-                    showToast(`⚠️ Gagal mengunggah gambar: ${err.message}`);
+                    showToast(`Gagal mengunggah gambar: ${err.message}`);
                   })
                   .finally(() => {
                     setIsUploadingMedia(false);
@@ -358,37 +342,6 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
                 return true;
               }
             }
-          }
-        }
-        return false;
-      },
-      handleDrop: (view, event, slice, moved) => {
-        if (!moved && event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files.length > 0 && sessionId) {
-          const file = event.dataTransfer.files[0];
-          if (file.type.startsWith('image/')) {
-            event.preventDefault();
-            const coordinates = view.posAtCoords({ left: event.clientX, top: event.clientY });
-            setIsUploadingMedia(true);
-            showToast('⏳ Mengunggah berkas gambar ke server...');
-
-            AiAssistantService.uploadEditorMedia(sessionId, file)
-              .then((mediaData) => {
-                const { schema } = view.state;
-                const node = schema.nodes.image.create({ src: mediaData.url });
-                const pos = coordinates ? coordinates.pos : view.state.selection.from;
-                const transaction = view.state.tr.insert(pos, node);
-                view.dispatch(transaction);
-                showToast('✅ Gambar berhasil disematkan!');
-              })
-              .catch((err) => {
-                console.error('Gagal mengunggah media:', err);
-                showToast(`⚠️ Gagal mengunggah gambar: ${err.message}`);
-              })
-              .finally(() => {
-                setIsUploadingMedia(false);
-              });
-
-            return true;
           }
         }
         return false;
@@ -420,65 +373,6 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
     },
   });
 
-  // --- updatePages sekarang dikelola oleh onPageCountChange callback dari Canvas ---
-  // (tidak perlu useEffect terpisah di sini)
-
-  useEffect(() => {
-    const handleGlobalMouseUp = () => {
-      if (tableResizeState && editor && !editor.isDestroyed) {
-        const nextHtml = editor.view.dom.innerHTML;
-        editor.commands.setContent(nextHtml, { emitUpdate: true });
-      }
-
-      setTableResizeState(null);
-    };
-
-    window.addEventListener('mouseup', handleGlobalMouseUp);
-    return () => {
-      window.removeEventListener('mouseup', handleGlobalMouseUp);
-    };
-  }, [editor, tableResizeState]);
-
-  useEffect(() => {
-    if (!tableResizeState || !editor || editor.isDestroyed) return;
-
-    const handleGlobalMouseMove = (moveEvent: MouseEvent) => {
-      const deltaX = moveEvent.clientX - tableResizeState.startX;
-      const deltaY = moveEvent.clientY - tableResizeState.startY;
-
-      if (tableResizeState.mode === 'column') {
-        const nextWidth = Math.max(72, tableResizeState.initialValue + deltaX);
-        applyColumnWidth(tableResizeState.tableElement, tableResizeState.index, nextWidth);
-      } else {
-        const nextHeight = Math.max(28, tableResizeState.initialValue + deltaY);
-        applyRowHeight(tableResizeState.tableElement, tableResizeState.index, nextHeight);
-      }
-    };
-
-    window.addEventListener('mousemove', handleGlobalMouseMove);
-    return () => {
-      window.removeEventListener('mousemove', handleGlobalMouseMove);
-    };
-  }, [applyColumnWidth, applyRowHeight, editor, tableResizeState]);
-
-  useEffect(() => {
-    if (!activeTableElement) return;
-
-    const updateOverlay = () => {
-      if (!activeTableElement.isConnected) {
-        setActiveTableElement(null);
-      }
-    };
-
-    updateOverlay();
-    const observer = new ResizeObserver(updateOverlay);
-    observer.observe(activeTableElement);
-    return () => observer.disconnect();
-  }, [activeTableElement]);
-
-
-
-
   useEffect(() => {
     if (!sessionId) {
       setIsLoading(false);
@@ -492,13 +386,13 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
         const session = await AiAssistantService.getArticleSession(sessionId);
         setActiveSession(session);
 
-        // Jika naskah sudah memiliki representasi visual editorial (editorDocumentState), gunakan langsung.
-        // Jika sesi lama/baru pertama kali dibuka, kompilasi sekali dari fullArticleText via MarkupConverter.toHTML.
-        const htmlContent = session.editorDocumentState && session.editorDocumentState.trim().length > 0
+        const rawContent = session.editorDocumentState && session.editorDocumentState.trim().length > 0
           ? session.editorDocumentState
-          : MarkupConverter.toHTML(session.fullArticleText || '');
+          : (session.fullArticleText && session.fullArticleText.trim().length > 0
+              ? MarkupConverter.toHTML(session.fullArticleText)
+              : '<p>Mempersiapkan draf naskah kebijakan...</p>');
 
-        initSession(sessionId, session.articleTitle || session.title || '', htmlContent);
+        initSession(sessionId, session.articleTitle || session.title || 'Draf Naskah Kebijakan', rawContent);
       } catch (err: any) {
         console.error('Gagal memuat sesi artikel:', err);
         showToast('Gagal memuat sesi artikel dari database.');
@@ -525,42 +419,6 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
       }
     }
   }, [editor, isLoading, storeSessionId, sessionId, draftContent]);
-
-  const getDefaultWaMessage = (
-    receiverName: string,
-    receiverRole: string,
-    titleStr: string,
-    sessionUUID: string,
-    draftHtml: string
-  ) => {
-    // Bersihkan HTML tag untuk summary
-    const tempDiv = document.createElement('div');
-    tempDiv.innerHTML = draftHtml;
-    const plainText = (tempDiv.textContent || tempDiv.innerText || '').replace(/\s+/g, ' ').trim();
-    const cleanSummary = plainText.substring(0, 280).trim() + '...';
-
-    const origin = window.location.origin;
-    const shareUrl = `${origin}/share/article/${sessionUUID}`;
-
-    return `Yth. Bapak/Ibu ${receiverName},
-Selaku ${receiverRole}.
-
-Assalamu'alaikum Wr. Wb.
-
-Dengan hormat, bersama surat ini kami sampaikan naskah artikel publikasi resmi dari Badan Riset dan Inovasi Daerah (BRIDA) Kabupaten Mimika untuk dapat dijadikan bahan pertimbangan:
-
-Judul    : ${titleStr}
-Ringkasan: ${cleanSummary}
-
-Naskah lengkap beserta dokumen resmi dalam format PDF dapat diakses dan diunduh melalui tautan berikut:
-${shareUrl}
-
-Atas perhatian dan kerja sama Bapak/Ibu, kami ucapkan terima kasih.
-
-Hormat kami,
-Badan Riset dan Inovasi Daerah (BRIDA)
-Kabupaten Mimika`;
-  };
 
   const handleOpenWaModal = async () => {
     if (!editor || !sessionId) return;
@@ -599,38 +457,20 @@ Kabupaten Mimika`;
       setWaContacts(contacts);
       if (contacts.length > 0) {
         setSelectedContactId(contacts[0].id);
-        const msg = getDefaultWaMessage(
-          contacts[0].displayName,
-          contacts[0].role,
-          articleTitle || 'Artikel Publikasi',
-          sessionId,
-          editor.getHTML()
-        );
-        setWaMessage(msg);
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = editor.getHTML();
+        const plainSummary = (tempDiv.textContent || '').substring(0, 250).trim() + '...';
+        const shareUrl = `${window.location.origin}/share/article/${sessionId}`;
+
+        const defaultMsg = `Yth. Bapak/Ibu ${contacts[0].displayName},\nSelaku ${contacts[0].role}.\n\nBerikut disampaikan draf naskah rekomendasi kebijakan BRIDA Kabupaten Mimika:\n\n*Judul*: ${articleTitle || 'Naskah Kebijakan'}\n*Ringkasan*: ${plainSummary}\n\nNaskah lengkap format PDF resmi dapat diakses melalui tautan:\n${shareUrl}\n\nTerima kasih.\nBRIDA Kabupaten Mimika.`;
+        setWaMessage(defaultMsg);
       }
     } catch (err) {
-      console.error('Gagal memuat kontak WhatsApp:', err);
-      showToast('⚠️ Gagal mengambil daftar kontak dari database.');
+      showToast('Gagal memuat kontak WhatsApp dari master data.');
     } finally {
       setLoadingContacts(false);
     }
   };
-
-  const handleContactChange = (contactId: string) => {
-    setSelectedContactId(contactId);
-    const contact = waContacts.find((c: any) => c.id === contactId);
-    if (contact && editor && sessionId) {
-      const msg = getDefaultWaMessage(
-        contact.displayName,
-        contact.role,
-        articleTitle || 'Artikel Publikasi',
-        sessionId,
-        editor.getHTML()
-      );
-      setWaMessage(msg);
-    }
-  };
-
 
   const handleSendWaSubmit = () => {
     const contact = waContacts.find(c => c.id === selectedContactId);
@@ -639,7 +479,6 @@ Kabupaten Mimika`;
     const url = `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(waMessage)}`;
     window.open(url, '_blank');
     setIsWaModalOpen(false);
-    showToast(`Membuka WhatsApp untuk mengirim naskah ke ${contact.name}`);
   };
 
   const handleCopyArticleLink = () => {
@@ -648,90 +487,88 @@ Kabupaten Mimika`;
     navigator.clipboard.writeText(shareUrl).then(() => {
       setCopyLinkSuccess(true);
       setTimeout(() => setCopyLinkSuccess(false), 2500);
-    }).catch(() => {
-      const ta = document.createElement('textarea');
-      ta.value = shareUrl;
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand('copy');
-      document.body.removeChild(ta);
-      setCopyLinkSuccess(true);
-      setTimeout(() => setCopyLinkSuccess(false), 2500);
     });
   };
 
   const handleSaveAndBack = async () => {
     if (!sessionId || !editor || isSaving) return;
-
     if (isUploadingMedia) {
-      showToast('⏳ Mohon tunggu sampai proses unggah gambar selesai...');
-      return;
-    }
-
-    if (!isDirty) {
-      onBack();
+      showToast('Tunggu proses unggah gambar selesai...');
       return;
     }
 
     setIsSaving(true);
-    showToast('⏳ Menyinkronkan naskah visual ke database...');
+    showToast('Menyinkronkan naskah visual ke database...');
     try {
       const editorStateHtml = editor.getHTML();
-      await AiAssistantService.updateArticleSessionContent(sessionId, articleTitle, editorStateHtml);
+      
+      // Ekstrak judul riil dari <h1> dokumen kanvas
+      const resolvedTitle = extractTitleFromDocument(
+        editorStateHtml,
+        articleTitle || activeSession?.title || 'Draf Naskah Kebijakan'
+      );
+
+      // Sinkronkan ke backend dengan judul asli yang tertera di dokumen
+      await AiAssistantService.updateArticleSessionContent(sessionId, resolvedTitle, editorStateHtml);
+      
+      // Perbarui judul di state store lokal
+      useEditorStore.getState().initSession(sessionId, resolvedTitle, editorStateHtml);
       markSaved();
       onBack();
     } catch (err: any) {
-      showToast(`⚠️ Sinkronisasi gagal: ${err.message}. Draft tetap aman di penyimpanan lokal (Offline Safe).`);
+      showToast(`Sinkronisasi gagal: ${err.message}.`);
     } finally {
       setIsSaving(false);
     }
   };
 
   const handlePrint = async () => {
-    console.log('[DEBUG] handlePrint dipanggil di Editor View. State:', { editor: !!editor, sessionId, isDirty, isPrinting });
     if (!editor) {
-      console.warn('[DEBUG] Batal cetak karena editor null/undefined.');
-      showToast('⚠️ Tidak ada naskah untuk dicetak.');
-      return;
-    }
-
-    if (isUploadingMedia) {
-      showToast('⏳ Mohon tunggu sampai proses unggah gambar selesai...');
+      showToast('Tidak ada naskah untuk dicetak.');
       return;
     }
 
     setIsPrinting(true);
+    const editorStateHtml = editor.getHTML();
 
-    if (isDirty && sessionId) {
-      showToast('⏳ Menyimpan draf ke database sebelum mencetak...');
+    // 1. Ekstrak judul riil dari tag <h1> pertama di naskah
+    const resolvedTitle = extractTitleFromDocument(
+      editorStateHtml,
+      articleTitle || activeSession?.title || 'Draf_Kebijakan_BRIDA_Mimika'
+    );
+
+    // 2. Sanitasi menjadi nama berkas yang aman dan rapi
+    const safeFilename = sanitizeFilenameForDownload(resolvedTitle);
+
+    // 3. Sinkronkan judul riil ke database & store agar riwayat sesi tidak lagi bernama "sesi"
+    if (sessionId) {
       try {
-        const editorStateHtml = editor.getHTML();
-        await AiAssistantService.updateArticleSessionContent(sessionId, articleTitle, editorStateHtml);
+        await AiAssistantService.updateArticleSessionContent(sessionId, resolvedTitle, editorStateHtml);
+        useEditorStore.getState().initSession(sessionId, resolvedTitle, editorStateHtml);
         markSaved();
-      } catch (e) {
-        showToast('⚠️ Gagal menyimpan ke server. Tetap mencetak PDF dari versi layar...');
+      } catch (err) {
+        console.warn('Gagal memperbarui judul sesi saat cetak:', err);
       }
     }
 
     try {
-      showToast('🖨️ Merakit dokumen PDF resmi di server (True WYSIWYG)...');
+      showToast(`Merakit PDF resmi: ${safeFilename}.pdf...`);
       const targetFontSize = parseFloat(fontSize);
 
-      // Strip semua elemen `.no-print` (termasuk CitationUrlNode chip) dari HTML
-      // sebelum dikirim ke server PDF generator, agar tidak muncul di dokumen akhir.
       const stripNoPrintElements = (htmlString: string): string => {
         try {
           const parser = new DOMParser();
           const doc = parser.parseFromString(htmlString, 'text/html');
-          doc.querySelectorAll('.no-print').forEach((el) => el.remove());
+          doc.querySelectorAll('.no-print, [data-auto-page-spacer]').forEach((el) => el.remove());
           return doc.body.innerHTML;
         } catch {
           return htmlString;
         }
       };
 
-      const cleanHtmlForPdf = stripNoPrintElements(editor.getHTML());
+      const cleanHtmlForPdf = stripNoPrintElements(editorStateHtml);
 
+      // 4. Unduh PDF dengan nama berkas sesuai judul naskah asli!
       await PdfExportService.exportCustomFormattedArticlePdf(
         cleanHtmlForPdf,
         {
@@ -740,12 +577,12 @@ Kabupaten Mimika`;
           lineSpacing,
           marginCm,
         },
-        articleTitle || 'Draf_Artikel_AKLS_Mimika'
+        safeFilename
       );
 
-      showToast('✅ Dokumen PDF resmi berhasil diunduh!');
+      showToast(`Dokumen '${safeFilename}.pdf' berhasil diunduh!`);
     } catch (err: any) {
-      showToast(`❌ Pencetakan PDF gagal: ${err.message}`);
+      showToast(`Pencetakan PDF gagal: ${err.message}`);
     } finally {
       setIsPrinting(false);
     }
@@ -782,22 +619,17 @@ Kabupaten Mimika`;
   }, [editor, setFormatting]);
 
   const handleInsertImage = useCallback((file: File) => {
-    if (!sessionId || !editor || editor.isDestroyed) {
-      showToast('⚠️ Editor belum siap untuk menyisipkan gambar.');
-      return;
-    }
-
+    if (!sessionId || !editor || editor.isDestroyed) return;
     setIsUploadingMedia(true);
-    showToast('⏳ Mengunggah berkas gambar ke server...');
+    showToast('Mengunggah gambar ke server...');
 
     AiAssistantService.uploadEditorMedia(sessionId, file)
       .then((mediaData) => {
         editor.chain().focus().setImage({ src: mediaData.url }).run();
-        showToast('✅ Gambar berhasil disematkan ke naskah!');
+        showToast('Gambar berhasil disematkan!');
       })
       .catch((err: any) => {
-        console.error('Gagal mengunggah gambar via toolbar:', err);
-        showToast(`⚠️ Gagal mengunggah gambar: ${err.message}`);
+        showToast(`Gagal mengunggah gambar: ${err.message}`);
       })
       .finally(() => {
         setIsUploadingMedia(false);
@@ -821,15 +653,13 @@ Kabupaten Mimika`;
         <div className="max-w-md mx-auto space-y-2">
           <AlertCircle className="mx-auto text-red-600" size={36} />
           <h3 className="text-base font-bold text-slate-900 uppercase">Akses Sesi Gagal</h3>
-          <p className="text-xs text-slate-600">
-            ID Sesi Sifat Editorial kosong atau tidak valid.
-          </p>
+          <p className="text-xs text-slate-600">ID Sesi Sifat Editorial kosong atau tidak valid.</p>
           <button
             onClick={onBack}
             className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-1.5 cursor-pointer mt-4"
           >
             <ArrowLeft size={13} />
-            <span>Kembali ke AI Editor</span>
+            <span>Kembali ke Editor</span>
           </button>
         </div>
       </div>
@@ -871,11 +701,14 @@ Kabupaten Mimika`;
         onInsertPageBreak={() => editor?.chain().focus().insertContent({ type: 'pageBreak' }).run()}
         onInsertImage={handleInsertImage}
         onZoomChange={setZoomLevel}
+        onConvertToInfographic={
+          onNavigateToInfographic
+            ? () => onNavigateToInfographic(articleTitle || activeSession?.title || '')
+            : undefined
+        }
       />
 
-      {/* MAIN WORKSPACE SPLIT CONTAINER */}
       <div className="flex-1 flex flex-row min-h-0 w-full overflow-hidden">
-
         <ArticlePreviewPageNavigator
           totalPages={totalPages}
           activePage={activePage}
@@ -886,9 +719,8 @@ Kabupaten Mimika`;
           editor={editor}
           lineSpacing={lineSpacing}
           marginCm={marginCm}
-          activeTableElement={activeTableElement}
+          activeTableElement={null}
           onScroll={handleScroll}
-          onStartTableResize={startTableResize}
           isSaving={isSaving || isUploadingMedia}
           isPrinting={isPrinting}
           isDirty={isDirty}
@@ -900,14 +732,12 @@ Kabupaten Mimika`;
           zoomLevel={zoomLevel}
           onPageCountChange={handlePageCountChange}
         />
-
       </div>
 
-      {/* WhatsApp Share Modal (rounded-none border-slate-300 layout) */}
       {isWaModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-955/40 backdrop-blur-sm p-4 animate-in fade-in duration-100 no-print">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 backdrop-blur-sm p-4 animate-in fade-in duration-100 no-print">
           <div className="w-full max-w-2xl bg-white border border-slate-350 shadow-2xl rounded-none flex flex-col max-h-[90vh]">
-            <div className="flex items-center justify-between border-b border-slate-205 px-6 py-4">
+            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
               <div>
                 <span className="text-[10px] font-black text-emerald-600 uppercase tracking-wider font-roboto">Berbagi Kajian</span>
                 <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider mt-0.5 font-roboto">
@@ -930,7 +760,7 @@ Kabupaten Mimika`;
                 </div>
               ) : waContacts.length === 0 ? (
                 <div className="text-center py-8 text-slate-500 text-xs font-roboto">
-                  Tidak ada kontak terdaftar dengan nomor WA aktif di database master. Silakan tambahkan nomor WA OPD di menu Admin Console.
+                  Tidak ada kontak terdaftar di master data.
                 </div>
               ) : (
                 <>
@@ -938,7 +768,7 @@ Kabupaten Mimika`;
                     <label className="text-[10px] font-black uppercase text-slate-500 tracking-wider block font-roboto">Pilih Kontak Tujuan</label>
                     <select
                       value={selectedContactId}
-                      onChange={(e) => handleContactChange(e.target.value)}
+                      onChange={(e) => setSelectedContactId(e.target.value)}
                       className="w-full px-3 py-2 text-xs border border-slate-300 rounded-none bg-slate-50 focus:bg-white focus:border-slate-900 outline-none font-bold text-slate-800 font-roboto"
                     >
                       {waContacts.map((c: any) => (
@@ -962,14 +792,14 @@ Kabupaten Mimika`;
               )}
             </div>
 
-            <div className="border-t border-slate-205 px-6 py-4 flex justify-between items-center gap-2 bg-slate-50">
+            <div className="border-t border-slate-200 px-6 py-4 flex justify-between items-center gap-2 bg-slate-50">
               <button
                 type="button"
                 onClick={handleCopyArticleLink}
                 className="flex items-center gap-1.5 px-3 py-2 border border-slate-300 text-slate-600 font-semibold text-xs uppercase tracking-wider rounded-none hover:bg-slate-100 transition-colors cursor-pointer font-roboto"
               >
                 {copyLinkSuccess ? <CheckCheck size={12} className="text-emerald-600" /> : <Link2 size={12} />}
-                <span>{copyLinkSuccess ? 'Link Tersalin!' : 'Salin Link Artikel'}</span>
+                <span>{copyLinkSuccess ? 'Link Tersalin!' : 'Salin Link'}</span>
               </button>
               <div className="flex items-center gap-2">
                 <button
