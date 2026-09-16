@@ -10,6 +10,7 @@ import { ReportsView } from './modules/reports/views/reports.view';
 import { AiQaView } from './modules/ai-assistant/views/ai-qa.view';
 import { ArticleGeneratorView } from './modules/ai-assistant/views/article-generator.view';
 import { ArticlePreviewEditorView } from './modules/ai-assistant/views/article-preview-editor.view';
+import { InfographicStudioView } from './modules/infographic/views/infographic-studio.view';
 
 import GisExplorerView from './modules/dashboard/views/gis-explorer.view';
 import { LandingView } from './modules/dashboard/views/landing.view';
@@ -58,6 +59,7 @@ export function App() {
   });
 
   const [initialArticlePrompt, setInitialArticlePrompt] = useState<string | undefined>(undefined);
+  const [initialInfographicTopic, setInitialInfographicTopic] = useState<string | undefined>(undefined);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(() => {
     try {
       return sessionStorage.getItem('brida_active_session_id');
@@ -124,6 +126,7 @@ export function App() {
     reports: 'Laporan Terstruktur & Matriks Rekap',
     'ai-request': 'AI Request & Asisten Obrolan Q&A',
     generator: 'Collaborative Workspace & AI Co-Writer (A4 Canvas)',
+    infographic: 'Studio Infografis AI - Visual Komposit Riset & Kebijakan',
     'article-editor': 'Pratinjau Cetak & Editor Manual',
     'admin-console': 'Panel Konsol Admin - Master Data',
   };
@@ -382,6 +385,17 @@ export function App() {
           <ArticlePreviewEditorView
             sessionId={activeSessionId}
             onBack={() => setActiveRoute('generator')}
+            onNavigateToInfographic={(topic) => {
+              setInitialInfographicTopic(topic);
+              setActiveRoute('infographic');
+            }}
+          />
+        );
+      case 'infographic':
+        return (
+          <InfographicStudioView
+            initialTopic={initialInfographicTopic}
+            onNavigateToArticleEditor={() => handleNavigationAttempt('article-editor')}
           />
         );
       case 'admin-console':

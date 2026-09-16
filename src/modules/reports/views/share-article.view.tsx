@@ -77,9 +77,8 @@ export const ShareArticleView: React.FC = () => {
       doc.querySelectorAll('.citation-url-node').forEach(node => node.remove());
       const cleanHtmlBody = doc.body.innerHTML;
 
-      // Ekstrak judul dari <h1> naskah
-      const h1Text = doc.querySelector('h1')?.textContent?.trim();
-      const rawTitle = h1Text || article.title || 'Draf_Kebijakan_BRIDA_Mimika';
+      // HAPUS PENCARIAN h1Text. LANGSUNG PAKAI JUDUL ARTIKEL ASLI:
+      const rawTitle = article.articleTitle || article.title || 'Draf_Kebijakan_BRIDA_Mimika';
       
       const safeFilename = rawTitle
         .replace(/[/\\?%*:|"<>#]/g, '')

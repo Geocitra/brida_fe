@@ -216,9 +216,13 @@ export const ResizableImageComponent: React.FC<NodeViewProps> = ({
         ref={imageRef}
         src={getDisplaySrc(node.attrs.src)}
         alt={node.attrs.alt || ''}
+        onLoad={() => {
+          window.dispatchEvent(new CustomEvent('tiptap-media-loaded'));
+        }}
         className="block w-full h-auto object-contain transition-all duration-75"
         style={{
           width: '100%',
+          minHeight: '220px',
           maxHeight: '750px',
           boxSizing: 'border-box',
         }}

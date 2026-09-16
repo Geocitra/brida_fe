@@ -5,6 +5,14 @@ import { RecentWorkspaceCards, type RecentChat, type RecentArticle } from '../co
 import { SpatialPreviewWrapper } from '../components/spatial-preview-wrapper.component';
 import { MOCK_DATA } from '../../../services/mock-data.service';
 import type { MapLocationPoint } from '../components/spatial-map.component';
+import {
+  FileText,
+  PenTool,
+  ArrowRight,
+  Sparkles,
+  PieChart,
+  Palette,
+} from 'lucide-react';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
 
@@ -124,7 +132,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   };
 
   return (
-    <div className="flex flex-col w-full bg-slate-50 font-roboto min-h-0 overflow-y-auto custom-scrollbar">
+    <div className="flex flex-col w-full bg-slate-50 font-roboto min-h-0 overflow-y-auto custom-scrollbar text-left">
 
       {/* SEKSI 1. SALAM SELAMAT DATANG RESMI (EXECUTIVE WELCOME) */}
       <div className="w-full bg-white border-b border-slate-200 py-6 px-8 md:px-10">
@@ -137,6 +145,83 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           budget={dashboardMeta?.tokenBudget}
           isLoading={isLoadingMeta}
         />
+      </div>
+
+      {/* SEKSI 2.5. AKSELERASI PRODUKSI DOKUMEN & VISUALISASI DAERAH */}
+      <div className="w-full bg-white border-b border-slate-200 py-6 px-8 md:px-10 font-roboto text-left">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
+          <div>
+            <span className="text-[10px] font-bold text-teal-800 uppercase tracking-widest flex items-center gap-1.5 mb-1">
+              <Sparkles size={12} className="text-teal-700" />
+              <span>AKSELERASI PRODUKSI DOKUMEN &amp; VISUALISASI DAERAH</span>
+            </span>
+            <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wide">
+              Pusat Kreasi Naskah Kebijakan &amp; Infografis AI
+            </h2>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Kartu 1: Generator Artikel & Policy Brief */}
+          <div className="border border-slate-300 p-5 bg-slate-50 flex flex-col justify-between space-y-4 rounded-none shadow-2xs hover:border-teal-700 transition-colors">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-teal-800">
+                <FileText size={18} className="shrink-0" />
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900">
+                  Penyusunan Naskah Kebijakan &amp; Policy Brief
+                </h3>
+              </div>
+              <p className="text-xs text-slate-600 leading-relaxed font-normal text-justify">
+                Rakit draf artikel analitis, <em>policy brief</em>, telaah regulasi, nota dinas bupati, atau naskah rilis pers berbasis data faktual dari seluruh dokumen acuan daerah Kabupaten Mimika secara otomatis dan komprehensif.
+              </p>
+            </div>
+
+            <div className="pt-3 border-t border-slate-200 flex items-center justify-between">
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                Format A4 &bull; Multi-Tone &bull; TipTap
+              </span>
+              <button
+                type="button"
+                onClick={() => handleSafeNavigation('generator')}
+                className="px-4 py-2 bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-1.5 cursor-pointer shadow-2xs transition-colors"
+              >
+                <PenTool size={13} />
+                <span>Buat Naskah Baru</span>
+                <ArrowRight size={13} />
+              </button>
+            </div>
+          </div>
+
+          {/* Kartu 2: Studio Desain Poster & Infografis */}
+          <div className="border border-slate-300 p-5 bg-slate-50 flex flex-col justify-between space-y-4 rounded-none shadow-2xs hover:border-teal-700 transition-colors">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-teal-800">
+                <PieChart size={18} className="shrink-0" />
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900">
+                  Studio Poster &amp; Infografis Statistik
+                </h3>
+              </div>
+              <p className="text-xs text-slate-600 leading-relaxed font-normal text-justify">
+                Rancang poster infografis visual multi-sektoral, grafik indikator capaian pembangunan daerah, matriks status 18 distrik, dan visualisasi data tematik yang siap dipublikasikan ke media dan masyarakat.
+              </p>
+            </div>
+
+            <div className="pt-3 border-t border-slate-200 flex items-center justify-between">
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                Aspek Rasio 9:16 / 16:9 &bull; Ekspor HD
+              </span>
+              <button
+                type="button"
+                onClick={() => handleSafeNavigation('infographic')}
+                className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs uppercase tracking-wider rounded-none inline-flex items-center gap-1.5 cursor-pointer shadow-2xs transition-colors"
+              >
+                <Palette size={13} />
+                <span>Buka Studio Infografis</span>
+                <ArrowRight size={13} />
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* SEKSI 3. BILAH AKTIVITAS TERBARU & TOMBOL POLIMORFIK (RECENT WORKSPACES) */}

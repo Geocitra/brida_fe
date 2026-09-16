@@ -943,9 +943,9 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                     disabled={isTransitioning}
                     className="w-full text-xs p-2.5 border border-slate-300 focus:outline-none focus:border-teal-700 bg-white font-semibold rounded-none"
                   >
-                    <option value="SHORT">Ringkas (~700 Kata)</option>
-                    <option value="MEDIUM">Sedang (~1000 Kata)</option>
-                    <option value="LONG">Mendalam (~1500 Kata)</option>
+                    <option value="SHORT">Ringkas (~750 Kata)</option>
+                    <option value="MEDIUM">Sedang (~1.500 Kata)</option>
+                    <option value="LONG">Mendalam (~3.000 Kata)</option>
                   </select>
                 </div>
               </div>

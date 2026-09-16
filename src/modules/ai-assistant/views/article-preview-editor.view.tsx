@@ -186,54 +186,23 @@ const TIPTAP_EXTENSIONS = [
   AutoPageSpacer,
 ];
 
-/**
- * Mengekstrak teks judul asli dari tag <h1> pertama di dalam dokumen kanvas TipTap
- */
-const extractTitleFromDocument = (htmlContent: string, fallbackTitle: string): string => {
-  if (!htmlContent) return fallbackTitle;
-  try {
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(htmlContent, 'text/html');
-    const h1 = doc.querySelector('h1');
-    if (h1 && h1.textContent && h1.textContent.trim().length > 0) {
-      return h1.textContent.trim();
-    }
-    const h2 = doc.querySelector('h2');
-    if (h2 && h2.textContent && h2.textContent.trim().length > 0) {
-      return h2.textContent.trim();
-    }
-  } catch {
-    // Abaikan jika parsing gagal
-  }
-  return fallbackTitle;
-};
-
-/**
- * Membersihkan judul agar menjadi nama berkas yang aman di Windows, macOS, dan Linux
- */
 const sanitizeFilenameForDownload = (title: string, defaultName: string = 'Naskah_Kebijakan_BRIDA_Mimika'): string => {
   if (!title || !title.trim()) return defaultName;
 
   let clean = title.trim();
-
-  // Buang awalan Markdown # atau spasi
   clean = clean.replace(/^#+\s*/, '');
-
-  // Buang tanda titik dua dari awalan umum (misal: "Policy Brief: Judul" -> "Policy_Brief_Judul")
   clean = clean.replace(/^(?:Policy\s*Brief|Artikel|Laporan|Draf|Nota\s*Dinas)\s*:\s*/i, (m) => m.replace(':', '_'));
-
-  // Bersihkan karakter terlarang untuk nama berkas OS
+  
+  // Bersihkan karakter OS ilegal
   clean = clean
     .replace(/[/\\?%*:|"<>#]/g, '')
     .replace(/\s+/g, '_')
     .replace(/_+/g, '_')
     .replace(/^_+|_+$/g, '');
 
-  // Batasi panjang nama berkas maksimal 100 karakter agar tidak melebihi limit OS
   if (clean.length > 100) {
     clean = clean.substring(0, 100).replace(/_+$/, '');
   }
-
   return clean || defaultName;
 };
 
@@ -502,16 +471,10 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
     try {
       const editorStateHtml = editor.getHTML();
       
-      // Ekstrak judul riil dari <h1> dokumen kanvas
-      const resolvedTitle = extractTitleFromDocument(
-        editorStateHtml,
-        articleTitle || activeSession?.title || 'Draf Naskah Kebijakan'
-      );
+      // KEMBALI MENGGUNAKAN JUDUL ASLI DARI DATABASE/AI (Bukan H1)
+      const resolvedTitle = articleTitle || activeSession?.articleTitle || activeSession?.title || 'Draf Naskah Kebijakan';
 
-      // Sinkronkan ke backend dengan judul asli yang tertera di dokumen
       await AiAssistantService.updateArticleSessionContent(sessionId, resolvedTitle, editorStateHtml);
-      
-      // Perbarui judul di state store lokal
       useEditorStore.getState().initSession(sessionId, resolvedTitle, editorStateHtml);
       markSaved();
       onBack();
@@ -531,13 +494,8 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
     setIsPrinting(true);
     const editorStateHtml = editor.getHTML();
 
-    // 1. Ekstrak judul riil dari tag <h1> pertama di naskah
-    const resolvedTitle = extractTitleFromDocument(
-      editorStateHtml,
-      articleTitle || activeSession?.title || 'Draf_Kebijakan_BRIDA_Mimika'
-    );
-
-    // 2. Sanitasi menjadi nama berkas yang aman dan rapi
+    // MENGGUNAKAN JUDUL ASLI UNTUK NAMA FILE PDF (Bukan H1)
+    const resolvedTitle = articleTitle || activeSession?.articleTitle || activeSession?.title || 'Draf_Kebijakan_BRIDA_Mimika';
     const safeFilename = sanitizeFilenameForDownload(resolvedTitle);
 
     // 3. Sinkronkan judul riil ke database & store agar riwayat sesi tidak lagi bernama "sesi"

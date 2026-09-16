@@ -17,7 +17,7 @@ export const AppShell: React.FC<AppShellProps> = ({
   onLogout,
 }) => {
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-900 flex flex-col font-roboto rounded-none w-full">
+    <div className="min-h-screen bg-slate-100 text-slate-900 flex flex-col font-roboto rounded-none w-full overflow-x-hidden">
       {/* Top Navbar Header */}
       <TopHeader
         activeRoute={activeRoute}
@@ -30,12 +30,12 @@ export const AppShell: React.FC<AppShellProps> = ({
         Mengeliminasi padding bawaan (px-4 lg:px-6 py-4) menjadi p-0 
         agar seluruh elemen anak menyatu secara solid dalam satu kesatuan grid.
       */}
-      <main className="flex-1 w-full p-0 flex flex-col">
+      <main className="flex-1 w-full p-0 flex flex-col min-w-0">
         {children}
       </main>
 
       {/* Global Application Footer */}
-      {activeRoute !== 'article-editor' && <AppFooter />}
+      {activeRoute !== 'article-editor' && activeRoute !== 'infographic' && <AppFooter />}
     </div>
   );
 };

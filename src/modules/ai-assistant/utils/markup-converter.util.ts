@@ -54,9 +54,9 @@ export class MarkupConverter {
                 const alignAttr = node.getAttribute('align') || '';
                 const isInsideTableOrList = node.closest('li, td, th') !== null;
 
-                return (
+                return Boolean(
                     ['p', 'div', 'h1', 'h2', 'h3'].includes(tagName) &&
-                    (styleAttr.includes('text-align') || alignAttr) &&
+                    (styleAttr.includes('text-align') || Boolean(alignAttr)) &&
                     !isInsideTableOrList
                 );
             },
@@ -139,7 +139,17 @@ export class MarkupConverter {
         }
 
         try {
-            let processedMarkdown = markdown
+            // 1. PENYELAMAT QUICKCHART: Ganti spasi di dalam URL QuickChart dengan %20 agar Markdown tidak rusak
+            let processedMarkdown = markdown.replace(
+                /!\[([^\]]*)\]\((https:\/\/quickchart\.io\/chart\?[^\)]+)\)/gi,
+                (match, alt, url) => {
+                    const safeUrl = url.replace(/\s+/g, '%20').replace(/"/g, '%22');
+                    return `![${alt}](${safeUrl})`;
+                }
+            );
+
+            // 2. Bersihkan token aneh dan spasi berlebih
+            processedMarkdown = processedMarkdown
                 .replace(/\\?\*?\[(?!https?:\/\/)(?:[a-f0-9-]{8,}|doc(?:[-_a-z0-9]*)):\d+\]\\?\*?/gi, '')
                 .replace(/\s{2,}(?=[.,;:!?])/g, '');
 
