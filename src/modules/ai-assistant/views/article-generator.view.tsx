@@ -517,24 +517,11 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
 
       {/* 2. BAGIAN ATAS: INPUT JUDUL & PROMPTING AI (LANGSUNG SETELAH JUDUL HALAMAN) */}
       <div className="w-full bg-white border border-slate-300 p-5 shadow-2xs rounded-none text-left space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 pb-3">
-          <div className="flex items-center gap-2">
-            <PenTool size={15} className="text-teal-700 shrink-0" />
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-800">
-              Perintah &amp; Parameter Penyusunan Naskah
-            </span>
-          </div>
-          {activeSessionId && onNavigateToEditor && (
-            <button
-              type="button"
-              disabled={isGenerating}
-              onClick={() => onNavigateToEditor(activeSessionId)}
-              className="px-3 py-1.5 bg-teal-700 hover:bg-teal-800 text-white disabled:bg-slate-300 disabled:cursor-not-allowed font-bold text-xs uppercase rounded-none inline-flex items-center gap-1.5 cursor-pointer transition-colors shadow-2xs"
-            >
-              <PenTool size={12} />
-              <span>Buka Lembar Kerja Editor</span>
-            </button>
-          )}
+        <div className="flex items-center gap-2 border-b border-slate-200 pb-3">
+          <PenTool size={15} className="text-teal-700 shrink-0" />
+          <span className="text-xs font-bold uppercase tracking-wider text-slate-800">
+            Perintah &amp; Parameter Penyusunan Naskah
+          </span>
         </div>
 
         {/* Input Judul Naskah */}
@@ -661,17 +648,6 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
                 <span>Hasil Analisis &amp; Riwayat Obrolan AI</span>
               </span>
             </div>
-
-            {currentDraft && activeSessionId && (
-              <button
-                type="button"
-                onClick={() => onNavigateToEditor(activeSessionId)}
-                className="text-xs font-bold text-teal-800 hover:text-teal-950 uppercase tracking-wider flex items-center gap-1 cursor-pointer transition-colors"
-              >
-                <span>Buka Lembar Kerja Penuh</span>
-                <Sparkles size={12} />
-              </button>
-            )}
           </div>
 
           {/* Banner Kesalahan */}

@@ -402,12 +402,30 @@ export const RichMessageRenderer: React.FC<RichMessageRendererProps> = ({
     const line = lines[i];
     const trimmed = line.trim();
 
-    // 0. Parser Gambar Markdown / QuickChart Chart Tunggal (![alt](url))
-    const singleImageMatch = trimmed.match(/^!\[([^\]]*)\]\((https?:\/\/[^\)]+)\)$/i);
+    // 0. Parser Gambar Markdown / QuickChart Chart Tunggal (![alt](url) atau varian [url])
+    const singleImageMatch = trimmed.match(
+      /^!?\[*([^\]]*)\]*\(?\s*(https?:\/\/(?:quickchart\.io\/chart\?[^\n\r\)]+|[^\s\)]+\.(?:png|jpe?g|gif|webp|svg)[^\)]*))\s*\)?\]*$/i,
+    );
     if (singleImageMatch) {
       flushAllBuffers();
-      const altText = singleImageMatch[1]?.trim() || 'Visualisasi Grafik / Diagram';
-      const rawUrl = singleImageMatch[2]?.trim();
+      const altText =
+        singleImageMatch[1]?.replace(/[\[\]]/g, '').trim() ||
+        'Visualisasi Grafik / Diagram';
+      let rawUrl = singleImageMatch[2]?.trim();
+      while (
+        rawUrl.startsWith('(') ||
+        rawUrl.startsWith('<') ||
+        rawUrl.startsWith('[')
+      ) {
+        rawUrl = rawUrl.substring(1);
+      }
+      while (
+        rawUrl.endsWith(')') ||
+        rawUrl.endsWith('>') ||
+        rawUrl.endsWith(']')
+      ) {
+        rawUrl = rawUrl.substring(0, rawUrl.length - 1);
+      }
       const safeUrl = rawUrl.replace(/\s+/g, '%20').replace(/"/g, '%22');
 
       elements.push(

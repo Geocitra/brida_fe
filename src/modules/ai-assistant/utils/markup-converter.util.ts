@@ -139,12 +139,20 @@ export class MarkupConverter {
         }
 
         try {
-            // 1. PENYELAMAT QUICKCHART: Ganti spasi di dalam URL QuickChart dengan %20 agar Markdown tidak rusak
+            // 1. PENYELAMAT QUICKCHART: Normalisasi URL QuickChart jika ada spasi, tanda kurung siku ganda, atau kurung biasa
             let processedMarkdown = markdown.replace(
-                /!\[([^\]]*)\]\((https:\/\/quickchart\.io\/chart\?[^\)]+)\)/gi,
-                (match, alt, url) => {
-                    const safeUrl = url.replace(/\s+/g, '%20').replace(/"/g, '%22');
-                    return `![${alt}](${safeUrl})`;
+                /!?\[*([^\]\n\r]*?)\]*\(?\s*(https?:\/\/quickchart\.io\/chart\?[^\n\r\)]+(?:[ \t]+[^\n\r\)]+)*)\s*\)?\]*/gi,
+                (match, altText, rawUrl) => {
+                    const cleanAlt = (altText && altText.replace(/[\[\]]/g, '').trim()) || 'Visualisasi Grafik Data';
+                    let cleanUrl = rawUrl.trim();
+                    while (cleanUrl.startsWith('<') || cleanUrl.startsWith('(') || cleanUrl.startsWith('[')) {
+                        cleanUrl = cleanUrl.substring(1);
+                    }
+                    while (cleanUrl.endsWith('>') || cleanUrl.endsWith(')') || cleanUrl.endsWith(']')) {
+                        cleanUrl = cleanUrl.substring(0, cleanUrl.length - 1);
+                    }
+                    const safeUrl = cleanUrl.replace(/\s+/g, '%20').replace(/"/g, '%22');
+                    return `\n\n![${cleanAlt}](${safeUrl})\n\n`;
                 }
             );
 
@@ -155,7 +163,7 @@ export class MarkupConverter {
 
             const collectedCitations: string[] = [];
             processedMarkdown = processedMarkdown.replace(
-                /\[(https?:\/\/[^\]\s]+?)(?::\d+)?\]/g,
+                /(?<!\!)\[(https?:\/\/(?!quickchart\.io)[^\]\s]+?)(?::\d+)?\]/g,
                 (_, url) => {
                     const idx = collectedCitations.length;
                     collectedCitations.push(url);
