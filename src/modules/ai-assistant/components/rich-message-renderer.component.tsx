@@ -1,7 +1,53 @@
 import React, { useState, useEffect } from 'react';
-import { Globe, FileText, Sparkles, AlertTriangle, Lightbulb } from 'lucide-react';
+import { Globe, FileText, Sparkles, AlertTriangle, Lightbulb, BarChart3, RefreshCw } from 'lucide-react';
 import { DocumentService } from '../../../services/document.service';
 import { MarkdownTableRenderer } from './markdown-table-renderer.component';
+
+export const SafeChartImage: React.FC<{ src: string; alt: string }> = ({ src, alt }) => {
+  const [hasError, setHasError] = useState(false);
+  const [retryKey, setRetryKey] = useState(0);
+
+  if (hasError) {
+    return (
+      <div className="my-3.5 w-full flex flex-col items-center justify-center p-3.5 bg-white border border-slate-300 rounded-none shadow-xs select-none font-roboto">
+        <div className="w-full py-6 px-4 bg-slate-50 border border-slate-200 flex flex-col items-center justify-center text-center space-y-2">
+          <BarChart3 className="text-slate-400" size={32} />
+          <div className="text-xs font-bold text-slate-700 uppercase tracking-wider">{alt || 'Visualisasi Grafik'}</div>
+          <div className="text-[11px] text-slate-500 max-w-sm">Grafik visualisasi data belum dapat dimuat dari server penyedia.</div>
+          <button
+            type="button"
+            onClick={() => {
+              setHasError(false);
+              setRetryKey((k) => k + 1);
+            }}
+            className="mt-1 inline-flex items-center gap-1 px-2.5 py-1 bg-teal-700 text-white text-[10px] font-bold uppercase rounded-none hover:bg-teal-800 cursor-pointer"
+          >
+            <RefreshCw size={11} />
+            <span>Muat Ulang Grafik</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="my-3.5 w-full flex flex-col items-center justify-center p-3.5 bg-white border border-slate-300 rounded-none shadow-xs select-none font-roboto">
+      <img
+        key={retryKey}
+        src={src}
+        alt={alt}
+        className="max-w-full h-auto object-contain max-h-[420px] rounded-none border border-slate-200"
+        onError={() => setHasError(true)}
+      />
+      {alt && (
+        <div className="flex items-center gap-1.5 mt-2.5 text-[10.5px] font-bold text-slate-700 uppercase tracking-wider font-roboto">
+          <span className="w-1.5 h-1.5 bg-teal-600 inline-block rounded-none shrink-0" />
+          <span>{alt}</span>
+        </div>
+      )}
+    </div>
+  );
+};
 
 export const parseInlineStylesRaw = (
   lineText: string,
@@ -404,7 +450,7 @@ export const RichMessageRenderer: React.FC<RichMessageRendererProps> = ({
 
     // 0. Parser Gambar Markdown / QuickChart Chart Tunggal (![alt](url) atau varian [url])
     const singleImageMatch = trimmed.match(
-      /^!?\[*([^\]]*)\]*\(?\s*(https?:\/\/(?:quickchart\.io\/chart\?[^\n\r\)]+|[^\s\)]+\.(?:png|jpe?g|gif|webp|svg)[^\)]*))\s*\)?\]*$/i,
+      /^!?\[*([^\]]*)\]*\(?\s*(https?:\/\/(?:quickchart\.io\/chart\?[^\s\n\r"'>]+|[^\s\)]+\.(?:png|jpe?g|gif|webp|svg)[^\)]*))\s*\)?\]*$/i,
     );
     if (singleImageMatch) {
       flushAllBuffers();
@@ -429,26 +475,7 @@ export const RichMessageRenderer: React.FC<RichMessageRendererProps> = ({
       const safeUrl = rawUrl.replace(/\s+/g, '%20').replace(/"/g, '%22');
 
       elements.push(
-        <div
-          key={`img-block-${keyIdx++}`}
-          className="my-3.5 w-full flex flex-col items-center justify-center p-3.5 bg-white border border-slate-300 rounded-none shadow-xs select-none"
-        >
-          <img
-            src={safeUrl}
-            alt={altText}
-            className="max-w-full h-auto object-contain max-h-[420px] rounded-none border border-slate-200"
-            loading="lazy"
-            onError={(e) => {
-              e.currentTarget.style.display = 'none';
-            }}
-          />
-          {altText && (
-            <div className="flex items-center gap-1.5 mt-2.5 text-[10.5px] font-bold text-slate-700 uppercase tracking-wider font-roboto">
-              <span className="w-1.5 h-1.5 bg-teal-600 inline-block rounded-none shrink-0" />
-              <span>{altText}</span>
-            </div>
-          )}
-        </div>,
+        <SafeChartImage key={`img-block-${keyIdx++}`} src={safeUrl} alt={altText} />,
       );
       continue;
     }

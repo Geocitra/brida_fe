@@ -139,22 +139,134 @@ export class MarkupConverter {
         }
 
         try {
-            // 1. PENYELAMAT QUICKCHART: Normalisasi URL QuickChart jika ada spasi, tanda kurung siku ganda, atau kurung biasa
-            let processedMarkdown = markdown.replace(
-                /!?\[*([^\]\n\r]*?)\]*\(?\s*(https?:\/\/quickchart\.io\/chart\?[^\n\r\)]+(?:[ \t]+[^\n\r\)]+)*)\s*\)?\]*/gi,
-                (match, altText, rawUrl) => {
-                    const cleanAlt = (altText && altText.replace(/[\[\]]/g, '').trim()) || 'Visualisasi Grafik Data';
-                    let cleanUrl = rawUrl.trim();
-                    while (cleanUrl.startsWith('<') || cleanUrl.startsWith('(') || cleanUrl.startsWith('[')) {
-                        cleanUrl = cleanUrl.substring(1);
+            // 1. PENYELAMAT QUICKCHART: Normalisasi URL QuickChart jika belum di-encode penuh
+            let processedMarkdown = markdown;
+            const qcMarker = 'quickchart.io/chart?';
+            let searchPos = 0;
+            let iterations = 0;
+
+            while (iterations++ < 50) {
+                const foundIdx = processedMarkdown.toLowerCase().indexOf(qcMarker, searchPos);
+                if (foundIdx === -1) break;
+
+                const textBefore = processedMarkdown.substring(0, foundIdx);
+                const httpMatch = textBefore.match(/(https?:\/\/)$/i);
+                const httpStart = httpMatch ? foundIdx - httpMatch[0].length : foundIdx;
+
+                let fullMatchStart = httpStart;
+                let altText = 'Visualisasi Grafik Data';
+
+                const textBeforeHttp = processedMarkdown.substring(0, httpStart);
+                const lastImgOpen = textBeforeHttp.lastIndexOf('![');
+                const lastLinkOpen = textBeforeHttp.lastIndexOf('[');
+                const lastOpen = lastImgOpen !== -1 ? lastImgOpen : lastLinkOpen;
+
+                if (lastOpen !== -1 && lastOpen >= textBeforeHttp.length - 300) {
+                    const candidate = textBeforeHttp.substring(lastOpen);
+                    const m = candidate.match(/^(!?\[([^\]]*)\]\s*\(\s*)$/);
+                    if (m) {
+                        fullMatchStart = lastOpen;
+                        if (m[2] && m[2].trim()) {
+                            altText = m[2].trim().replace(/[\[\]]/g, '');
+                        }
                     }
-                    while (cleanUrl.endsWith('>') || cleanUrl.endsWith(')') || cleanUrl.endsWith(']')) {
-                        cleanUrl = cleanUrl.substring(0, cleanUrl.length - 1);
-                    }
-                    const safeUrl = cleanUrl.replace(/\s+/g, '%20').replace(/"/g, '%22');
-                    return `\n\n![${cleanAlt}](${safeUrl})\n\n`;
                 }
-            );
+
+                const afterQc = processedMarkdown.substring(foundIdx + qcMarker.length);
+                const cMatch = afterQc.match(/^(?:[^ \n\r"'>]*?[?&])?(c|chart)=/i);
+
+                if (cMatch) {
+                    const cStart = foundIdx + qcMarker.length + cMatch[0].length;
+                    const subFromC = processedMarkdown.substring(cStart);
+
+                    const lineEnd = subFromC.search(/[\n\r]/);
+                    const lineChunk = lineEnd !== -1 ? subFromC.substring(0, lineEnd) : subFromC;
+
+                    let rawChunk = lineChunk.trimEnd();
+                    const trailMatch = rawChunk.match(/[\)\]\>]+$/);
+                    if (trailMatch) {
+                        rawChunk = rawChunk.substring(0, rawChunk.length - trailMatch[0].length);
+                    }
+
+                    const replaceEnd = cStart + lineChunk.length;
+
+                    // Normalisasi encoding & perbaiki typo %7Y jika ada
+                    let decoded = rawChunk
+                        .replace(/%7B/gi, '{')
+                        .replace(/%7D/gi, '}')
+                        .replace(/%5B/gi, '[')
+                        .replace(/%5D/gi, ']')
+                        .replace(/%3A/gi, ':')
+                        .replace(/%2C/gi, ',')
+                        .replace(/%22/gi, '"')
+                        .replace(/%27/gi, "'")
+                        .replace(/%20/gi, ' ')
+                        .replace(/%23/gi, '#')
+                        .replace(/%28/gi, '(')
+                        .replace(/%29/gi, ')')
+                        .replace(/%2F/gi, '/')
+                        .replace(/%7([a-zA-Z])/g, '{"$1"');
+
+                    try {
+                        decoded = decodeURIComponent(decoded);
+                    } catch {
+                        try {
+                            const fixed = decoded.replace(/%(?![0-9a-fA-F]{2})/g, '%25');
+                            decoded = decodeURIComponent(fixed);
+                        } catch {}
+                    }
+
+                    let configParam = '';
+                    if (decoded.includes('{')) {
+                        let depth = 0;
+                        let inStr: string | null = null;
+                        let isEsc = false;
+                        let objStart = -1;
+                        let objEnd = -1;
+
+                        for (let i = 0; i < decoded.length; i++) {
+                            const ch = decoded[i];
+                            if (inStr) {
+                                if (isEsc) isEsc = false;
+                                else if (ch === '\\') isEsc = true;
+                                else if (ch === inStr) inStr = null;
+                                continue;
+                            }
+                            if (ch === '"' || ch === "'" || ch === '`') {
+                                inStr = ch;
+                                continue;
+                            }
+                            if (ch === '{') {
+                                if (depth === 0) objStart = i;
+                                depth++;
+                            } else if (ch === '}') {
+                                depth--;
+                                if (depth === 0 && objStart !== -1) {
+                                    objEnd = i + 1;
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (objEnd !== -1 && objStart !== -1) {
+                            configParam = encodeURIComponent(decoded.substring(objStart, objEnd).trim());
+                        }
+                    }
+
+                    if (configParam) {
+                        const safeUrl = `https://quickchart.io/chart?c=${configParam}&bkg=white&w=650&h=350&devicePixelRatio=2`;
+                        const replacement = `\n\n![${altText}](${safeUrl})\n\n`;
+                        processedMarkdown =
+                            processedMarkdown.substring(0, fullMatchStart) +
+                            replacement +
+                            processedMarkdown.substring(replaceEnd);
+                        searchPos = fullMatchStart + replacement.length;
+                        continue;
+                    }
+                }
+
+                searchPos = foundIdx + qcMarker.length;
+            }
 
             // 2. Bersihkan token aneh dan spasi berlebih
             processedMarkdown = processedMarkdown

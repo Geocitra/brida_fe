@@ -8,6 +8,8 @@ import {
   Trash2,
   Subtitles,
   Check,
+  BarChart3,
+  RefreshCw,
 } from 'lucide-react';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
@@ -37,6 +39,8 @@ export const ResizableImageComponent: React.FC<NodeViewProps> = ({
 
   const align: ImageAlignment = node.attrs.align || 'center';
   const width: string = node.attrs.width || '100%';
+  const [hasError, setHasError] = useState(false);
+  const [retryKey, setRetryKey] = useState(0);
 
   useEffect(() => {
     setCaptionText(node.attrs.caption || '');
@@ -212,21 +216,44 @@ export const ResizableImageComponent: React.FC<NodeViewProps> = ({
         </div>
       )}
 
-      <img
-        ref={imageRef}
-        src={getDisplaySrc(node.attrs.src)}
-        alt={node.attrs.alt || ''}
-        onLoad={() => {
-          window.dispatchEvent(new CustomEvent('tiptap-media-loaded'));
-        }}
-        className="block w-full h-auto object-contain transition-all duration-75"
-        style={{
-          width: '100%',
-          minHeight: '220px',
-          maxHeight: '750px',
-          boxSizing: 'border-box',
-        }}
-      />
+      {hasError ? (
+        <div className="w-full py-6 px-4 bg-slate-50 border border-slate-300 flex flex-col items-center justify-center text-center space-y-2 select-none">
+          <BarChart3 className="text-slate-400" size={32} />
+          <div className="text-xs font-bold text-slate-700 uppercase tracking-wider">{node.attrs.alt || 'Visualisasi Grafik'}</div>
+          <div className="text-[11px] text-slate-500 max-w-sm">Grafik visualisasi data belum dapat dimuat dari server penyedia.</div>
+          <button
+            type="button"
+            onClick={() => {
+              setHasError(false);
+              setRetryKey((k) => k + 1);
+            }}
+            className="mt-1 inline-flex items-center gap-1 px-2.5 py-1 bg-teal-700 text-white text-[10px] font-bold uppercase rounded-none hover:bg-teal-800 cursor-pointer no-print"
+          >
+            <RefreshCw size={11} />
+            <span>Muat Ulang Grafik</span>
+          </button>
+        </div>
+      ) : (
+        <img
+          key={retryKey}
+          ref={imageRef}
+          src={getDisplaySrc(node.attrs.src)}
+          alt={node.attrs.alt || ''}
+          onLoad={() => {
+            window.dispatchEvent(new CustomEvent('tiptap-media-loaded'));
+          }}
+          onError={() => {
+            setHasError(true);
+          }}
+          className="block w-full h-auto object-contain transition-all duration-75"
+          style={{
+            width: '100%',
+            minHeight: '180px',
+            maxHeight: '750px',
+            boxSizing: 'border-box',
+          }}
+        />
+      )}
 
       {isEditingCaption ? (
         <div className="mt-1 flex items-center gap-1.5 no-print" onClick={(e) => e.stopPropagation()}>
