@@ -30,6 +30,43 @@ export function getOverlayDimensions(aspectRatio?: string): {
   }
 }
 
+/**
+ * Menghitung CSS inline style untuk base image agar hanya menempati zona konten
+ * (antara header dan footer), bukan mengisi 100% kanvas.
+ *
+ * ARSITEKTUR BENAR:
+ *   [Header bar — clean dedicated space]
+ *   [Base AI image — only occupies content zone]
+ *   [Footer bar — clean dedicated space]
+ *
+ * Digunakan oleh PosterShowcaseStage untuk sinkronisasi preview dengan output Puppeteer.
+ */
+export function getImageContentZoneStyle(
+  branding: { headerEnabled: boolean; footerEnabled: boolean } | null,
+  aspectRatio?: string,
+): React.CSSProperties {
+  if (!branding || (!branding.headerEnabled && !branding.footerEnabled)) {
+    return {};
+  }
+
+  const dims = getOverlayDimensions(aspectRatio);
+
+  const topOffset = branding.headerEnabled ? dims.headerHeight : '0%';
+  const bottomOffset = branding.footerEnabled ? dims.footerHeight : '0%';
+
+  return {
+    position: 'absolute' as const,
+    top: topOffset,
+    left: 0,
+    right: 0,
+    bottom: bottomOffset,
+    width: '100%',
+    height: `calc(100% - ${topOffset} - ${bottomOffset})`,
+    objectFit: 'cover' as const,
+    objectPosition: 'center top',
+  };
+}
+
 function isDarkColor(hex?: string): boolean {
   if (!hex || !hex.startsWith('#')) return false;
   const clean = hex.replace('#', '');

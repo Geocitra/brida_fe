@@ -18,7 +18,10 @@ import type {
 } from '../services/infographic.api';
 import type { PosterBrandingData } from '../types/poster-branding.types';
 import { PosterBrandingBar } from './poster-branding-bar.component';
-import { PosterBrandingOverlay } from './poster-branding-overlay.component';
+import {
+  PosterBrandingOverlay,
+  getImageContentZoneStyle,
+} from './poster-branding-overlay.component';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
 
@@ -372,18 +375,35 @@ export const PosterShowcaseStage: React.FC<PosterShowcaseStageProps> = ({
           style={{ maxWidth: `${Math.round(860 * (zoom / 100))}px` }}
           className="@container relative w-full flex items-center justify-center shadow-2xl drop-shadow-2xl rounded-none select-none transition-all duration-200"
         >
-          <img
-            src={fullImageUrl}
-            alt={session.title || 'Infografis BRIDA Mimika'}
-            className="w-full h-auto object-contain rounded-none select-none block"
-            loading="lazy"
-          />
+          {/* Wrapper aspect-ratio agar absolute positioning img dan overlay selaras */}
+          <div className="relative w-full">
+            {/* Spacer: mempertahankan aspek rasio kontainer */}
+            <img
+              src={fullImageUrl}
+              alt={session.title || 'Infografis BRIDA Mimika'}
+              className="w-full h-auto block rounded-none select-none"
+              style={{ visibility: hasActiveBranding ? 'hidden' : 'visible' }}
+              loading="lazy"
+              aria-hidden={hasActiveBranding}
+            />
 
-          {/* Live Preview Overlay (Header & Footer Adaptif Sinkron) */}
-          <PosterBrandingOverlay
-            branding={brandingData}
-            aspectRatio={activePoster?.aspectRatio || session.aspectRatio}
-          />
+            {/* Gambar aktual: diposisikan ke zona konten jika branding aktif */}
+            {hasActiveBranding ? (
+              <img
+                src={fullImageUrl}
+                alt={session.title || 'Infografis BRIDA Mimika'}
+                style={getImageContentZoneStyle(brandingData, activePoster?.aspectRatio || session.aspectRatio)}
+                className="rounded-none select-none"
+                loading="lazy"
+              />
+            ) : null}
+
+            {/* Live Preview Overlay (Header & Footer Adaptif Sinkron) */}
+            <PosterBrandingOverlay
+              branding={brandingData}
+              aspectRatio={activePoster?.aspectRatio || session.aspectRatio}
+            />
+          </div>
         </div>
       </div>
 
@@ -413,16 +433,30 @@ export const PosterShowcaseStage: React.FC<PosterShowcaseStageProps> = ({
 
           <div className="relative w-full h-full flex items-center justify-center p-2 sm:p-6 overflow-hidden">
             <div className="@container relative max-h-[92vh] max-w-full flex items-center justify-center shadow-2xl rounded-none">
-              <img
-                src={fullImageUrl}
-                alt={session.title}
-                className="max-w-full max-h-[92vh] object-contain rounded-none block"
-              />
-              {/* Overlay inside Lightbox */}
-              <PosterBrandingOverlay
-                branding={brandingData}
-                aspectRatio={activePoster?.aspectRatio || session.aspectRatio}
-              />
+              <div className="relative">
+                {/* Spacer aspect ratio */}
+                <img
+                  src={fullImageUrl}
+                  alt={session.title}
+                  className="max-w-full max-h-[92vh] object-contain rounded-none block"
+                  style={{ visibility: hasActiveBranding ? 'hidden' : 'visible' }}
+                  aria-hidden={hasActiveBranding}
+                />
+                {/* Gambar aktual diposisikan ke zona konten jika branding aktif */}
+                {hasActiveBranding && (
+                  <img
+                    src={fullImageUrl}
+                    alt={session.title}
+                    className="max-w-full max-h-[92vh] rounded-none block"
+                    style={getImageContentZoneStyle(brandingData, activePoster?.aspectRatio || session.aspectRatio)}
+                  />
+                )}
+                {/* Overlay inside Lightbox */}
+                <PosterBrandingOverlay
+                  branding={brandingData}
+                  aspectRatio={activePoster?.aspectRatio || session.aspectRatio}
+                />
+              </div>
             </div>
           </div>
         </div>
