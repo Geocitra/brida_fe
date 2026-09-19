@@ -330,7 +330,7 @@ export const PosterShowcaseStage: React.FC<PosterShowcaseStageProps> = ({
 
       {/* ── KANVAS UTAMA DI BAWAH (OUTPUT PRATINJAU LEGA & PROPORSIONAL) ── */}
       <div className="flex-1 min-h-0 w-full p-2 sm:p-4 md:p-6 flex items-center justify-center overflow-hidden">
-        <div className="relative max-h-full max-w-full flex items-center justify-center shadow-2xl drop-shadow-2xl rounded-none select-none">
+        <div className="@container relative max-h-full max-w-full flex items-center justify-center shadow-2xl drop-shadow-2xl rounded-none select-none">
           <img
             src={fullImageUrl}
             alt={session.title || 'Infografis BRIDA Mimika'}
@@ -338,8 +338,11 @@ export const PosterShowcaseStage: React.FC<PosterShowcaseStageProps> = ({
             loading="lazy"
           />
 
-          {/* Live Preview Overlay (Header 0-8% & Footer 94-100%) */}
-          <PosterBrandingOverlay branding={brandingData} />
+          {/* Live Preview Overlay (Header & Footer Adaptif Sinkron) */}
+          <PosterBrandingOverlay
+            branding={brandingData}
+            aspectRatio={activePoster?.aspectRatio || session.aspectRatio}
+          />
         </div>
       </div>
 
@@ -368,14 +371,17 @@ export const PosterShowcaseStage: React.FC<PosterShowcaseStageProps> = ({
           </div>
 
           <div className="relative w-full h-full flex items-center justify-center p-2 sm:p-6 overflow-hidden">
-            <div className="relative max-h-[92vh] max-w-full flex items-center justify-center shadow-2xl rounded-none">
+            <div className="@container relative max-h-[92vh] max-w-full flex items-center justify-center shadow-2xl rounded-none">
               <img
                 src={fullImageUrl}
                 alt={session.title}
                 className="max-w-full max-h-[92vh] object-contain rounded-none block"
               />
               {/* Overlay inside Lightbox */}
-              <PosterBrandingOverlay branding={brandingData} />
+              <PosterBrandingOverlay
+                branding={brandingData}
+                aspectRatio={activePoster?.aspectRatio || session.aspectRatio}
+              />
             </div>
           </div>
         </div>

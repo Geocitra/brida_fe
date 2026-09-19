@@ -1,3 +1,5 @@
+export type PosterAspectRatio = '1:1' | '9:16' | '16:9' | '3:4' | '4:3';
+
 export type PosterGenerationProfile = 'V1_BAKED_FOOTER' | 'V2_CLEAN_CANVAS';
 
 export interface PosterLayoutConfig {

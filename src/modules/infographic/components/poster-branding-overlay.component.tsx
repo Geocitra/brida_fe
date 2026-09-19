@@ -1,10 +1,33 @@
 import React from 'react';
-import type { PosterBrandingData } from '../types/poster-branding.types';
+import type { PosterBrandingData, PosterAspectRatio } from '../types/poster-branding.types';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
 
 interface PosterBrandingOverlayProps {
   branding: PosterBrandingData | null;
+  aspectRatio?: PosterAspectRatio | string;
+}
+
+/**
+ * Menghitung proporsi tinggi header dan footer adaptif sinkron dengan engine backend
+ */
+export function getOverlayDimensions(aspectRatio?: string): {
+  headerHeight: string;
+  footerHeight: string;
+} {
+  switch (aspectRatio) {
+    case '16:9':
+      return { headerHeight: '6.0%', footerHeight: '3.5%' };
+    case '4:3':
+      return { headerHeight: '6.5%', footerHeight: '4.0%' };
+    case '1:1':
+      return { headerHeight: '7.0%', footerHeight: '4.0%' };
+    case '3:4':
+      return { headerHeight: '7.0%', footerHeight: '4.0%' };
+    case '9:16':
+    default:
+      return { headerHeight: '7.5%', footerHeight: '4.0%' };
+  }
 }
 
 function isDarkColor(hex?: string): boolean {
@@ -18,7 +41,7 @@ function isDarkColor(hex?: string): boolean {
   return luminance < 0.5;
 }
 
-export const PosterBrandingOverlay: React.FC<PosterBrandingOverlayProps> = ({ branding }) => {
+export const PosterBrandingOverlay: React.FC<PosterBrandingOverlayProps> = ({ branding, aspectRatio }) => {
   if (!branding) return null;
 
   const {
@@ -32,6 +55,8 @@ export const PosterBrandingOverlay: React.FC<PosterBrandingOverlayProps> = ({ br
   } = branding;
 
   if (!headerEnabled && !footerEnabled) return null;
+
+  const dims = getOverlayDimensions(aspectRatio);
 
   const headerBgColor = layoutConfig.headerBgColor || '#FFFFFF';
   const headerTextColor = layoutConfig.headerTextColor || (isDarkColor(headerBgColor) ? '#FFFFFF' : '#0F1E36');
@@ -49,13 +74,13 @@ export const PosterBrandingOverlay: React.FC<PosterBrandingOverlayProps> = ({ br
 
   return (
     <div className="absolute inset-0 pointer-events-none z-10 overflow-hidden font-roboto rounded-none select-none">
-      {/* ── HEADER RESMI (0% - 8%) ── */}
+      {/* ── HEADER RESMI DETERMINISTIK ── */}
       {headerEnabled && (
         <div
           style={{
             backgroundColor: headerBgColor,
             color: headerTextColor,
-            height: '8%',
+            height: dims.headerHeight,
           }}
           className={`absolute top-0 left-0 right-0 flex items-center px-[4%] border-b border-black/10 rounded-none transition-colors duration-150 ${
             headerAlignment === 'center' ? 'justify-center text-center' : 'justify-start text-left'
@@ -65,15 +90,15 @@ export const PosterBrandingOverlay: React.FC<PosterBrandingOverlayProps> = ({ br
             <img
               src={fullLogoUrl}
               alt="Logo Instansi"
-              className="h-[72%] max-w-[18%] w-auto object-contain mr-[2.5%] rounded-none flex-shrink-0 drop-shadow-xs"
+              className="h-[74%] max-w-[18%] w-auto object-contain mr-[2.5%] rounded-none flex-shrink-0 drop-shadow-xs"
             />
           )}
-          <div className="flex flex-col justify-center leading-tight">
-            <span className="text-[clamp(10px,1.8cqw,18px)] font-black tracking-wider uppercase">
+          <div className="flex flex-col justify-center leading-tight min-w-0 flex-1 overflow-hidden">
+            <span className="text-[clamp(9px,2.2cqw,17px)] font-black tracking-wider uppercase whitespace-nowrap truncate leading-normal">
               {institution}
             </span>
             {subInstitution && (
-              <span className="text-[clamp(8px,1.3cqw,14px)] font-medium opacity-90 mt-[1px] tracking-normal">
+              <span className="text-[clamp(7.5px,1.6cqw,13px)] font-medium opacity-90 tracking-normal whitespace-nowrap truncate leading-normal">
                 {subInstitution}
               </span>
             )}
@@ -81,13 +106,13 @@ export const PosterBrandingOverlay: React.FC<PosterBrandingOverlayProps> = ({ br
         </div>
       )}
 
-      {/* ── FOOTER RESMI (94% - 100%) ── */}
+      {/* ── FOOTER RESMI DETERMINISTIK ── */}
       {footerEnabled && (
         <div
           style={{
             backgroundColor: footerBgColor,
             color: footerTextColor,
-            height: '6%',
+            height: dims.footerHeight,
           }}
           className={`absolute bottom-0 left-0 right-0 flex items-center px-[4%] border-t border-white/10 rounded-none transition-colors duration-150 ${
             footerAlignment === 'center'
