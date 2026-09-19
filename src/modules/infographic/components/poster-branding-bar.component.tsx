@@ -14,6 +14,7 @@ import {
   Type,
   Image,
   Layout,
+  SlidersHorizontal,
 } from 'lucide-react';
 import type { PosterBrandingData } from '../types/poster-branding.types';
 import { BRANDING_COLOR_PRESETS } from '../types/poster-branding.types';
@@ -114,6 +115,16 @@ export const PosterBrandingBar: React.FC<PosterBrandingBarProps> = ({
     });
   };
 
+  const handleHeaderHeight = (height: 'compact' | 'normal' | 'spacious') => {
+    onChange({
+      ...branding,
+      layoutConfig: {
+        ...(branding.layoutConfig || {}),
+        headerHeight: height,
+      },
+    });
+  };
+
   const handleFooterFontSize = (size: 'compact' | 'normal' | 'large') => {
     onChange({
       ...branding,
@@ -146,6 +157,7 @@ export const PosterBrandingBar: React.FC<PosterBrandingBarProps> = ({
   const currentLogoPosition = branding.layoutConfig?.logoPosition || (branding.layoutConfig?.headerAlignment === 'center' ? 'center' : 'left');
   const currentLogoSize = branding.layoutConfig?.logoSize || 'normal';
   const currentHeaderFontSize = branding.layoutConfig?.headerFontSize || 'normal';
+  const currentHeaderHeight = branding.layoutConfig?.headerHeight || 'normal';
   const currentFooterFontSize = branding.layoutConfig?.footerFontSize || 'normal';
   const currentFooterAlignment = branding.layoutConfig?.footerAlignment || 'center';
 
@@ -344,6 +356,36 @@ export const PosterBrandingBar: React.FC<PosterBrandingBarProps> = ({
                         ? 'bg-teal-700 text-white'
                         : 'text-slate-400 hover:text-white disabled:opacity-40'
                     }`}
+                  >
+                    {labels[sz]}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Tinggi Kop Header */}
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 flex items-center gap-1">
+              <SlidersHorizontal size={11} className="text-teal-400" />
+              <span>Tinggi Kop:</span>
+            </span>
+            <div className="flex items-center border border-slate-700 rounded-none bg-slate-900 p-0.5">
+              {(['compact', 'normal', 'spacious'] as const).map((sz) => {
+                const labels = { compact: 'Ringkas', normal: 'Standar', spacious: 'Lega' };
+                const isSelected = currentHeaderHeight === sz;
+                return (
+                  <button
+                    key={sz}
+                    type="button"
+                    disabled={!branding.headerEnabled}
+                    onClick={() => handleHeaderHeight(sz)}
+                    className={`px-2 py-1 text-[10px] font-bold uppercase cursor-pointer rounded-none transition-colors ${
+                      isSelected
+                        ? 'bg-teal-700 text-white'
+                        : 'text-slate-400 hover:text-white disabled:opacity-40'
+                    }`}
+                    title={`Tinggi Kop: ${labels[sz]}`}
                   >
                     {labels[sz]}
                   </button>

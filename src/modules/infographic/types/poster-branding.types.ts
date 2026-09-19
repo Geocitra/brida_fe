@@ -13,7 +13,24 @@ export interface PosterLayoutConfig {
   footerFontSize?: 'compact' | 'normal' | 'large';
   logoPosition?: 'left' | 'right' | 'center';
   logoSize?: 'compact' | 'normal' | 'large';
+  /** Tinggi / ketebalan kop header: compact (~85%), normal (100%), spacious (~120%) */
+  headerHeight?: 'compact' | 'normal' | 'spacious';
 }
+
+/**
+ * Konfigurasi Safe Area per rasio aspek (sinkron persis dengan backend SAFE_AREA_CONFIG)
+ */
+export const BRANDING_SAFE_AREA_CONFIG: Record<
+  PosterAspectRatio,
+  { headerBarPercent: number; footerBarPercent: number }
+> = {
+  '9:16': { headerBarPercent: 7.5, footerBarPercent: 4.0 },
+  '3:4': { headerBarPercent: 7.0, footerBarPercent: 4.0 },
+  '1:1': { headerBarPercent: 7.0, footerBarPercent: 4.0 },
+  '4:3': { headerBarPercent: 6.5, footerBarPercent: 4.0 },
+  '16:9': { headerBarPercent: 6.0, footerBarPercent: 3.5 },
+};
+
 
 export interface PosterBrandingData {
   id?: string;

@@ -1,5 +1,8 @@
-import React from 'react';
-import type { PosterBrandingData, PosterAspectRatio } from '../types/poster-branding.types';
+import {
+  BRANDING_SAFE_AREA_CONFIG,
+  type PosterBrandingData,
+  type PosterAspectRatio,
+} from '../types/poster-branding.types';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
 
@@ -10,62 +13,32 @@ interface PosterBrandingOverlayProps {
 
 /**
  * Menghitung proporsi tinggi header dan footer adaptif sinkron dengan engine backend
+ * dan konfigurasi Safe Area sentral (BRANDING_SAFE_AREA_CONFIG).
  */
-export function getOverlayDimensions(aspectRatio?: string): {
+export function getOverlayDimensions(
+  aspectRatio?: string,
+  headerHeightOption?: 'compact' | 'normal' | 'spacious',
+): {
   headerHeight: string;
   footerHeight: string;
 } {
-  switch (aspectRatio) {
-    case '16:9':
-      return { headerHeight: '6.0%', footerHeight: '3.5%' };
-    case '4:3':
-      return { headerHeight: '6.5%', footerHeight: '4.0%' };
-    case '1:1':
-      return { headerHeight: '7.0%', footerHeight: '4.0%' };
-    case '3:4':
-      return { headerHeight: '7.0%', footerHeight: '4.0%' };
-    case '9:16':
-    default:
-      return { headerHeight: '7.5%', footerHeight: '4.0%' };
-  }
-}
+  const ratioKey = (aspectRatio && aspectRatio in BRANDING_SAFE_AREA_CONFIG)
+    ? (aspectRatio as PosterAspectRatio)
+    : '9:16';
+  const config = BRANDING_SAFE_AREA_CONFIG[ratioKey];
 
-/**
- * Menghitung CSS inline style untuk base image agar hanya menempati zona konten
- * (antara header dan footer), bukan mengisi 100% kanvas.
- *
- * ARSITEKTUR BENAR:
- *   [Header bar — clean dedicated space]
- *   [Base AI image — only occupies content zone]
- *   [Footer bar — clean dedicated space]
- *
- * Digunakan oleh PosterShowcaseStage untuk sinkronisasi preview dengan output Puppeteer.
- */
-export function getImageContentZoneStyle(
-  branding: { headerEnabled: boolean; footerEnabled: boolean } | null,
-  aspectRatio?: string,
-): React.CSSProperties {
-  if (!branding || (!branding.headerEnabled && !branding.footerEnabled)) {
-    return {};
-  }
+  const headerMultiplier =
+    headerHeightOption === 'compact' ? 0.85 : headerHeightOption === 'spacious' ? 1.2 : 1.0;
 
-  const dims = getOverlayDimensions(aspectRatio);
-
-  const topOffset = branding.headerEnabled ? dims.headerHeight : '0%';
-  const bottomOffset = branding.footerEnabled ? dims.footerHeight : '0%';
+  const headerPercent = (config.headerBarPercent * headerMultiplier).toFixed(2);
+  const footerPercent = config.footerBarPercent.toFixed(2);
 
   return {
-    position: 'absolute' as const,
-    top: topOffset,
-    left: 0,
-    right: 0,
-    bottom: bottomOffset,
-    width: '100%',
-    height: `calc(100% - ${topOffset} - ${bottomOffset})`,
-    objectFit: 'cover' as const,
-    objectPosition: 'center top',
+    headerHeight: `${headerPercent}%`,
+    footerHeight: `${footerPercent}%`,
   };
 }
+
 
 function isDarkColor(hex?: string): boolean {
   if (!hex || !hex.startsWith('#')) return false;
@@ -120,7 +93,7 @@ export const PosterBrandingOverlay: React.FC<PosterBrandingOverlayProps> = ({ br
 
   if (!headerEnabled && !footerEnabled) return null;
 
-  const dims = getOverlayDimensions(aspectRatio);
+  const dims = getOverlayDimensions(aspectRatio, layoutConfig.headerHeight);
 
   const headerBgColor = layoutConfig.headerBgColor || '#FFFFFF';
   const headerTextColor = layoutConfig.headerTextColor || (isDarkColor(headerBgColor) ? '#FFFFFF' : '#0F1E36');
