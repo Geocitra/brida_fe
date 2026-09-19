@@ -40,7 +40,7 @@ export const InfographicStudioView: React.FC<InfographicStudioViewProps> = ({
   const [activePoster, setActivePoster] = useState<InfographicPosterItem | null>(null);
 
   const [inputPrompt, setInputPrompt] = useState<string>(initialTopic || '');
-  const [aspectRatio, setAspectRatio] = useState<PosterAspectRatio>('3:4');
+  const aspectRatio: PosterAspectRatio = '3:4';
   const [attachedFile, setAttachedFile] = useState<File | null>(null);
 
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -494,15 +494,6 @@ export const InfographicStudioView: React.FC<InfographicStudioViewProps> = ({
               </div>
             )}
 
-            {/* Format Rasio (Terkunci ke 3:4 Standar Editorial) */}
-            <div className="flex items-center justify-between text-[11px]">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Format Rasio:</span>
-              <div className="flex items-center gap-1">
-                <span className="px-2.5 py-0.5 text-[10px] font-bold border bg-teal-700 text-white border-teal-800 rounded-none">
-                  3:4
-                </span>
-              </div>
-            </div>
 
             {/* Input Bar & Actions */}
             <div className="flex items-center border border-slate-300 focus-within:border-teal-700 bg-slate-50 transition-colors rounded-none">
