@@ -3922,9 +3922,9 @@ export const ChatInputBar: React.FC<ChatInputBarProps> = ({
                             disabled={isLoading || isUploading}
                             className="text-xs bg-white border-b border-slate-300 text-slate-800 font-bold focus:outline-none focus:border-teal-700 px-2.5 py-1.5 rounded-none cursor-pointer hover:border-slate-400 transition-colors"
                         >
-                            <option value="SHORT">Ringkas (~700 Kata)</option>
-                            <option value="MEDIUM">Sedang (~1000 Kata)</option>
-                            <option value="LONG">Mendalam (~1500 Kata)</option>
+                            <option value="SHORT">Ringkas (~750 Kata)</option>
+                            <option value="MEDIUM">Sedang (~1.500 Kata)</option>
+                            <option value="LONG">Mendalam (~3.000 Kata)</option>
                         </select>
                     </div>
                 </div>
@@ -3934,7 +3934,7 @@ export const ChatInputBar: React.FC<ChatInputBarProps> = ({
                         type="button"
                         disabled={isLoading}
                         onClick={() => onNavigateToEditor(activeSessionId)}
-                        className="px-3 py-1.5 text-teal-700 disabled:text-slate-400 disabled:border-slate-200 disabled:cursor-not-allowed font-bold text-xs uppercase rounded-none inline-flex items-center gap-1.5 cursor-pointer transition-colors bg-white"
+                        className="px-3 py-1.5 text-teal-800 hover:text-teal-900 border-b border-teal-700 hover:bg-teal-50/50 disabled:text-slate-400 disabled:border-slate-200 disabled:cursor-not-allowed font-bold text-xs uppercase rounded-none inline-flex items-center gap-1.5 cursor-pointer transition-colors bg-white"
                         title={isLoading ? "Tunggu AI selesai merakit naskah..." : "Alihkan langsung ke lembar kerja A4 Word WYSIWYG untuk sunting manual penuh"}
                     >
                         <PenTool size={12} className="shrink-0" />
@@ -4950,9 +4950,9 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                     disabled={isTransitioning}
                     className="w-full text-xs p-2.5 border border-slate-300 focus:outline-none focus:border-teal-700 bg-white font-semibold rounded-none"
                   >
-                    <option value="SHORT">Ringkas (~700 Kata)</option>
-                    <option value="MEDIUM">Sedang (~1000 Kata)</option>
-                    <option value="LONG">Mendalam (~1500 Kata)</option>
+                    <option value="SHORT">Ringkas (~750 Kata)</option>
+                    <option value="MEDIUM">Sedang (~1.500 Kata)</option>
+                    <option value="LONG">Mendalam (~3.000 Kata)</option>
                   </select>
                 </div>
               </div>
@@ -5513,9 +5513,55 @@ export const MarkdownTableRenderer: React.FC<MarkdownTableRendererProps> = ({
 
 --- FILE: src\modules\ai-assistant\components\rich-message-renderer.component.tsx ---
 import React, { useState, useEffect } from 'react';
-import { Globe, FileText, Sparkles, AlertTriangle, Lightbulb } from 'lucide-react';
+import { Globe, FileText, Sparkles, AlertTriangle, Lightbulb, BarChart3, RefreshCw } from 'lucide-react';
 import { DocumentService } from '../../../services/document.service';
 import { MarkdownTableRenderer } from './markdown-table-renderer.component';
+
+export const SafeChartImage: React.FC<{ src: string; alt: string }> = ({ src, alt }) => {
+  const [hasError, setHasError] = useState(false);
+  const [retryKey, setRetryKey] = useState(0);
+
+  if (hasError) {
+    return (
+      <div className="my-3.5 w-full flex flex-col items-center justify-center p-3.5 bg-white border border-slate-300 rounded-none shadow-xs select-none font-roboto">
+        <div className="w-full py-6 px-4 bg-slate-50 border border-slate-200 flex flex-col items-center justify-center text-center space-y-2">
+          <BarChart3 className="text-slate-400" size={32} />
+          <div className="text-xs font-bold text-slate-700 uppercase tracking-wider">{alt || 'Visualisasi Grafik'}</div>
+          <div className="text-[11px] text-slate-500 max-w-sm">Grafik visualisasi data belum dapat dimuat dari server penyedia.</div>
+          <button
+            type="button"
+            onClick={() => {
+              setHasError(false);
+              setRetryKey((k) => k + 1);
+            }}
+            className="mt-1 inline-flex items-center gap-1 px-2.5 py-1 bg-teal-700 text-white text-[10px] font-bold uppercase rounded-none hover:bg-teal-800 cursor-pointer"
+          >
+            <RefreshCw size={11} />
+            <span>Muat Ulang Grafik</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="my-3.5 w-full flex flex-col items-center justify-center p-3.5 bg-white border border-slate-300 rounded-none shadow-xs select-none font-roboto">
+      <img
+        key={retryKey}
+        src={src}
+        alt={alt}
+        className="max-w-full h-auto object-contain max-h-[420px] rounded-none border border-slate-200"
+        onError={() => setHasError(true)}
+      />
+      {alt && (
+        <div className="flex items-center gap-1.5 mt-2.5 text-[10.5px] font-bold text-slate-700 uppercase tracking-wider font-roboto">
+          <span className="w-1.5 h-1.5 bg-teal-600 inline-block rounded-none shrink-0" />
+          <span>{alt}</span>
+        </div>
+      )}
+    </div>
+  );
+};
 
 export const parseInlineStylesRaw = (
   lineText: string,
@@ -5915,39 +5961,39 @@ export const RichMessageRenderer: React.FC<RichMessageRendererProps> = ({
     const line = lines[i];
     const trimmed = line.trim();
 
-    // 0. Parser Gambar Markdown / QuickChart Chart Tunggal (![alt](url))
-    const singleImageMatch = trimmed.match(/^!\[([^\]]*)\]\((https?:\/\/[^\)]+)\)$/i);
+    // 0. Parser Gambar Markdown / QuickChart Chart Tunggal (![alt](url) atau varian [url])
+    const singleImageMatch = trimmed.match(
+      /^!?\[*([^\]]*)\]*\(?\s*(https?:\/\/(?:quickchart\.io\/chart\?[^\s\n\r"'>]+|[^\s\)]+\.(?:png|jpe?g|gif|webp|svg)[^\)]*))\s*\)?\]*$/i,
+    );
     if (singleImageMatch) {
       flushAllBuffers();
-      const altText = singleImageMatch[1]?.trim() || 'Visualisasi Grafik / Diagram';
-      const rawUrl = singleImageMatch[2]?.trim();
+      const altText =
+        singleImageMatch[1]?.replace(/[\[\]]/g, '').trim() ||
+        'Visualisasi Grafik / Diagram';
+      let rawUrl = singleImageMatch[2]?.trim();
+      while (
+        rawUrl.startsWith('(') ||
+        rawUrl.startsWith('<') ||
+        rawUrl.startsWith('[')
+      ) {
+        rawUrl = rawUrl.substring(1);
+      }
+      while (
+        rawUrl.endsWith(')') ||
+        rawUrl.endsWith('>') ||
+        rawUrl.endsWith(']')
+      ) {
+        rawUrl = rawUrl.substring(0, rawUrl.length - 1);
+      }
       const safeUrl = rawUrl.replace(/\s+/g, '%20').replace(/"/g, '%22');
 
       elements.push(
-        <div
-          key={`img-block-${keyIdx++}`}
-          className="my-3.5 w-full flex flex-col items-center justify-center p-3.5 bg-white border border-slate-300 rounded-none shadow-xs select-none"
-        >
-          <img
-            src={safeUrl}
-            alt={altText}
-            className="max-w-full h-auto object-contain max-h-[420px] rounded-none border border-slate-200"
-            loading="lazy"
-            onError={(e) => {
-              e.currentTarget.style.display = 'none';
-            }}
-          />
-          {altText && (
-            <div className="flex items-center gap-1.5 mt-2.5 text-[10.5px] font-bold text-slate-700 uppercase tracking-wider font-roboto">
-              <span className="w-1.5 h-1.5 bg-teal-600 inline-block rounded-none shrink-0" />
-              <span>{altText}</span>
-            </div>
-          )}
-        </div>,
+        <SafeChartImage key={`img-block-${keyIdx++}`} src={safeUrl} alt={altText} />,
       );
       continue;
     }
 
+    // 1. Parser Tabel Markdown (|...|)
     if (trimmed.startsWith('|') && trimmed.endsWith('|')) {
       flushBulletList();
       flushNumberedList();
@@ -5969,6 +6015,7 @@ export const RichMessageRenderer: React.FC<RichMessageRendererProps> = ({
       flushTable();
     }
 
+    // 2. Parser Blockquote / Catatan Kritis (> )
     if (trimmed.startsWith('> ') || trimmed === '>') {
       flushBulletList();
       flushNumberedList();
@@ -5978,6 +6025,7 @@ export const RichMessageRenderer: React.FC<RichMessageRendererProps> = ({
       flushBlockquote();
     }
 
+    // 3. Parser Unordered Bullet List (- , * , • )
     if (trimmed.startsWith('- ') || trimmed.startsWith('* ') || trimmed.startsWith('• ')) {
       flushNumberedList();
       const content = parseInlineStyles(trimmed.slice(2));
@@ -5991,6 +6039,7 @@ export const RichMessageRenderer: React.FC<RichMessageRendererProps> = ({
       flushBulletList();
     }
 
+    // 4. Parser Numbered List (1. , 2. )
     const numberedMatch = trimmed.match(/^(\d+)\.\s+(.*)$/);
     if (numberedMatch) {
       const content = parseInlineStyles(numberedMatch[2]);
@@ -6004,6 +6053,7 @@ export const RichMessageRenderer: React.FC<RichMessageRendererProps> = ({
       flushNumberedList();
     }
 
+    // 5. Parser Heading & Paragraphs
     if (trimmed.startsWith('### ')) {
       flushAllBuffers();
       elements.push(
@@ -7225,6 +7275,8 @@ import {
   Trash2,
   Subtitles,
   Check,
+  BarChart3,
+  RefreshCw,
 } from 'lucide-react';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
@@ -7254,6 +7306,8 @@ export const ResizableImageComponent: React.FC<NodeViewProps> = ({
 
   const align: ImageAlignment = node.attrs.align || 'center';
   const width: string = node.attrs.width || '100%';
+  const [hasError, setHasError] = useState(false);
+  const [retryKey, setRetryKey] = useState(0);
 
   useEffect(() => {
     setCaptionText(node.attrs.caption || '');
@@ -7429,21 +7483,44 @@ export const ResizableImageComponent: React.FC<NodeViewProps> = ({
         </div>
       )}
 
-      <img
-        ref={imageRef}
-        src={getDisplaySrc(node.attrs.src)}
-        alt={node.attrs.alt || ''}
-        onLoad={() => {
-          window.dispatchEvent(new CustomEvent('tiptap-media-loaded'));
-        }}
-        className="block w-full h-auto object-contain transition-all duration-75"
-        style={{
-          width: '100%',
-          minHeight: '220px',
-          maxHeight: '750px',
-          boxSizing: 'border-box',
-        }}
-      />
+      {hasError ? (
+        <div className="w-full py-6 px-4 bg-slate-50 border border-slate-300 flex flex-col items-center justify-center text-center space-y-2 select-none">
+          <BarChart3 className="text-slate-400" size={32} />
+          <div className="text-xs font-bold text-slate-700 uppercase tracking-wider">{node.attrs.alt || 'Visualisasi Grafik'}</div>
+          <div className="text-[11px] text-slate-500 max-w-sm">Grafik visualisasi data belum dapat dimuat dari server penyedia.</div>
+          <button
+            type="button"
+            onClick={() => {
+              setHasError(false);
+              setRetryKey((k) => k + 1);
+            }}
+            className="mt-1 inline-flex items-center gap-1 px-2.5 py-1 bg-teal-700 text-white text-[10px] font-bold uppercase rounded-none hover:bg-teal-800 cursor-pointer no-print"
+          >
+            <RefreshCw size={11} />
+            <span>Muat Ulang Grafik</span>
+          </button>
+        </div>
+      ) : (
+        <img
+          key={retryKey}
+          ref={imageRef}
+          src={getDisplaySrc(node.attrs.src)}
+          alt={node.attrs.alt || ''}
+          onLoad={() => {
+            window.dispatchEvent(new CustomEvent('tiptap-media-loaded'));
+          }}
+          onError={() => {
+            setHasError(true);
+          }}
+          className="block w-full h-auto object-contain transition-all duration-75"
+          style={{
+            width: '100%',
+            minHeight: '180px',
+            maxHeight: '750px',
+            boxSizing: 'border-box',
+          }}
+        />
+      )}
 
       {isEditingCaption ? (
         <div className="mt-1 flex items-center gap-1.5 no-print" onClick={(e) => e.stopPropagation()}>
@@ -8019,13 +8096,133 @@ export class MarkupConverter {
 
         try {
 
-            let processedMarkdown = markdown.replace(
-                /!\[([^\]]*)\]\((https:\/\/quickchart\.io\/chart\?[^\)]+)\)/gi,
-                (match, alt, url) => {
-                    const safeUrl = url.replace(/\s+/g, '%20').replace(/"/g, '%22');
-                    return `![${alt}](${safeUrl})`;
+            let processedMarkdown = markdown;
+            const qcMarker = 'quickchart.io/chart?';
+            let searchPos = 0;
+            let iterations = 0;
+
+            while (iterations++ < 50) {
+                const foundIdx = processedMarkdown.toLowerCase().indexOf(qcMarker, searchPos);
+                if (foundIdx === -1) break;
+
+                const textBefore = processedMarkdown.substring(0, foundIdx);
+                const httpMatch = textBefore.match(/(https?:\/\/)$/i);
+                const httpStart = httpMatch ? foundIdx - httpMatch[0].length : foundIdx;
+
+                let fullMatchStart = httpStart;
+                let altText = 'Visualisasi Grafik Data';
+
+                const textBeforeHttp = processedMarkdown.substring(0, httpStart);
+                const lastImgOpen = textBeforeHttp.lastIndexOf('![');
+                const lastLinkOpen = textBeforeHttp.lastIndexOf('[');
+                const lastOpen = lastImgOpen !== -1 ? lastImgOpen : lastLinkOpen;
+
+                if (lastOpen !== -1 && lastOpen >= textBeforeHttp.length - 300) {
+                    const candidate = textBeforeHttp.substring(lastOpen);
+                    const m = candidate.match(/^(!?\[([^\]]*)\]\s*\(\s*)$/);
+                    if (m) {
+                        fullMatchStart = lastOpen;
+                        if (m[2] && m[2].trim()) {
+                            altText = m[2].trim().replace(/[\[\]]/g, '');
+                        }
+                    }
                 }
-            );
+
+                const afterQc = processedMarkdown.substring(foundIdx + qcMarker.length);
+                const cMatch = afterQc.match(/^(?:[^ \n\r"'>]*?[?&])?(c|chart)=/i);
+
+                if (cMatch) {
+                    const cStart = foundIdx + qcMarker.length + cMatch[0].length;
+                    const subFromC = processedMarkdown.substring(cStart);
+
+                    const lineEnd = subFromC.search(/[\n\r]/);
+                    const lineChunk = lineEnd !== -1 ? subFromC.substring(0, lineEnd) : subFromC;
+
+                    let rawChunk = lineChunk.trimEnd();
+                    const trailMatch = rawChunk.match(/[\)\]\>]+$/);
+                    if (trailMatch) {
+                        rawChunk = rawChunk.substring(0, rawChunk.length - trailMatch[0].length);
+                    }
+
+                    const replaceEnd = cStart + lineChunk.length;
+
+                    // Normalisasi encoding & perbaiki typo %7Y jika ada
+                    let decoded = rawChunk
+                        .replace(/%7B/gi, '{')
+                        .replace(/%7D/gi, '}')
+                        .replace(/%5B/gi, '[')
+                        .replace(/%5D/gi, ']')
+                        .replace(/%3A/gi, ':')
+                        .replace(/%2C/gi, ',')
+                        .replace(/%22/gi, '"')
+                        .replace(/%27/gi, "'")
+                        .replace(/%20/gi, ' ')
+                        .replace(/%23/gi, '#')
+                        .replace(/%28/gi, '(')
+                        .replace(/%29/gi, ')')
+                        .replace(/%2F/gi, '/')
+                        .replace(/%7([a-zA-Z])/g, '{"$1"');
+
+                    try {
+                        decoded = decodeURIComponent(decoded);
+                    } catch {
+                        try {
+                            const fixed = decoded.replace(/%(?![0-9a-fA-F]{2})/g, '%25');
+                            decoded = decodeURIComponent(fixed);
+                        } catch {}
+                    }
+
+                    let configParam = '';
+                    if (decoded.includes('{')) {
+                        let depth = 0;
+                        let inStr: string | null = null;
+                        let isEsc = false;
+                        let objStart = -1;
+                        let objEnd = -1;
+
+                        for (let i = 0; i < decoded.length; i++) {
+                            const ch = decoded[i];
+                            if (inStr) {
+                                if (isEsc) isEsc = false;
+                                else if (ch === '\\') isEsc = true;
+                                else if (ch === inStr) inStr = null;
+                                continue;
+                            }
+                            if (ch === '"' || ch === "'" || ch === '`') {
+                                inStr = ch;
+                                continue;
+                            }
+                            if (ch === '{') {
+                                if (depth === 0) objStart = i;
+                                depth++;
+                            } else if (ch === '}') {
+                                depth--;
+                                if (depth === 0 && objStart !== -1) {
+                                    objEnd = i + 1;
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (objEnd !== -1 && objStart !== -1) {
+                            configParam = encodeURIComponent(decoded.substring(objStart, objEnd).trim());
+                        }
+                    }
+
+                    if (configParam) {
+                        const safeUrl = `https://quickchart.io/chart?c=${configParam}&bkg=white&w=650&h=350&devicePixelRatio=2`;
+                        const replacement = `\n\n![${altText}](${safeUrl})\n\n`;
+                        processedMarkdown =
+                            processedMarkdown.substring(0, fullMatchStart) +
+                            replacement +
+                            processedMarkdown.substring(replaceEnd);
+                        searchPos = fullMatchStart + replacement.length;
+                        continue;
+                    }
+                }
+
+                searchPos = foundIdx + qcMarker.length;
+            }
 
             // 2. Bersihkan token aneh dan spasi berlebih
             processedMarkdown = processedMarkdown
@@ -8034,7 +8231,7 @@ export class MarkupConverter {
 
             const collectedCitations: string[] = [];
             processedMarkdown = processedMarkdown.replace(
-                /\[(https?:\/\/[^\]\s]+?)(?::\d+)?\]/g,
+                /(?<!\!)\[(https?:\/\/(?!quickchart\.io)[^\]\s]+?)(?::\d+)?\]/g,
                 (_, url) => {
                     const idx = collectedCitations.length;
                     collectedCitations.push(url);
@@ -8764,24 +8961,11 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
 
       {}
       <div className="w-full bg-white border border-slate-300 p-5 shadow-2xs rounded-none text-left space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 pb-3">
-          <div className="flex items-center gap-2">
-            <PenTool size={15} className="text-teal-700 shrink-0" />
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-800">
-              Perintah &amp; Parameter Penyusunan Naskah
-            </span>
-          </div>
-          {activeSessionId && onNavigateToEditor && (
-            <button
-              type="button"
-              disabled={isGenerating}
-              onClick={() => onNavigateToEditor(activeSessionId)}
-              className="px-3 py-1.5 bg-teal-700 hover:bg-teal-800 text-white disabled:bg-slate-300 disabled:cursor-not-allowed font-bold text-xs uppercase rounded-none inline-flex items-center gap-1.5 cursor-pointer transition-colors shadow-2xs"
-            >
-              <PenTool size={12} />
-              <span>Buka Lembar Kerja Editor</span>
-            </button>
-          )}
+        <div className="flex items-center gap-2 border-b border-slate-200 pb-3">
+          <PenTool size={15} className="text-teal-700 shrink-0" />
+          <span className="text-xs font-bold uppercase tracking-wider text-slate-800">
+            Perintah &amp; Parameter Penyusunan Naskah
+          </span>
         </div>
 
         {}
@@ -8908,17 +9092,6 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
                 <span>Hasil Analisis &amp; Riwayat Obrolan AI</span>
               </span>
             </div>
-
-            {currentDraft && activeSessionId && (
-              <button
-                type="button"
-                onClick={() => onNavigateToEditor(activeSessionId)}
-                className="text-xs font-bold text-teal-800 hover:text-teal-950 uppercase tracking-wider flex items-center gap-1 cursor-pointer transition-colors"
-              >
-                <span>Buka Lembar Kerja Penuh</span>
-                <Sparkles size={12} />
-              </button>
-            )}
           </div>
 
           {}
@@ -16955,11 +17128,9 @@ import React, { useState } from 'react';
 import {
   Download,
   Maximize2,
-  ExternalLink,
   History,
   Layers,
   X,
-  Sparkles,
   Loader2,
 } from 'lucide-react';
 import type {
@@ -16977,7 +17148,7 @@ interface PosterShowcaseStageProps {
 }
 
 const generateCleanDownloadFilename = (title: string, versionNumber: number): string => {
-  const cleanTitle = (title || 'Poster')
+  const cleanTitle = (title || 'Infografis')
     .replace(/[^a-zA-Z0-9\s]/g, '')
     .trim()
     .replace(/\s+/g, '_')
@@ -17002,10 +17173,10 @@ export const PosterShowcaseStage: React.FC<PosterShowcaseStageProps> = ({
           <Layers size={26} />
         </div>
         <h3 className="text-sm font-bold text-white uppercase tracking-wider">
-          Panggung Kreatif Poster
+          Panggung Kreatif Infografis
         </h3>
         <p className="text-xs text-slate-400 max-w-sm mt-2 leading-relaxed">
-          Ketik topik poster pada panel dialog untuk memulai perancangan visual resmi BRIDA Kabupaten Mimika.
+          Ketik topik infografis pada panel dialog untuk memulai perancangan visual resmi BRIDA Kabupaten Mimika.
         </p>
       </div>
     );
@@ -17021,7 +17192,7 @@ export const PosterShowcaseStage: React.FC<PosterShowcaseStageProps> = ({
     setIsDownloading(true);
 
     const downloadFilename = generateCleanDownloadFilename(
-      session?.title || 'Poster',
+      session?.title || 'Infografis',
       activePoster.versionNumber,
     );
 
@@ -17033,7 +17204,7 @@ export const PosterShowcaseStage: React.FC<PosterShowcaseStageProps> = ({
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: Gagal mengambil berkas poster`);
+        throw new Error(`HTTP ${response.status}: Gagal mengambil berkas infografis`);
       }
 
       const blob = await response.blob();
@@ -17066,31 +17237,12 @@ export const PosterShowcaseStage: React.FC<PosterShowcaseStageProps> = ({
   };
 
   return (
-    <div className="w-full h-full flex flex-col bg-slate-950 rounded-none font-roboto overflow-hidden select-none">
+    <div className="relative w-full h-full bg-slate-950 flex items-center justify-center overflow-hidden select-none font-roboto rounded-none">
       {}
-      <div className="px-3 sm:px-6 py-2.5 sm:py-3.5 bg-slate-900 border-b border-slate-800 flex flex-wrap items-center justify-between gap-2 sm:gap-4 shrink-0 rounded-none z-10">
-        {}
-        <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-          <div className="w-2 h-2 bg-teal-400 shrink-0" />
-          <div className="min-w-0">
-            <h2 className="text-xs font-bold text-white uppercase tracking-wider truncate max-w-[200px] sm:max-w-md">
-              {session.title}
-            </h2>
-            <div className="flex items-center gap-2 text-[10px] sm:text-[11px] text-slate-400 font-medium mt-0.5">
-              <span>Rasio {activePoster.aspectRatio}</span>
-              <span>&bull;</span>
-              <span>Versi {activePoster.versionNumber} dari {posters.length}</span>
-            </div>
-          </div>
-        </div>
-
+      <div className="absolute top-3 right-3 sm:top-4 sm:right-4 z-20 flex items-center gap-2">
         {}
         {posters.length > 1 && (
-          <div className="flex items-center gap-1 bg-slate-950 p-1 border border-slate-800 rounded-none overflow-x-auto max-w-full">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-1.5 flex items-center gap-1 shrink-0">
-              <History size={11} className="text-teal-400" />
-              <span>Versi:</span>
-            </span>
+          <div className="flex items-center gap-1">
             {posters.map((poster) => {
               const isActive = poster.versionNumber === activePoster.versionNumber;
               return (
@@ -17098,11 +17250,12 @@ export const PosterShowcaseStage: React.FC<PosterShowcaseStageProps> = ({
                   key={poster.id}
                   type="button"
                   onClick={() => onSelectVersion(poster)}
-                  className={`px-2 py-0.5 sm:px-2.5 sm:py-1 text-[10px] font-bold uppercase transition-all cursor-pointer rounded-none shrink-0 ${
+                  className={`px-2.5 py-1.5 text-xs font-bold uppercase transition-colors cursor-pointer rounded-none border ${
                     isActive
-                      ? 'bg-teal-600 text-white font-black'
-                      : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                      ? 'bg-teal-700 border-teal-600 text-white'
+                      : 'bg-slate-900/90 hover:bg-slate-800 border-slate-700 text-slate-300 hover:text-white'
                   }`}
+                  title={`Versi ${poster.versionNumber}`}
                 >
                   v{poster.versionNumber}
                 </button>
@@ -17111,119 +17264,86 @@ export const PosterShowcaseStage: React.FC<PosterShowcaseStageProps> = ({
           </div>
         )}
 
-        {}
-        <div className="flex items-center gap-1.5 sm:gap-2 ml-auto sm:ml-0">
-          <button
-            type="button"
-            onClick={() => setIsLightboxOpen(true)}
-            className="p-1.5 sm:p-2 text-slate-300 hover:text-white hover:bg-slate-800 transition-colors border border-slate-700 cursor-pointer rounded-none"
-            title="Perbesar Layar Penuh"
-          >
-            <Maximize2 size={13} />
-          </button>
+        <button
+          type="button"
+          onClick={() => setIsLightboxOpen(true)}
+          className="p-2 bg-slate-900/90 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700 transition-colors cursor-pointer rounded-none"
+          title="Pratinjau Layar Penuh"
+        >
+          <Maximize2 size={15} />
+        </button>
 
-          <a
-            href={fullImageUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="p-1.5 sm:p-2 text-slate-300 hover:text-white hover:bg-slate-800 transition-colors border border-slate-700 rounded-none"
-            title="Buka di Tab Baru"
-          >
-            <ExternalLink size={13} />
-          </a>
-
-          <button
-            type="button"
-            onClick={handleDownloadImage}
-            disabled={isDownloading}
-            className="px-2.5 sm:px-4 py-1.5 sm:py-2 bg-teal-600 hover:bg-teal-500 disabled:bg-teal-800 disabled:cursor-not-allowed text-white font-bold text-[11px] sm:text-xs uppercase tracking-wider inline-flex items-center gap-1.5 transition-colors cursor-pointer rounded-none shadow-sm"
-            title="Unduh berkas gambar PNG ke komputer"
-          >
-            {isDownloading ? (
-              <>
-                <Loader2 size={12} className="animate-spin text-teal-200" />
-                <span className="hidden sm:inline">Mengunduh...</span>
-              </>
-            ) : (
-              <>
-                <Download size={12} />
-                <span>Unduh PNG</span>
-              </>
-            )}
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={handleDownloadImage}
+          disabled={isDownloading}
+          className="px-3.5 sm:px-4 py-2 bg-teal-700 hover:bg-teal-600 disabled:bg-teal-900 border border-teal-600 text-white font-bold text-xs uppercase tracking-wider inline-flex items-center gap-1.5 transition-colors cursor-pointer rounded-none shadow-sm"
+          title="Unduh berkas PNG ke komputer"
+        >
+          {isDownloading ? (
+            <>
+              <Loader2 size={13} className="animate-spin text-teal-200" />
+              <span className="hidden sm:inline">Mengunduh...</span>
+            </>
+          ) : (
+            <>
+              <Download size={13} />
+              <span>Unduh PNG</span>
+            </>
+          )}
+        </button>
       </div>
 
       {}
-      <div className="flex-1 overflow-auto p-3 sm:p-6 lg:p-10 flex items-center justify-center custom-scrollbar relative bg-slate-950">
-        {isGenerating && (
-          <div className="absolute inset-0 z-20 bg-slate-950/70 backdrop-blur-xs flex flex-col items-center justify-center text-white space-y-3 select-none rounded-none">
-            <div className="w-9 h-9 border-3 border-teal-400 border-t-transparent animate-spin rounded-none" />
-            <span className="text-xs font-bold uppercase tracking-widest text-teal-300">
-              Merender Versi Revisi Berikutnya...
-            </span>
-          </div>
-        )}
-
-        {}
-        <div
-          className={`relative shadow-2xl shadow-black overflow-hidden transition-all duration-300 rounded-none ${
-            activePoster.aspectRatio === '9:16'
-              ? 'max-w-[430px] aspect-[9/16]'
-              : activePoster.aspectRatio === '1:1'
-              ? 'max-w-[540px] aspect-square'
-              : 'max-w-[760px] aspect-[16/9]'
-          } w-full`}
-        >
-          <img
-            src={fullImageUrl}
-            alt={session.title}
-            className="w-full h-full object-contain select-none rounded-none"
-            loading="lazy"
-          />
+      {isGenerating && (
+        <div className="absolute inset-0 z-30 bg-slate-950/75 backdrop-blur-xs flex flex-col items-center justify-center text-white space-y-3 select-none rounded-none">
+          <div className="w-9 h-9 border-3 border-teal-400 border-t-transparent animate-spin rounded-none" />
+          <span className="text-xs font-bold uppercase tracking-widest text-teal-300">
+            Merender Versi Revisi Berikutnya...
+          </span>
         </div>
+      )}
+
+      {}
+      <div className="w-full h-full p-2 sm:p-4 md:p-6 flex items-center justify-center overflow-hidden">
+        <img
+          src={fullImageUrl}
+          alt={session.title || 'Infografis BRIDA Mimika'}
+          className="max-h-full max-w-full w-auto h-auto object-contain shadow-2xl drop-shadow-2xl rounded-none select-none transition-all duration-300"
+          loading="lazy"
+        />
       </div>
 
       {}
       {isLightboxOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-sm flex flex-col items-center justify-center p-4 sm:p-8 rounded-none">
-          <button
-            type="button"
-            onClick={() => setIsLightboxOpen(false)}
-            className="absolute top-6 right-6 p-2 bg-slate-800 text-white hover:bg-slate-700 transition-colors cursor-pointer rounded-none"
-            title="Tutup (Esc)"
-          >
-            <X size={20} />
-          </button>
-
-          <div className="max-w-4xl max-h-[85vh] flex items-center justify-center overflow-auto rounded-none">
-            <img
-              src={fullImageUrl}
-              alt={session.title}
-              className="max-w-full max-h-[85vh] object-contain shadow-2xl rounded-none"
-            />
-          </div>
-
-          <div className="mt-4 flex items-center gap-4 text-white text-xs font-semibold">
-            <span>{session.title} &bull; Versi {activePoster.versionNumber}</span>
+        <div className="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-md flex flex-col items-center justify-center p-3 sm:p-6 rounded-none">
+          {}
+          <div className="absolute top-4 right-4 sm:top-6 sm:right-6 flex items-center gap-2 z-10">
             <button
               type="button"
               onClick={handleDownloadImage}
               disabled={isDownloading}
-              className="px-3 py-1.5 bg-teal-600 hover:bg-teal-500 disabled:bg-teal-800 disabled:cursor-not-allowed text-white uppercase text-[11px] font-bold tracking-wider inline-flex items-center gap-1.5 rounded-none cursor-pointer"
+              className="px-3 sm:px-4 py-2 bg-teal-600 hover:bg-teal-500 disabled:bg-teal-800 text-white uppercase text-xs font-bold tracking-wider inline-flex items-center gap-1.5 rounded-none cursor-pointer shadow-md"
             >
-              {isDownloading ? (
-                <>
-                  <Loader2 size={12} className="animate-spin text-teal-200" />
-                  <span>Mengunduh...</span>
-                </>
-              ) : (
-                <>
-                  <Download size={12} />
-                  <span>Simpan ke Komputer</span>
-                </>
-              )}
+              {isDownloading ? <Loader2 size={13} className="animate-spin text-teal-200" /> : <Download size={13} />}
+              <span>Unduh PNG</span>
             </button>
+            <button
+              type="button"
+              onClick={() => setIsLightboxOpen(false)}
+              className="p-2 bg-slate-800 hover:bg-slate-700 text-white transition-colors cursor-pointer rounded-none"
+              title="Tutup (Esc)"
+            >
+              <X size={18} />
+            </button>
+          </div>
+
+          <div className="w-full h-full flex items-center justify-center p-2 sm:p-6 overflow-hidden">
+            <img
+              src={fullImageUrl}
+              alt={session.title}
+              className="max-w-full max-h-[92vh] object-contain shadow-2xl rounded-none"
+            />
           </div>
         </div>
       )}
@@ -17234,7 +17354,7 @@ export const PosterShowcaseStage: React.FC<PosterShowcaseStageProps> = ({
 --- FILE: src\modules\infographic\services\infographic.api.ts ---
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
 
-export type PosterAspectRatio = '1:1' | '9:16' | '16:9';
+export type PosterAspectRatio = '1:1' | '9:16' | '16:9' | '3:4' | '4:3';
 
 export interface InfographicPosterItem {
   id: string;
@@ -17311,7 +17431,7 @@ export const InfographicApi = {
 
     const result = await response.json();
     if (!response.ok || result?.success === false) {
-      throw new Error(result?.message || 'Gagal memulai sesi pembuatan poster.');
+      throw new Error(result?.message || 'Gagal memulai sesi pembuatan infografis.');
     }
     return result.data;
   },
@@ -17327,7 +17447,7 @@ export const InfographicApi = {
 
     const result = await response.json();
     if (!response.ok || result?.success === false) {
-      throw new Error(result?.message || 'Gagal mengirim instruksi revisi poster.');
+      throw new Error(result?.message || 'Gagal mengirim instruksi revisi infografis.');
     }
     return result.data;
   },
@@ -17356,7 +17476,7 @@ export const InfographicApi = {
 
     const result = await response.json();
     if (!response.ok || result?.success === false) {
-      throw new Error(result?.message || 'Gagal memuat detail sesi poster.');
+      throw new Error(result?.message || 'Gagal memuat detail sesi infografis.');
     }
     return result.data;
   },
@@ -17369,7 +17489,7 @@ export const InfographicApi = {
 
     const result = await response.json();
     if (!response.ok || result?.success === false) {
-      throw new Error(result?.message || 'Gagal menghapus sesi poster.');
+      throw new Error(result?.message || 'Gagal menghapus sesi infografis.');
     }
   },
 
@@ -17408,6 +17528,8 @@ import {
   Compass,
   MessageSquareCode,
   Layers,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from 'lucide-react';
 import { InfographicApi } from '../services/infographic.api';
 import type {
@@ -17431,13 +17553,14 @@ export const InfographicStudioView: React.FC<InfographicStudioViewProps> = ({
   const [activePoster, setActivePoster] = useState<InfographicPosterItem | null>(null);
 
   const [inputPrompt, setInputPrompt] = useState<string>(initialTopic || '');
-  const [aspectRatio, setAspectRatio] = useState<PosterAspectRatio>('9:16');
+  const [aspectRatio, setAspectRatio] = useState<PosterAspectRatio>('3:4');
   const [attachedFile, setAttachedFile] = useState<File | null>(null);
 
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [mobileTab, setMobileTab] = useState<'chat' | 'showcase'>('chat');
+  const [isChatCollapsed, setIsChatCollapsed] = useState<boolean>(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -17462,7 +17585,7 @@ export const InfographicStudioView: React.FC<InfographicStudioViewProps> = ({
         handleSelectSession(list[0].id);
       }
     } catch (err: any) {
-      console.error('Gagal memuat sesi poster:', err);
+      console.error('Gagal memuat sesi infografis:', err);
     }
   };
 
@@ -17490,11 +17613,12 @@ export const InfographicStudioView: React.FC<InfographicStudioViewProps> = ({
     setAttachedFile(null);
     setErrorMessage(null);
     setMobileTab('chat');
+    setIsChatCollapsed(false);
   };
 
   const handleDeleteSession = async (e: React.MouseEvent, sessionId: string) => {
     e.stopPropagation();
-    if (!window.confirm('Hapus sesi poster ini beserta seluruh berkas gambarnya?')) return;
+    if (!window.confirm('Hapus sesi infografis ini beserta seluruh berkas gambarnya?')) return;
 
     try {
       await InfographicApi.deleteSession(sessionId);
@@ -17562,7 +17686,7 @@ export const InfographicStudioView: React.FC<InfographicStudioViewProps> = ({
       setInputPrompt('');
       setAttachedFile(null);
     } catch (err: any) {
-      setErrorMessage(err.message || 'Terjadi gangguan saat memproses instruksi poster.');
+      setErrorMessage(err.message || 'Terjadi gangguan saat memproses instruksi infografis.');
       if (window.innerWidth < 1024) {
         setMobileTab('chat');
       }
@@ -17575,51 +17699,63 @@ export const InfographicStudioView: React.FC<InfographicStudioViewProps> = ({
     {
       label: 'Dampak El Niño Mimika 2026',
       icon: Compass,
-      prompt: 'Buatkan poster infografis perkembangan dampak El Niño di Kabupaten Mimika 2026 lengkap dengan perbandingan curah hujan, sektor pertanian, dan peta kerawanan distrik.',
+      prompt: 'Buatkan infografis perkembangan dampak El Niño di Kabupaten Mimika 2026 lengkap dengan perbandingan curah hujan, sektor pertanian, dan peta kerawanan distrik.',
     },
     {
       label: 'Prevalensi Stunting 18.4%',
       icon: HeartPulse,
-      prompt: 'Buatkan poster infografis penurunan stunting di Kabupaten Mimika tahun 2026, tonjolkan prevalensi 18.4% dan rekomendasi aksi Dinas Kesehatan.',
+      prompt: 'Buatkan infografis penurunan stunting di Kabupaten Mimika tahun 2026, tonjolkan prevalensi 18.4% dan rekomendasi aksi Dinas Kesehatan.',
     },
     {
       label: 'Evaluasi Serapan APBD & PAD',
       icon: Coins,
-      prompt: 'Buatkan poster evaluasi serapan anggaran APBD dan realisasi PAD Kabupaten Mimika 2026 dengan warna dominan Deep Navy dan Gold.',
+      prompt: 'Buatkan infografis evaluasi serapan anggaran APBD dan realisasi PAD Kabupaten Mimika 2026 dengan warna dominan Deep Navy dan Gold.',
     },
     {
       label: 'Konektivitas Jalan Distrik',
       icon: Building2,
-      prompt: 'Buatkan poster infografis progres pembangunan jalan poros dan jembatan penghubung distrik terisolasi di Mimika.',
+      prompt: 'Buatkan infografis progres pembangunan jalan poros dan jembatan penghubung distrik terisolasi di Mimika.',
     },
   ];
 
   return (
     <div className="w-full h-[calc(100vh-64px)] flex flex-col bg-slate-100 font-roboto select-none overflow-hidden rounded-none">
       {}
-      <div className="px-4 sm:px-6 py-2.5 sm:py-3.5 bg-white border-b border-slate-200 flex items-center justify-between gap-3 shrink-0 rounded-none z-10">
+      <div className="px-4 sm:px-6 py-2 bg-white border-b border-slate-200 flex items-center justify-between gap-3 shrink-0 rounded-none z-10">
         <div className="flex items-center gap-2.5 min-w-0">
-          <div className="p-1.5 sm:p-2 bg-teal-50 border border-teal-200 text-teal-800 rounded-none shrink-0">
-            <Sparkles size={15} />
+          <div className="p-1.5 bg-teal-50 border border-teal-200 text-teal-800 rounded-none shrink-0">
+            <Sparkles size={14} />
           </div>
           <div className="min-w-0">
             <h1 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-slate-900 truncate">
               Studio Infografis AI &bull; Asisten Kreatif BRIDA
             </h1>
-            <p className="text-[10px] sm:text-[11px] text-slate-500 font-medium truncate sm:whitespace-normal">
-              Rancang poster infografis resmi berbasis data riset daerah dan internet live.
+            <p className="text-[10px] text-slate-500 font-medium truncate hidden sm:block">
+              Rancang infografis resmi berbasis data riset daerah dan internet live.
             </p>
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={handleCreateNewSession}
-          className="px-3 sm:px-4 py-1.5 sm:py-2 bg-teal-700 hover:bg-teal-800 text-white font-bold text-[11px] sm:text-xs uppercase tracking-wider inline-flex items-center gap-1.5 transition-colors cursor-pointer rounded-none shrink-0"
-        >
-          <Plus size={13} />
-          <span>Poster Baru</span>
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={() => setIsChatCollapsed(!isChatCollapsed)}
+            className="hidden lg:inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-slate-700 hover:text-slate-950 bg-slate-100 hover:bg-slate-200 border border-slate-300 uppercase tracking-wider rounded-none cursor-pointer transition-colors"
+            title={isChatCollapsed ? "Buka panel obrolan AI" : "Sembunyikan panel obrolan"}
+          >
+            {isChatCollapsed ? <PanelLeftOpen size={13} /> : <PanelLeftClose size={13} />}
+            <span>{isChatCollapsed ? "Buka Obrolan" : "Sembunyikan Obrolan"}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleCreateNewSession}
+            className="px-3 sm:px-4 py-1.5 bg-teal-700 hover:bg-teal-800 text-white font-bold text-[11px] sm:text-xs uppercase tracking-wider inline-flex items-center gap-1.5 transition-colors cursor-pointer rounded-none shrink-0"
+          >
+            <Plus size={13} />
+            <span>Infografis Baru</span>
+          </button>
+        </div>
       </div>
 
       {}
@@ -17646,7 +17782,7 @@ export const InfographicStudioView: React.FC<InfographicStudioViewProps> = ({
           }`}
         >
           <Layers size={14} className={mobileTab === 'showcase' ? 'text-teal-700' : 'text-slate-400'} />
-          <span>Panggung Poster {activePoster ? `(v${activePoster.versionNumber})` : ''}</span>
+          <span>Panggung Infografis {activePoster ? `(v${activePoster.versionNumber})` : ''}</span>
         </button>
       </div>
 
@@ -17681,7 +17817,7 @@ export const InfographicStudioView: React.FC<InfographicStudioViewProps> = ({
               <div className="flex-1 overflow-y-auto divide-y divide-slate-200/60 custom-scrollbar">
                 {sessions.length === 0 ? (
                   <div className="p-6 text-center text-xs text-slate-400 italic">
-                    Belum ada sesi poster tersimpan.
+                    Belum ada sesi infografis tersimpan.
                   </div>
                 ) : (
                   sessions.map((sess) => {
@@ -17702,7 +17838,7 @@ export const InfographicStudioView: React.FC<InfographicStudioViewProps> = ({
                             type="button"
                             onClick={(e) => handleDeleteSession(e, sess.id)}
                             className="text-slate-400 hover:text-red-600 p-0.5 shrink-0 cursor-pointer rounded-none"
-                            title="Hapus sesi poster"
+                            title="Hapus sesi infografis"
                           >
                             <Trash2 size={12} />
                           </button>
@@ -17722,8 +17858,8 @@ export const InfographicStudioView: React.FC<InfographicStudioViewProps> = ({
 
         {}
         <div
-          className={`w-full lg:w-[460px] bg-white border-r border-slate-200 flex flex-col shrink-0 overflow-hidden rounded-none ${
-            mobileTab === 'chat' ? 'flex' : 'hidden lg:flex'
+          className={`w-full lg:w-[460px] bg-white border-r border-slate-200 flex flex-col shrink-0 overflow-hidden rounded-none transition-all duration-200 ${
+            isChatCollapsed ? 'hidden' : mobileTab === 'chat' ? 'flex' : 'hidden lg:flex'
           }`}
         >
           {}
@@ -17803,7 +17939,7 @@ export const InfographicStudioView: React.FC<InfographicStudioViewProps> = ({
                     </div>
 
                     <p className="text-xs text-slate-700 leading-relaxed font-normal">
-                      {poster.aiCommentary || 'Poster infografis telah dirancang sesuai data acuan dan arahan visual.'}
+                      {poster.aiCommentary || 'Infografis telah dirancang sesuai data acuan dan arahan visual.'}
                     </p>
 
                     <div className="pt-1">
@@ -17834,8 +17970,8 @@ export const InfographicStudioView: React.FC<InfographicStudioViewProps> = ({
                 <Loader2 size={16} className="animate-spin text-teal-700 shrink-0" />
                 <span>
                   {activeSession
-                    ? 'Pengarah kreatif sedang memproses revisi & merender poster baru...'
-                    : 'Memadukan data database & internet untuk merender poster v1...'}
+                    ? 'Pengarah kreatif sedang memproses revisi & merender infografis baru...'
+                    : 'Memadukan data database & internet untuk merender infografis v1...'}
                 </span>
               </div>
             )}
@@ -17873,21 +18009,9 @@ export const InfographicStudioView: React.FC<InfographicStudioViewProps> = ({
             <div className="flex items-center justify-between text-[11px]">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Format Rasio:</span>
               <div className="flex items-center gap-1">
-                {(['9:16', '1:1', '16:9'] as PosterAspectRatio[]).map((ratio) => (
-                  <button
-                    key={ratio}
-                    type="button"
-                    onClick={() => setAspectRatio(ratio)}
-                    disabled={isLoading}
-                    className={`px-2 py-0.5 text-[10px] font-bold border transition-colors cursor-pointer rounded-none ${
-                      aspectRatio === ratio
-                        ? 'bg-teal-700 text-white border-teal-800'
-                        : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-                    }`}
-                  >
-                    {ratio}
-                  </button>
-                ))}
+                <span className="px-2.5 py-0.5 text-[10px] font-bold border bg-teal-700 text-white border-teal-800 rounded-none">
+                  3:4
+                </span>
               </div>
             </div>
 
@@ -17919,7 +18043,7 @@ export const InfographicStudioView: React.FC<InfographicStudioViewProps> = ({
                 placeholder={
                   activeSession
                     ? 'Ketik instruksi revisi (misal: "Ganti warna jadi navy gold")...'
-                    : 'Ketik topik poster atau lampirkan dokumen laporan...'
+                    : 'Ketik topik infografis atau lampirkan dokumen laporan...'
                 }
                 className="flex-1 bg-transparent px-3 py-2.5 text-xs text-slate-900 outline-none font-medium"
               />
@@ -17939,7 +18063,7 @@ export const InfographicStudioView: React.FC<InfographicStudioViewProps> = ({
         {}
         <div
           className={`flex-1 overflow-hidden flex flex-col ${
-            mobileTab === 'showcase' ? 'flex' : 'hidden lg:flex'
+            mobileTab === 'showcase' || isChatCollapsed ? 'flex' : 'hidden lg:flex'
           }`}
         >
           <PosterShowcaseStage

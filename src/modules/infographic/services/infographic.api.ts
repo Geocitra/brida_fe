@@ -1,3 +1,10 @@
+import type {
+  PosterBrandingData,
+  PosterGenerationProfile,
+} from '../types/poster-branding.types';
+
+export type { PosterBrandingData, PosterGenerationProfile };
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
 
 export type PosterAspectRatio = '1:1' | '9:16' | '16:9' | '3:4' | '4:3';
@@ -11,6 +18,8 @@ export interface InfographicPosterItem {
   aiCommentary?: string;
   imageUrl: string;
   aspectRatio: PosterAspectRatio;
+  generationProfile?: PosterGenerationProfile;
+  branding?: PosterBrandingData | null;
   createdAt: string;
 }
 
@@ -156,19 +165,130 @@ export const InfographicApi = {
   /**
    * Mengambil daftar dokumen acuan dari database untuk grounding data
    */
-  async getAvailableDocuments(): Promise<Array<{ id: string; title: string }>> {
-    try {
-      const response = await fetch(`${API_BASE_URL}/documents`, {
-        method: 'GET',
-        headers: getAuthHeaders(),
-      });
-      const result = await response.json();
-      if (response.ok && result?.data) {
-        return result.data.map((d: any) => ({ id: d.id, title: d.title }));
-      }
-      return [];
-    } catch {
-      return [];
+  /**
+   * Mengambil konfigurasi branding poster
+   */
+  async getBranding(posterId: string): Promise<PosterBrandingData> {
+    const response = await fetch(`${API_BASE_URL}/infographic/agent/posters/${posterId}/branding`, {
+      method: 'GET',
+      headers: getAuthHeaders(),
+    });
+
+    const result = await response.json();
+    if (!response.ok || result?.success === false) {
+      throw new Error(result?.message || 'Gagal memuat konfigurasi branding poster.');
     }
+    return result.data;
+  },
+
+  /**
+   * Menyimpan / memperbarui konfigurasi branding poster
+   */
+  async saveBranding(
+    posterId: string,
+    payload: Partial<PosterBrandingData>,
+  ): Promise<PosterBrandingData> {
+    const response = await fetch(`${API_BASE_URL}/infographic/agent/posters/${posterId}/branding`, {
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload),
+    });
+
+    const result = await response.json();
+    if (!response.ok || result?.success === false) {
+      throw new Error(result?.message || 'Gagal menyimpan konfigurasi branding poster.');
+    }
+    return result.data;
+  },
+
+  /**
+   * Mengunggah berkas logo resmi (PNG/JPEG max 2MB)
+   */
+  async uploadBrandingLogo(posterId: string, file: File): Promise<PosterBrandingData> {
+    const formData = new FormData();
+    formData.append('logo', file);
+
+    const token = sessionStorage.getItem('brida_auth_token');
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(
+      `${API_BASE_URL}/infographic/agent/posters/${posterId}/branding/logo`,
+      {
+        method: 'POST',
+        headers,
+        body: formData,
+      },
+    );
+
+    const result = await response.json();
+    if (!response.ok || result?.success === false) {
+      throw new Error(result?.message || 'Gagal mengunggah berkas logo instansi.');
+    }
+    return result.data;
+  },
+
+  /**
+   * Menghapus berkas logo resmi yang terpasang
+   */
+  async deleteBrandingLogo(posterId: string): Promise<PosterBrandingData> {
+    const response = await fetch(
+      `${API_BASE_URL}/infographic/agent/posters/${posterId}/branding/logo`,
+      {
+        method: 'DELETE',
+        headers: getAuthHeaders(),
+      },
+    );
+
+    const result = await response.json();
+    if (!response.ok || result?.success === false) {
+      throw new Error(result?.message || 'Gagal menghapus berkas logo.');
+    }
+    return result.data;
+  },
+
+  /**
+   * Mengunduh berkas poster resmi beresolusi tinggi langsung dari server dengan JWT
+   */
+  async downloadPosterFile(
+    posterId: string,
+    filename: string,
+    branded: boolean = true,
+  ): Promise<void> {
+    const token = sessionStorage.getItem('brida_auth_token');
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const url = `${API_BASE_URL}/infographic/agent/posters/${posterId}/download?branded=${branded}`;
+    const response = await fetch(url, {
+      method: 'GET',
+      headers,
+    });
+
+    if (!response.ok) {
+      let errMsg = `HTTP ${response.status}: Gagal mengunduh berkas poster`;
+      try {
+        const errJson = await response.json();
+        if (errJson?.message) errMsg = errJson.message;
+      } catch {}
+      throw new Error(errMsg);
+    }
+
+    const blob = await response.blob();
+    const objectUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = objectUrl;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    setTimeout(() => {
+      window.URL.revokeObjectURL(objectUrl);
+    }, 2000);
   },
 };
