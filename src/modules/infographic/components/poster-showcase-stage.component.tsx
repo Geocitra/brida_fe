@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Download,
   Maximize2,
@@ -7,11 +7,18 @@ import {
   Loader2,
   ZoomIn,
   ZoomOut,
+  SlidersHorizontal,
+  ChevronUp,
+  ChevronDown,
 } from 'lucide-react';
+import { InfographicApi } from '../services/infographic.api';
 import type {
   InfographicPosterItem,
   InfographicSessionDetail,
 } from '../services/infographic.api';
+import type { PosterBrandingData } from '../types/poster-branding.types';
+import { PosterBrandingBar } from './poster-branding-bar.component';
+import { PosterBrandingOverlay } from './poster-branding-overlay.component';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
 
@@ -22,14 +29,43 @@ interface PosterShowcaseStageProps {
   isGenerating: boolean;
 }
 
-const generateCleanDownloadFilename = (title: string, versionNumber: number): string => {
+const DEFAULT_BRANDING: (posterId: string) => PosterBrandingData = (posterId) => ({
+  posterId,
+  headerEnabled: false,
+  logoUrl: null,
+  institution: 'PEMERINTAH KABUPATEN MIMIKA',
+  subInstitution: 'Badan Riset dan Inovasi Daerah',
+  footerEnabled: false,
+  footerText: 'Sumber: Dokumen Resmi BRIDA Kabupaten Mimika',
+  layoutConfig: {
+    headerBgColor: '#FFFFFF',
+    headerTextColor: '#0F1E36',
+    headerAlignment: 'left_with_logo',
+    footerBgColor: '#0F1E36',
+    footerTextColor: '#F8FAFC',
+    footerAlignment: 'center',
+    headerFontSize: 'normal',
+    footerFontSize: 'normal',
+    logoPosition: 'left',
+    logoSize: 'normal',
+  },
+  composedUrl: null,
+  brandingHash: null,
+});
+
+const generateCleanDownloadFilename = (
+  title: string,
+  versionNumber: number,
+  isBranded: boolean,
+): string => {
   const cleanTitle = (title || 'Infografis')
     .replace(/[^a-zA-Z0-9\s]/g, '')
     .trim()
     .replace(/\s+/g, '_')
     .substring(0, 50);
 
-  return `Infografis_BRIDA_${cleanTitle}_v${versionNumber}.png`;
+  const suffix = isBranded ? '_Resmi' : '';
+  return `Infografis_BRIDA_${cleanTitle}_v${versionNumber}${suffix}.png`;
 };
 
 export const PosterShowcaseStage: React.FC<PosterShowcaseStageProps> = ({
@@ -41,10 +77,115 @@ export const PosterShowcaseStage: React.FC<PosterShowcaseStageProps> = ({
   const [isLightboxOpen, setIsLightboxOpen] = useState<boolean>(false);
   const [isDownloading, setIsDownloading] = useState<boolean>(false);
   const [zoom, setZoom] = useState<number>(100);
+  const [isBrandingOpen, setIsBrandingOpen] = useState<boolean>(false);
+  const [brandingData, setBrandingData] = useState<PosterBrandingData | null>(null);
+  const [isSavingBranding, setIsSavingBranding] = useState<boolean>(false);
+  const [isUploadingLogo, setIsUploadingLogo] = useState<boolean>(false);
+
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Load branding when activePoster changes
+  useEffect(() => {
+    if (!activePoster) {
+      setBrandingData(null);
+      return;
+    }
+
+    let isMounted = true;
+    const fetchBranding = async () => {
+      try {
+        const data = await InfographicApi.getBranding(activePoster.id);
+        if (isMounted) {
+          setBrandingData(data || DEFAULT_BRANDING(activePoster.id));
+        }
+      } catch (err) {
+        console.warn('Gagal memuat branding poster, memakai default:', err);
+        if (isMounted) {
+          setBrandingData(DEFAULT_BRANDING(activePoster.id));
+        }
+      }
+    };
+
+    fetchBranding();
+
+    return () => {
+      isMounted = false;
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, [activePoster?.id]);
+
+  const handleBrandingChange = (updated: PosterBrandingData) => {
+    setBrandingData(updated);
+
+    if (!activePoster) return;
+
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+
+    setIsSavingBranding(true);
+    saveTimeoutRef.current = setTimeout(async () => {
+      try {
+        await InfographicApi.saveBranding(activePoster.id, updated);
+      } catch (err) {
+        console.error('Gagal menyimpan branding:', err);
+      } finally {
+        setIsSavingBranding(false);
+      }
+    }, 600);
+  };
+
+  const handleUploadLogo = async (file: File) => {
+    if (!activePoster) return;
+    setIsUploadingLogo(true);
+    try {
+      const updated = await InfographicApi.uploadBrandingLogo(activePoster.id, file);
+      setBrandingData(updated);
+    } catch (err: any) {
+      alert(err.message || 'Gagal mengunggah logo');
+    } finally {
+      setIsUploadingLogo(false);
+    }
+  };
+
+  const handleDeleteLogo = async () => {
+    if (!activePoster) return;
+    try {
+      const updated = await InfographicApi.deleteBrandingLogo(activePoster.id);
+      setBrandingData(updated);
+    } catch (err: any) {
+      alert(err.message || 'Gagal menghapus logo');
+    }
+  };
+
+  const handleResetBranding = async () => {
+    if (!activePoster) return;
+    const def = DEFAULT_BRANDING(activePoster.id);
+    setBrandingData(def);
+    try {
+      await InfographicApi.saveBranding(activePoster.id, def);
+    } catch (err) {
+      console.error('Gagal mereset branding:', err);
+    }
+  };
+
+  const handleZoomIn = () => {
+    setZoom((prev) => Math.min(prev + 20, 200));
+  };
+
+  const handleZoomOut = () => {
+    setZoom((prev) => Math.max(prev - 20, 60));
+  };
+
+  const handleResetZoom = () => {
+    setZoom(100);
+  };
 
   if (!session || !activePoster) {
     return (
-      <div className="w-full h-full min-h-[500px] lg:min-h-[700px] bg-slate-900 flex flex-col items-center justify-center p-8 text-center select-none rounded-none text-slate-400">
+      <div className="w-full h-full min-h-[500px] lg:min-h-[700px] bg-slate-900 flex flex-col items-center justify-center p-8 text-center select-none rounded-none text-slate-400 font-roboto">
         <div className="w-14 h-14 bg-slate-800/80 border border-slate-700 text-teal-400 flex items-center justify-center mb-4 rounded-none">
           <Layers size={26} />
         </div>
@@ -63,17 +204,7 @@ export const PosterShowcaseStage: React.FC<PosterShowcaseStageProps> = ({
     ? activePoster.imageUrl
     : `${API_BASE_URL}${activePoster.imageUrl}`;
 
-  const handleZoomIn = () => {
-    setZoom((prev) => Math.min(prev + 20, 200));
-  };
-
-  const handleZoomOut = () => {
-    setZoom((prev) => Math.max(prev - 20, 60));
-  };
-
-  const handleResetZoom = () => {
-    setZoom(100);
-  };
+  const hasActiveBranding = !!(brandingData?.headerEnabled || brandingData?.footerEnabled);
 
   const handleDownloadImage = async () => {
     if (!activePoster || isDownloading) return;
@@ -82,44 +213,19 @@ export const PosterShowcaseStage: React.FC<PosterShowcaseStageProps> = ({
     const downloadFilename = generateCleanDownloadFilename(
       session?.title || 'Infografis',
       activePoster.versionNumber,
+      hasActiveBranding,
     );
 
     try {
-      // 1. Ambil berkas biner gambar via fetch CORS
-      const response = await fetch(fullImageUrl, {
-        method: 'GET',
-        cache: 'no-store',
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: Gagal mengambil berkas infografis`);
-      }
-
-      const blob = await response.blob();
-      const pngBlob = blob.type === 'image/png' ? blob : new Blob([blob], { type: 'image/png' });
-      const objectUrl = window.URL.createObjectURL(pngBlob);
-
-      // 2. Trigger unduhan melalui Object URL (same-origin sehingga atribut download 100% dipatuhi oleh browser)
-      const link = document.createElement('a');
-      link.href = objectUrl;
-      link.download = downloadFilename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-
-      setTimeout(() => {
-        window.URL.revokeObjectURL(objectUrl);
-      }, 2000);
-    } catch (err) {
-      console.warn('Pengunduhan via Blob gagal, mengalihkan ke endpoint server resmi:', err);
-      // Fallback: gunakan endpoint unduhan server dengan Content-Disposition attachment
-      const serverDownloadUrl = `${API_BASE_URL}/infographic/agent/posters/${activePoster.id}/download`;
-      const fallbackLink = document.createElement('a');
-      fallbackLink.href = serverDownloadUrl;
-      fallbackLink.setAttribute('download', downloadFilename);
-      document.body.appendChild(fallbackLink);
-      fallbackLink.click();
-      document.body.removeChild(fallbackLink);
+      // Selalu unduh via endpoint backend authoritative dengan token JWT
+      await InfographicApi.downloadPosterFile(
+        activePoster.id,
+        downloadFilename,
+        hasActiveBranding,
+      );
+    } catch (err: any) {
+      console.error('Pengunduhan berkas poster gagal:', err);
+      alert(err.message || 'Gagal mengunduh berkas poster resmi.');
     } finally {
       setIsDownloading(false);
     }
@@ -127,7 +233,7 @@ export const PosterShowcaseStage: React.FC<PosterShowcaseStageProps> = ({
 
   return (
     <div className="relative w-full h-full min-h-[750px] lg:min-h-[900px] bg-slate-950 flex flex-col items-center justify-center select-none font-roboto rounded-none">
-      {/* ── SEAMLESS CONTROLS: KANAN ATAS (AKSI & VERSI) ── */}
+      {/* ── SEAMLESS TOP BAR (NAVIGASI, ZOOM & BRANDING CONTROLS) ── */}
       <div className="absolute top-3 right-3 sm:top-4 sm:right-4 z-20 flex flex-wrap items-center gap-1.5 sm:gap-2">
         {/* Iterasi Versi Switcher (Tampil jika ada > 1 versi) */}
         {posters.length > 1 && (
@@ -154,7 +260,7 @@ export const PosterShowcaseStage: React.FC<PosterShowcaseStageProps> = ({
         )}
 
         {/* Kontrol Skala Ukuran Gambar (Zoom In / Zoom Out) */}
-        <div className="flex items-center bg-slate-900/90 border border-slate-700 text-slate-300 rounded-none">
+        <div className="flex items-center bg-slate-900/90 border border-slate-700 text-slate-300 rounded-none shadow-sm">
           <button
             type="button"
             onClick={handleZoomOut}
@@ -183,15 +289,36 @@ export const PosterShowcaseStage: React.FC<PosterShowcaseStageProps> = ({
           </button>
         </div>
 
+        {/* Tombol Toggle Panel Kop & Footer */}
+        <button
+          type="button"
+          onClick={() => setIsBrandingOpen((prev) => !prev)}
+          className={`px-3 py-1.5 text-xs font-bold uppercase tracking-wider border rounded-none cursor-pointer transition-colors inline-flex items-center gap-1.5 shadow-sm ${
+            isBrandingOpen
+              ? 'bg-teal-700 border-teal-500 text-white'
+              : 'bg-slate-900/90 hover:bg-slate-800 border-slate-700 text-slate-300 hover:text-white'
+          }`}
+          title="Buka / Tutup Pengaturan Header & Footer"
+        >
+          <SlidersHorizontal size={13} />
+          <span className="hidden sm:inline">Kop & Footer</span>
+          {hasActiveBranding && !isBrandingOpen && (
+            <span className="w-1.5 h-1.5 rounded-none bg-teal-400"></span>
+          )}
+          {isBrandingOpen ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+        </button>
+
+        {/* Tombol Pratinjau Layar Penuh (Lightbox) */}
         <button
           type="button"
           onClick={() => setIsLightboxOpen(true)}
-          className="p-2 bg-slate-900/90 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700 transition-colors cursor-pointer rounded-none"
+          className="p-2 bg-slate-900/90 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700 transition-colors cursor-pointer rounded-none shadow-sm"
           title="Pratinjau Layar Penuh"
         >
           <Maximize2 size={15} />
         </button>
 
+        {/* Tombol Unduh PNG Resmi */}
         <button
           type="button"
           onClick={handleDownloadImage}
@@ -213,9 +340,25 @@ export const PosterShowcaseStage: React.FC<PosterShowcaseStageProps> = ({
         </button>
       </div>
 
+      {/* ── MODULAR BRANDING BAR (PENGATURAN DI ATAS FLOATING LEGA) ── */}
+      {isBrandingOpen && brandingData && (
+        <div className="absolute top-14 left-4 right-4 sm:left-auto sm:right-4 z-30 max-w-3xl w-full shadow-2xl max-h-[calc(100vh-90px)] overflow-y-auto">
+          <PosterBrandingBar
+            branding={brandingData}
+            onChange={handleBrandingChange}
+            onUploadLogo={handleUploadLogo}
+            onDeleteLogo={handleDeleteLogo}
+            onReset={handleResetBranding}
+            onClose={() => setIsBrandingOpen(false)}
+            isSaving={isSavingBranding}
+            isUploadingLogo={isUploadingLogo}
+          />
+        </div>
+      )}
+
       {/* ── LOADING REVISI OVERLAY ── */}
       {isGenerating && (
-        <div className="absolute inset-0 z-30 bg-slate-950/75 backdrop-blur-xs flex flex-col items-center justify-center text-white space-y-3 select-none rounded-none">
+        <div className="absolute inset-0 z-40 bg-slate-950/80 backdrop-blur-xs flex flex-col items-center justify-center text-white space-y-3 select-none rounded-none">
           <div className="w-9 h-9 border-3 border-teal-400 border-t-transparent animate-spin rounded-none" />
           <span className="text-xs font-bold uppercase tracking-widest text-teal-300">
             Merender Versi Revisi Berikutnya...
@@ -225,20 +368,30 @@ export const PosterShowcaseStage: React.FC<PosterShowcaseStageProps> = ({
 
       {/* ── KANVAS UTAMA FULL LEBAR LEGA (UKURAN PROMINEN & RESPONSIF ZOOM) ── */}
       <div className="w-full min-h-[750px] lg:min-h-[900px] pt-18 pb-12 px-4 sm:px-8 md:px-12 flex items-center justify-center overflow-x-auto">
-        <img
-          src={fullImageUrl}
-          alt={session.title || 'Infografis BRIDA Mimika'}
+        <div
           style={{ maxWidth: `${Math.round(860 * (zoom / 100))}px` }}
-          className="w-full h-auto object-contain shadow-2xl drop-shadow-2xl rounded-none select-none transition-all duration-200"
-          loading="lazy"
-        />
+          className="@container relative w-full flex items-center justify-center shadow-2xl drop-shadow-2xl rounded-none select-none transition-all duration-200"
+        >
+          <img
+            src={fullImageUrl}
+            alt={session.title || 'Infografis BRIDA Mimika'}
+            className="w-full h-auto object-contain rounded-none select-none block"
+            loading="lazy"
+          />
+
+          {/* Live Preview Overlay (Header & Footer Adaptif Sinkron) */}
+          <PosterBrandingOverlay
+            branding={brandingData}
+            aspectRatio={activePoster?.aspectRatio || session.aspectRatio}
+          />
+        </div>
       </div>
 
       {/* ── MODAL LIGHTBOX FULLSCREEN ZOOM ── */}
       {isLightboxOpen && (
         <div className="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-md flex flex-col items-center justify-center p-3 sm:p-6 rounded-none">
           {/* Header Controls Lightbox */}
-          <div className="absolute top-4 right-4 sm:top-6 sm:right-6 flex items-center gap-2 z-10">
+          <div className="absolute top-4 right-4 sm:top-6 sm:right-6 flex items-center gap-2 z-20">
             <button
               type="button"
               onClick={handleDownloadImage}
@@ -258,12 +411,19 @@ export const PosterShowcaseStage: React.FC<PosterShowcaseStageProps> = ({
             </button>
           </div>
 
-          <div className="w-full h-full flex items-center justify-center p-2 sm:p-6 overflow-hidden">
-            <img
-              src={fullImageUrl}
-              alt={session.title}
-              className="max-w-full max-h-[92vh] object-contain shadow-2xl rounded-none"
-            />
+          <div className="relative w-full h-full flex items-center justify-center p-2 sm:p-6 overflow-hidden">
+            <div className="@container relative max-h-[92vh] max-w-full flex items-center justify-center shadow-2xl rounded-none">
+              <img
+                src={fullImageUrl}
+                alt={session.title}
+                className="max-w-full max-h-[92vh] object-contain rounded-none block"
+              />
+              {/* Overlay inside Lightbox */}
+              <PosterBrandingOverlay
+                branding={brandingData}
+                aspectRatio={activePoster?.aspectRatio || session.aspectRatio}
+              />
+            </div>
           </div>
         </div>
       )}
