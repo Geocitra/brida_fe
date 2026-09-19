@@ -2,10 +2,11 @@ import React, { useState } from 'react';
 import {
   Download,
   Maximize2,
-  History,
   Layers,
   X,
   Loader2,
+  ZoomIn,
+  ZoomOut,
 } from 'lucide-react';
 import type {
   InfographicPosterItem,
@@ -39,10 +40,11 @@ export const PosterShowcaseStage: React.FC<PosterShowcaseStageProps> = ({
 }) => {
   const [isLightboxOpen, setIsLightboxOpen] = useState<boolean>(false);
   const [isDownloading, setIsDownloading] = useState<boolean>(false);
+  const [zoom, setZoom] = useState<number>(100);
 
   if (!session || !activePoster) {
     return (
-      <div className="w-full h-full bg-slate-900 flex flex-col items-center justify-center p-8 text-center select-none rounded-none text-slate-400">
+      <div className="w-full h-full min-h-[500px] lg:min-h-[700px] bg-slate-900 flex flex-col items-center justify-center p-8 text-center select-none rounded-none text-slate-400">
         <div className="w-14 h-14 bg-slate-800/80 border border-slate-700 text-teal-400 flex items-center justify-center mb-4 rounded-none">
           <Layers size={26} />
         </div>
@@ -60,6 +62,18 @@ export const PosterShowcaseStage: React.FC<PosterShowcaseStageProps> = ({
   const fullImageUrl = activePoster.imageUrl.startsWith('http')
     ? activePoster.imageUrl
     : `${API_BASE_URL}${activePoster.imageUrl}`;
+
+  const handleZoomIn = () => {
+    setZoom((prev) => Math.min(prev + 20, 200));
+  };
+
+  const handleZoomOut = () => {
+    setZoom((prev) => Math.max(prev - 20, 60));
+  };
+
+  const handleResetZoom = () => {
+    setZoom(100);
+  };
 
   const handleDownloadImage = async () => {
     if (!activePoster || isDownloading) return;
@@ -112,9 +126,9 @@ export const PosterShowcaseStage: React.FC<PosterShowcaseStageProps> = ({
   };
 
   return (
-    <div className="relative w-full h-full bg-slate-950 flex items-center justify-center overflow-hidden select-none font-roboto rounded-none">
+    <div className="relative w-full h-full min-h-[750px] lg:min-h-[900px] bg-slate-950 flex flex-col items-center justify-center select-none font-roboto rounded-none">
       {/* ── SEAMLESS CONTROLS: KANAN ATAS (AKSI & VERSI) ── */}
-      <div className="absolute top-3 right-3 sm:top-4 sm:right-4 z-20 flex items-center gap-2">
+      <div className="absolute top-3 right-3 sm:top-4 sm:right-4 z-20 flex flex-wrap items-center gap-1.5 sm:gap-2">
         {/* Iterasi Versi Switcher (Tampil jika ada > 1 versi) */}
         {posters.length > 1 && (
           <div className="flex items-center gap-1">
@@ -138,6 +152,36 @@ export const PosterShowcaseStage: React.FC<PosterShowcaseStageProps> = ({
             })}
           </div>
         )}
+
+        {/* Kontrol Skala Ukuran Gambar (Zoom In / Zoom Out) */}
+        <div className="flex items-center bg-slate-900/90 border border-slate-700 text-slate-300 rounded-none">
+          <button
+            type="button"
+            onClick={handleZoomOut}
+            disabled={zoom <= 60}
+            className="p-1.5 sm:p-2 hover:text-white hover:bg-slate-800 disabled:opacity-35 disabled:hover:bg-transparent cursor-pointer transition-colors"
+            title="Perkecil Gambar (-20%)"
+          >
+            <ZoomOut size={14} />
+          </button>
+          <button
+            type="button"
+            onClick={handleResetZoom}
+            className="px-2 py-1 text-[11px] font-bold font-mono hover:text-teal-300 cursor-pointer"
+            title="Reset Ukuran Standar (100%)"
+          >
+            {zoom}%
+          </button>
+          <button
+            type="button"
+            onClick={handleZoomIn}
+            disabled={zoom >= 200}
+            className="p-1.5 sm:p-2 hover:text-white hover:bg-slate-800 disabled:opacity-35 disabled:hover:bg-transparent cursor-pointer transition-colors"
+            title="Perbesar Gambar (+20%)"
+          >
+            <ZoomIn size={14} />
+          </button>
+        </div>
 
         <button
           type="button"
@@ -179,12 +223,13 @@ export const PosterShowcaseStage: React.FC<PosterShowcaseStageProps> = ({
         </div>
       )}
 
-      {/* ── KANVAS UTAMA FULL LEBAR LEGA (MAX FIT VIEWPORT HEIGHT & WIDTH) ── */}
-      <div className="w-full h-full p-2 sm:p-4 md:p-6 flex items-center justify-center overflow-hidden">
+      {/* ── KANVAS UTAMA FULL LEBAR LEGA (UKURAN PROMINEN & RESPONSIF ZOOM) ── */}
+      <div className="w-full min-h-[750px] lg:min-h-[900px] pt-18 pb-12 px-4 sm:px-8 md:px-12 flex items-center justify-center overflow-x-auto">
         <img
           src={fullImageUrl}
           alt={session.title || 'Infografis BRIDA Mimika'}
-          className="max-h-full max-w-full w-auto h-auto object-contain shadow-2xl drop-shadow-2xl rounded-none select-none transition-all duration-300"
+          style={{ maxWidth: `${Math.round(860 * (zoom / 100))}px` }}
+          className="w-full h-auto object-contain shadow-2xl drop-shadow-2xl rounded-none select-none transition-all duration-200"
           loading="lazy"
         />
       </div>

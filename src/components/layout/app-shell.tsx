@@ -35,7 +35,7 @@ export const AppShell: React.FC<AppShellProps> = ({
       </main>
 
       {/* Global Application Footer */}
-      {activeRoute !== 'article-editor' && activeRoute !== 'infographic' && <AppFooter />}
+      {activeRoute !== 'article-editor' && <AppFooter />}
     </div>
   );
 };
