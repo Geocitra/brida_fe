@@ -24,11 +24,11 @@ export const BRANDING_SAFE_AREA_CONFIG: Record<
   PosterAspectRatio,
   { headerBarPercent: number; footerBarPercent: number }
 > = {
-  '9:16': { headerBarPercent: 7.5, footerBarPercent: 4.0 },
-  '3:4': { headerBarPercent: 7.0, footerBarPercent: 4.0 },
-  '1:1': { headerBarPercent: 7.0, footerBarPercent: 4.0 },
-  '4:3': { headerBarPercent: 6.5, footerBarPercent: 4.0 },
-  '16:9': { headerBarPercent: 6.0, footerBarPercent: 3.5 },
+  '9:16': { headerBarPercent: 10.5, footerBarPercent: 4.0 },
+  '3:4': { headerBarPercent: 10.0, footerBarPercent: 4.0 },
+  '1:1': { headerBarPercent: 10.0, footerBarPercent: 4.0 },
+  '4:3': { headerBarPercent: 9.5, footerBarPercent: 4.0 },
+  '16:9': { headerBarPercent: 9.0, footerBarPercent: 3.5 },
 };
 
 
