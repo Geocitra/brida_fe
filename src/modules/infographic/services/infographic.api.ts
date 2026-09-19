@@ -1,6 +1,6 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
 
-export type PosterAspectRatio = '1:1' | '9:16' | '16:9';
+export type PosterAspectRatio = '1:1' | '9:16' | '16:9' | '3:4' | '4:3';
 
 export interface InfographicPosterItem {
   id: string;
@@ -79,13 +79,13 @@ export const InfographicApi = {
 
     const result = await response.json();
     if (!response.ok || result?.success === false) {
-      throw new Error(result?.message || 'Gagal memulai sesi pembuatan poster.');
+      throw new Error(result?.message || 'Gagal memulai sesi pembuatan infografis.');
     }
     return result.data;
   },
 
   /**
-   * Mengirim pesan revisi dan menghasilkan poster versi baru (v2, v3, ...)
+   * Mengirim pesan revisi dan menghasilkan infografis versi baru (v2, v3, ...)
    */
   async sendRevisionChat(
     payload: ChatTurnPayload,
@@ -98,13 +98,13 @@ export const InfographicApi = {
 
     const result = await response.json();
     if (!response.ok || result?.success === false) {
-      throw new Error(result?.message || 'Gagal mengirim instruksi revisi poster.');
+      throw new Error(result?.message || 'Gagal mengirim instruksi revisi infografis.');
     }
     return result.data;
   },
 
   /**
-   * Mengambil daftar seluruh riwayat sesi poster
+   * Mengambil daftar seluruh riwayat sesi infografis
    */
   async getSessionsList(): Promise<InfographicSessionListItem[]> {
     try {
@@ -133,7 +133,7 @@ export const InfographicApi = {
 
     const result = await response.json();
     if (!response.ok || result?.success === false) {
-      throw new Error(result?.message || 'Gagal memuat detail sesi poster.');
+      throw new Error(result?.message || 'Gagal memuat detail sesi infografis.');
     }
     return result.data;
   },
@@ -149,7 +149,7 @@ export const InfographicApi = {
 
     const result = await response.json();
     if (!response.ok || result?.success === false) {
-      throw new Error(result?.message || 'Gagal menghapus sesi poster.');
+      throw new Error(result?.message || 'Gagal menghapus sesi infografis.');
     }
   },
 

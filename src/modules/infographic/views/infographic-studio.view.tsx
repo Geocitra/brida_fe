@@ -38,7 +38,7 @@ export const InfographicStudioView: React.FC<InfographicStudioViewProps> = ({
   const [activePoster, setActivePoster] = useState<InfographicPosterItem | null>(null);
 
   const [inputPrompt, setInputPrompt] = useState<string>(initialTopic || '');
-  const [aspectRatio, setAspectRatio] = useState<PosterAspectRatio>('9:16');
+  const [aspectRatio, setAspectRatio] = useState<PosterAspectRatio>('3:4');
   const [attachedFile, setAttachedFile] = useState<File | null>(null);
 
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -69,7 +69,7 @@ export const InfographicStudioView: React.FC<InfographicStudioViewProps> = ({
         handleSelectSession(list[0].id);
       }
     } catch (err: any) {
-      console.error('Gagal memuat sesi poster:', err);
+      console.error('Gagal memuat sesi infografis:', err);
     }
   };
 
@@ -81,7 +81,7 @@ export const InfographicStudioView: React.FC<InfographicStudioViewProps> = ({
       const posters = detail.posters || [];
       setActivePoster(posters[posters.length - 1] || null);
 
-      // Pada perangkat mobile, otomatis alihkan ke tab panggung poster saat memilih sesi
+      // Pada perangkat mobile, otomatis alihkan ke tab panggung infografis saat memilih sesi
       if (window.innerWidth < 1024) {
         setIsSidebarOpen(false);
         setMobileTab('showcase');
@@ -102,7 +102,7 @@ export const InfographicStudioView: React.FC<InfographicStudioViewProps> = ({
 
   const handleDeleteSession = async (e: React.MouseEvent, sessionId: string) => {
     e.stopPropagation();
-    if (!window.confirm('Hapus sesi poster ini beserta seluruh berkas gambarnya?')) return;
+    if (!window.confirm('Hapus sesi infografis ini beserta seluruh berkas gambarnya?')) return;
 
     try {
       await InfographicApi.deleteSession(sessionId);
@@ -139,7 +139,7 @@ export const InfographicStudioView: React.FC<InfographicStudioViewProps> = ({
       const effectivePrompt = query || (attachedFile ? `Rangkum dan visualisasikan dokumen terlampir: ${attachedFile.name}` : '');
 
       if (!activeSession) {
-        // TURN 1: Inisiasi sesi baru & buat poster v1
+        // TURN 1: Inisiasi sesi baru & buat infografis v1
         const createdSession = await InfographicApi.createSession({
           topic: effectivePrompt,
           aspectRatio,
@@ -150,7 +150,7 @@ export const InfographicStudioView: React.FC<InfographicStudioViewProps> = ({
         setActivePoster(posters[posters.length - 1] || null);
         loadSessionsList();
       } else {
-        // TURN 2+: Kirim instruksi revisi & buat poster versi baru (v2, v3, ...)
+        // TURN 2+: Kirim instruksi revisi & buat infografis versi baru (v2, v3, ...)
         const result = await InfographicApi.sendRevisionChat({
           sessionId: activeSession.id,
           message: effectivePrompt,
@@ -171,7 +171,7 @@ export const InfographicStudioView: React.FC<InfographicStudioViewProps> = ({
       setInputPrompt('');
       setAttachedFile(null);
     } catch (err: any) {
-      setErrorMessage(err.message || 'Terjadi gangguan saat memproses instruksi poster.');
+      setErrorMessage(err.message || 'Terjadi gangguan saat memproses instruksi infografis.');
       if (window.innerWidth < 1024) {
         setMobileTab('chat');
       }
@@ -184,22 +184,22 @@ export const InfographicStudioView: React.FC<InfographicStudioViewProps> = ({
     {
       label: 'Dampak El Niño Mimika 2026',
       icon: Compass,
-      prompt: 'Buatkan poster infografis perkembangan dampak El Niño di Kabupaten Mimika 2026 lengkap dengan perbandingan curah hujan, sektor pertanian, dan peta kerawanan distrik.',
+      prompt: 'Buatkan infografis perkembangan dampak El Niño di Kabupaten Mimika 2026 lengkap dengan perbandingan curah hujan, sektor pertanian, dan peta kerawanan distrik.',
     },
     {
       label: 'Prevalensi Stunting 18.4%',
       icon: HeartPulse,
-      prompt: 'Buatkan poster infografis penurunan stunting di Kabupaten Mimika tahun 2026, tonjolkan prevalensi 18.4% dan rekomendasi aksi Dinas Kesehatan.',
+      prompt: 'Buatkan infografis penurunan stunting di Kabupaten Mimika tahun 2026, tonjolkan prevalensi 18.4% dan rekomendasi aksi Dinas Kesehatan.',
     },
     {
       label: 'Evaluasi Serapan APBD & PAD',
       icon: Coins,
-      prompt: 'Buatkan poster evaluasi serapan anggaran APBD dan realisasi PAD Kabupaten Mimika 2026 dengan warna dominan Deep Navy dan Gold.',
+      prompt: 'Buatkan infografis evaluasi serapan anggaran APBD dan realisasi PAD Kabupaten Mimika 2026 dengan warna dominan Deep Navy dan Gold.',
     },
     {
       label: 'Konektivitas Jalan Distrik',
       icon: Building2,
-      prompt: 'Buatkan poster infografis progres pembangunan jalan poros dan jembatan penghubung distrik terisolasi di Mimika.',
+      prompt: 'Buatkan infografis progres pembangunan jalan poros dan jembatan penghubung distrik terisolasi di Mimika.',
     },
   ];
 
@@ -216,7 +216,7 @@ export const InfographicStudioView: React.FC<InfographicStudioViewProps> = ({
               Studio Infografis AI &bull; Asisten Kreatif BRIDA
             </h1>
             <p className="text-[10px] sm:text-[11px] text-slate-500 font-medium truncate sm:whitespace-normal">
-              Rancang poster infografis resmi berbasis data riset daerah dan internet live.
+              Rancang infografis resmi berbasis data riset daerah dan internet live.
             </p>
           </div>
         </div>
@@ -227,7 +227,7 @@ export const InfographicStudioView: React.FC<InfographicStudioViewProps> = ({
           className="px-3 sm:px-4 py-1.5 sm:py-2 bg-teal-700 hover:bg-teal-800 text-white font-bold text-[11px] sm:text-xs uppercase tracking-wider inline-flex items-center gap-1.5 transition-colors cursor-pointer rounded-none shrink-0"
         >
           <Plus size={13} />
-          <span>Poster Baru</span>
+          <span>Infografis Baru</span>
         </button>
       </div>
 
@@ -255,7 +255,7 @@ export const InfographicStudioView: React.FC<InfographicStudioViewProps> = ({
           }`}
         >
           <Layers size={14} className={mobileTab === 'showcase' ? 'text-teal-700' : 'text-slate-400'} />
-          <span>Panggung Poster {activePoster ? `(v${activePoster.versionNumber})` : ''}</span>
+          <span>Panggung Infografis {activePoster ? `(v${activePoster.versionNumber})` : ''}</span>
         </button>
       </div>
 
@@ -290,7 +290,7 @@ export const InfographicStudioView: React.FC<InfographicStudioViewProps> = ({
               <div className="flex-1 overflow-y-auto divide-y divide-slate-200/60 custom-scrollbar">
                 {sessions.length === 0 ? (
                   <div className="p-6 text-center text-xs text-slate-400 italic">
-                    Belum ada sesi poster tersimpan.
+                    Belum ada sesi infografis tersimpan.
                   </div>
                 ) : (
                   sessions.map((sess) => {
@@ -311,7 +311,7 @@ export const InfographicStudioView: React.FC<InfographicStudioViewProps> = ({
                             type="button"
                             onClick={(e) => handleDeleteSession(e, sess.id)}
                             className="text-slate-400 hover:text-red-600 p-0.5 shrink-0 cursor-pointer rounded-none"
-                            title="Hapus sesi poster"
+                            title="Hapus sesi infografis"
                           >
                             <Trash2 size={12} />
                           </button>
@@ -412,7 +412,7 @@ export const InfographicStudioView: React.FC<InfographicStudioViewProps> = ({
                     </div>
 
                     <p className="text-xs text-slate-700 leading-relaxed font-normal">
-                      {poster.aiCommentary || 'Poster infografis telah dirancang sesuai data acuan dan arahan visual.'}
+                      {poster.aiCommentary || 'Infografis telah dirancang sesuai data acuan dan arahan visual.'}
                     </p>
 
                     <div className="pt-1">
@@ -443,8 +443,8 @@ export const InfographicStudioView: React.FC<InfographicStudioViewProps> = ({
                 <Loader2 size={16} className="animate-spin text-teal-700 shrink-0" />
                 <span>
                   {activeSession
-                    ? 'Pengarah kreatif sedang memproses revisi & merender poster baru...'
-                    : 'Memadukan data database & internet untuk merender poster v1...'}
+                    ? 'Pengarah kreatif sedang memproses revisi & merender infografis baru...'
+                    : 'Memadukan data database & internet untuk merender infografis v1...'}
                 </span>
               </div>
             )}
@@ -478,25 +478,13 @@ export const InfographicStudioView: React.FC<InfographicStudioViewProps> = ({
               </div>
             )}
 
-            {/* Opsi Aspek Rasio Cepat */}
+            {/* Format Rasio (Terkunci ke 3:4 Standar Editorial) */}
             <div className="flex items-center justify-between text-[11px]">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Format Rasio:</span>
               <div className="flex items-center gap-1">
-                {(['9:16', '1:1', '16:9'] as PosterAspectRatio[]).map((ratio) => (
-                  <button
-                    key={ratio}
-                    type="button"
-                    onClick={() => setAspectRatio(ratio)}
-                    disabled={isLoading}
-                    className={`px-2 py-0.5 text-[10px] font-bold border transition-colors cursor-pointer rounded-none ${
-                      aspectRatio === ratio
-                        ? 'bg-teal-700 text-white border-teal-800'
-                        : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-                    }`}
-                  >
-                    {ratio}
-                  </button>
-                ))}
+                <span className="px-2.5 py-0.5 text-[10px] font-bold border bg-teal-700 text-white border-teal-800 rounded-none">
+                  3:4
+                </span>
               </div>
             </div>
 
@@ -528,7 +516,7 @@ export const InfographicStudioView: React.FC<InfographicStudioViewProps> = ({
                 placeholder={
                   activeSession
                     ? 'Ketik instruksi revisi (misal: "Ganti warna jadi navy gold")...'
-                    : 'Ketik topik poster atau lampirkan dokumen laporan...'
+                    : 'Ketik topik infografis atau lampirkan dokumen laporan...'
                 }
                 className="flex-1 bg-transparent px-3 py-2.5 text-xs text-slate-900 outline-none font-medium"
               />
@@ -545,7 +533,7 @@ export const InfographicStudioView: React.FC<InfographicStudioViewProps> = ({
           </form>
         </div>
 
-        {/* ── PANE KANAN: PANGGUNG SHOWCASE POSTER ── */}
+        {/* ── PANE KANAN: PANGGUNG SHOWCASE INFOGRAFIS ── */}
         <div
           className={`flex-1 overflow-hidden flex flex-col ${
             mobileTab === 'showcase' ? 'flex' : 'hidden lg:flex'

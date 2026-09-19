@@ -24,7 +24,7 @@ interface PosterShowcaseStageProps {
 }
 
 const generateCleanDownloadFilename = (title: string, versionNumber: number): string => {
-  const cleanTitle = (title || 'Poster')
+  const cleanTitle = (title || 'Infografis')
     .replace(/[^a-zA-Z0-9\s]/g, '')
     .trim()
     .replace(/\s+/g, '_')
@@ -49,10 +49,10 @@ export const PosterShowcaseStage: React.FC<PosterShowcaseStageProps> = ({
           <Layers size={26} />
         </div>
         <h3 className="text-sm font-bold text-white uppercase tracking-wider">
-          Panggung Kreatif Poster
+          Panggung Kreatif Infografis
         </h3>
         <p className="text-xs text-slate-400 max-w-sm mt-2 leading-relaxed">
-          Ketik topik poster pada panel dialog untuk memulai perancangan visual resmi BRIDA Kabupaten Mimika.
+          Ketik topik infografis pada panel dialog untuk memulai perancangan visual resmi BRIDA Kabupaten Mimika.
         </p>
       </div>
     );
@@ -68,7 +68,7 @@ export const PosterShowcaseStage: React.FC<PosterShowcaseStageProps> = ({
     setIsDownloading(true);
 
     const downloadFilename = generateCleanDownloadFilename(
-      session?.title || 'Poster',
+      session?.title || 'Infografis',
       activePoster.versionNumber,
     );
 
@@ -80,7 +80,7 @@ export const PosterShowcaseStage: React.FC<PosterShowcaseStageProps> = ({
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: Gagal mengambil berkas poster`);
+        throw new Error(`HTTP ${response.status}: Gagal mengambil berkas infografis`);
       }
 
       const blob = await response.blob();
@@ -218,8 +218,12 @@ export const PosterShowcaseStage: React.FC<PosterShowcaseStageProps> = ({
           className={`relative shadow-2xl shadow-black overflow-hidden transition-all duration-300 rounded-none ${
             activePoster.aspectRatio === '9:16'
               ? 'max-w-[430px] aspect-[9/16]'
+              : activePoster.aspectRatio === '3:4'
+              ? 'max-w-[490px] aspect-[3/4]'
               : activePoster.aspectRatio === '1:1'
               ? 'max-w-[540px] aspect-square'
+              : activePoster.aspectRatio === '4:3'
+              ? 'max-w-[650px] aspect-[4/3]'
               : 'max-w-[760px] aspect-[16/9]'
           } w-full`}
         >
