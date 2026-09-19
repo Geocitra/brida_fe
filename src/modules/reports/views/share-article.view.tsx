@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { ReportService } from '../../../services/report.service';
 import { PdfExportService } from '../../../services/pdf-export.service';
+import { DocxExportService } from '../../../services/docx-export.service';
 import { A4DocumentSegmenter } from '../utils/a4-document-segmenter.util';
 import { MarkupConverter } from '../../ai-assistant/utils/markup-converter.util';
 import {
   Download,
+  FileText,
   Loader2,
   AlertCircle,
   Building,
@@ -24,6 +26,7 @@ export const ShareArticleView: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const [isExportingDocx, setIsExportingDocx] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
   const [pages, setPages] = useState<string[]>([]);
 
@@ -119,6 +122,41 @@ export const ShareArticleView: React.FC = () => {
       alert(`Gagal mengekspor PDF: ${err.message || 'Terjadi kesalahan'}`);
     } finally {
       setIsExportingPdf(false);
+    }
+  };
+
+  const handleExportDocx = async () => {
+    if (!article) return;
+    setIsExportingDocx(true);
+    try {
+      const cleanBody = stripCoverPage(article.content || '');
+      const rawHtml = MarkupConverter.toHTML(cleanBody);
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(rawHtml, 'text/html');
+      doc.querySelectorAll('.citation-url-node, .no-print').forEach((node) => node.remove());
+      const cleanHtmlBody = doc.body.innerHTML;
+
+      const rawTitle = article.articleTitle || article.title || 'Draf_Kebijakan_BRIDA_Mimika';
+      const safeFilename = rawTitle
+        .replace(/[/\\?%*:|"<>#]/g, '')
+        .replace(/\s+/g, '_')
+        .replace(/_+/g, '_')
+        .substring(0, 100);
+
+      await DocxExportService.exportCustomFormattedArticleDocx(
+        cleanHtmlBody,
+        {
+          fontFamily: 'Calibri',
+          fontSize: 11,
+          lineSpacing: 1.18,
+          marginCm: 2.5,
+        },
+        `BRIDA_${safeFilename}.docx`
+      );
+    } catch (err: any) {
+      alert(`Gagal mengekspor Word DOCX: ${err.message || 'Terjadi kesalahan'}`);
+    } finally {
+      setIsExportingDocx(false);
     }
   };
 
@@ -252,8 +290,16 @@ export const ShareArticleView: React.FC = () => {
               <span>{copySuccess ? 'Tersalin!' : 'Salin Link'}</span>
             </button>
             <button
+              onClick={handleExportDocx}
+              disabled={isExportingDocx || isExportingPdf}
+              className="flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-blue-700 hover:bg-blue-800 disabled:bg-slate-300 transition-colors cursor-pointer rounded-none uppercase tracking-wider"
+            >
+              {isExportingDocx ? <Loader2 size={12} className="animate-spin" /> : <FileText size={12} />}
+              <span>{isExportingDocx ? 'Merakit DOCX...' : 'Unduh Word (.docx)'}</span>
+            </button>
+            <button
               onClick={handleExportPdf}
-              disabled={isExportingPdf}
+              disabled={isExportingPdf || isExportingDocx}
               className="flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-teal-800 hover:bg-teal-900 disabled:bg-slate-300 transition-colors cursor-pointer rounded-none uppercase tracking-wider"
             >
               {isExportingPdf ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}

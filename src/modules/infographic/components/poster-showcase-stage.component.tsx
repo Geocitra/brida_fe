@@ -5,6 +5,8 @@ import {
   Layers,
   X,
   Loader2,
+  ZoomIn,
+  ZoomOut,
   SlidersHorizontal,
   ChevronUp,
   ChevronDown,
@@ -70,6 +72,7 @@ export const PosterShowcaseStage: React.FC<PosterShowcaseStageProps> = ({
 }) => {
   const [isLightboxOpen, setIsLightboxOpen] = useState<boolean>(false);
   const [isDownloading, setIsDownloading] = useState<boolean>(false);
+  const [zoom, setZoom] = useState<number>(100);
   const [isBrandingOpen, setIsBrandingOpen] = useState<boolean>(false);
   const [brandingData, setBrandingData] = useState<PosterBrandingData | null>(null);
   const [isSavingBranding, setIsSavingBranding] = useState<boolean>(false);
@@ -164,9 +167,21 @@ export const PosterShowcaseStage: React.FC<PosterShowcaseStageProps> = ({
     }
   };
 
+  const handleZoomIn = () => {
+    setZoom((prev) => Math.min(prev + 20, 200));
+  };
+
+  const handleZoomOut = () => {
+    setZoom((prev) => Math.max(prev - 20, 60));
+  };
+
+  const handleResetZoom = () => {
+    setZoom(100);
+  };
+
   if (!session || !activePoster) {
     return (
-      <div className="w-full h-full bg-slate-900 flex flex-col items-center justify-center p-8 text-center select-none rounded-none text-slate-400 font-roboto">
+      <div className="w-full h-full min-h-[500px] lg:min-h-[700px] bg-slate-900 flex flex-col items-center justify-center p-8 text-center select-none rounded-none text-slate-400 font-roboto">
         <div className="w-14 h-14 bg-slate-800/80 border border-slate-700 text-teal-400 flex items-center justify-center mb-4 rounded-none">
           <Layers size={26} />
         </div>
@@ -213,99 +228,117 @@ export const PosterShowcaseStage: React.FC<PosterShowcaseStageProps> = ({
   };
 
   return (
-    <div className="relative w-full h-full bg-slate-950 flex flex-col overflow-hidden select-none font-roboto rounded-none">
-      {/* ── HEADER TOOLBAR ATAS: NAVIGASI VERSI & KONTROL AKSI ── */}
-      <div className="w-full bg-slate-900/90 border-b border-slate-800 px-3 sm:px-4 py-2 flex flex-wrap items-center justify-between gap-2 z-20 flex-shrink-0">
-        {/* Versi Switcher */}
-        <div className="flex items-center gap-1.5">
-          {posters.length > 1 && (
-            <div className="flex items-center gap-1 mr-2">
-              {posters.map((poster) => {
-                const isActive = poster.versionNumber === activePoster.versionNumber;
-                return (
-                  <button
-                    key={poster.id}
-                    type="button"
-                    onClick={() => onSelectVersion(poster)}
-                    className={`px-2 py-1 text-xs font-bold uppercase transition-colors cursor-pointer rounded-none border ${
-                      isActive
-                        ? 'bg-teal-700 border-teal-600 text-white'
-                        : 'bg-slate-950 hover:bg-slate-800 border-slate-800 text-slate-300 hover:text-white'
-                    }`}
-                    title={`Versi ${poster.versionNumber}`}
-                  >
-                    v{poster.versionNumber}
-                  </button>
-                );
-              })}
-            </div>
-          )}
+    <div className="relative w-full h-full min-h-[750px] lg:min-h-[900px] bg-slate-950 flex flex-col items-center justify-center select-none font-roboto rounded-none">
+      {/* ── SEAMLESS TOP BAR (NAVIGASI, ZOOM & BRANDING CONTROLS) ── */}
+      <div className="absolute top-3 right-3 sm:top-4 sm:right-4 z-20 flex flex-wrap items-center gap-1.5 sm:gap-2">
+        {/* Iterasi Versi Switcher (Tampil jika ada > 1 versi) */}
+        {posters.length > 1 && (
+          <div className="flex items-center gap-1">
+            {posters.map((poster) => {
+              const isActive = poster.versionNumber === activePoster.versionNumber;
+              return (
+                <button
+                  key={poster.id}
+                  type="button"
+                  onClick={() => onSelectVersion(poster)}
+                  className={`px-2.5 py-1.5 text-xs font-bold uppercase transition-colors cursor-pointer rounded-none border ${
+                    isActive
+                      ? 'bg-teal-700 border-teal-600 text-white'
+                      : 'bg-slate-900/90 hover:bg-slate-800 border-slate-700 text-slate-300 hover:text-white'
+                  }`}
+                  title={`Versi ${poster.versionNumber}`}
+                >
+                  v{poster.versionNumber}
+                </button>
+              );
+            })}
+          </div>
+        )}
 
-          <span className="text-xs text-slate-400 font-medium">
-            Rasio: <strong className="text-white">{activePoster.aspectRatio}</strong>
-          </span>
-
-          {hasActiveBranding && (
-            <span className="hidden sm:inline-block px-1.5 py-0.5 bg-teal-950 border border-teal-700 text-teal-300 text-[10px] font-bold uppercase tracking-wider rounded-none">
-              Branding Aktif
-            </span>
-          )}
-        </div>
-
-        {/* Tombol Aksi Kanan */}
-        <div className="flex items-center gap-2">
-          {/* Toggle Panel Kop & Footer */}
+        {/* Kontrol Skala Ukuran Gambar (Zoom In / Zoom Out) */}
+        <div className="flex items-center bg-slate-900/90 border border-slate-700 text-slate-300 rounded-none shadow-sm">
           <button
             type="button"
-            onClick={() => setIsBrandingOpen((prev) => !prev)}
-            className={`px-3 py-1.5 text-xs font-bold uppercase tracking-wider border rounded-none cursor-pointer transition-colors inline-flex items-center gap-1.5 ${
-              isBrandingOpen
-                ? 'bg-teal-800/90 border-teal-600 text-white'
-                : 'bg-slate-950 hover:bg-slate-800 border-slate-700 text-slate-200'
-            }`}
-            title="Buka / Tutup Pengaturan Header & Footer"
+            onClick={handleZoomOut}
+            disabled={zoom <= 60}
+            className="p-1.5 sm:p-2 hover:text-white hover:bg-slate-800 disabled:opacity-35 disabled:hover:bg-transparent cursor-pointer transition-colors"
+            title="Perkecil Gambar (-20%)"
           >
-            <SlidersHorizontal size={13} />
-            <span>Kop & Footer</span>
-            {isBrandingOpen ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+            <ZoomOut size={14} />
           </button>
-
-          {/* Fullscreen Lightbox Button */}
           <button
             type="button"
-            onClick={() => setIsLightboxOpen(true)}
-            className="p-1.5 bg-slate-950 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700 transition-colors cursor-pointer rounded-none"
-            title="Pratinjau Layar Penuh"
+            onClick={handleResetZoom}
+            className="px-2 py-1 text-[11px] font-bold font-mono hover:text-teal-300 cursor-pointer"
+            title="Reset Ukuran Standar (100%)"
           >
-            <Maximize2 size={14} />
+            {zoom}%
           </button>
-
-          {/* Unduh PNG Resmi Button */}
           <button
             type="button"
-            onClick={handleDownloadImage}
-            disabled={isDownloading}
-            className="px-3.5 sm:px-4 py-1.5 bg-teal-700 hover:bg-teal-600 disabled:bg-teal-900 border border-teal-600 text-white font-bold text-xs uppercase tracking-wider inline-flex items-center gap-1.5 transition-colors cursor-pointer rounded-none shadow-xs"
-            title="Unduh berkas PNG ke komputer"
+            onClick={handleZoomIn}
+            disabled={zoom >= 200}
+            className="p-1.5 sm:p-2 hover:text-white hover:bg-slate-800 disabled:opacity-35 disabled:hover:bg-transparent cursor-pointer transition-colors"
+            title="Perbesar Gambar (+20%)"
           >
-            {isDownloading ? (
-              <>
-                <Loader2 size={13} className="animate-spin text-teal-200" />
-                <span>Memproses...</span>
-              </>
-            ) : (
-              <>
-                <Download size={13} />
-                <span>Unduh PNG</span>
-              </>
-            )}
+            <ZoomIn size={14} />
           </button>
         </div>
+
+        {/* Tombol Toggle Panel Kop & Footer */}
+        <button
+          type="button"
+          onClick={() => setIsBrandingOpen((prev) => !prev)}
+          className={`px-3 py-1.5 text-xs font-bold uppercase tracking-wider border rounded-none cursor-pointer transition-colors inline-flex items-center gap-1.5 shadow-sm ${
+            isBrandingOpen
+              ? 'bg-teal-700 border-teal-500 text-white'
+              : 'bg-slate-900/90 hover:bg-slate-800 border-slate-700 text-slate-300 hover:text-white'
+          }`}
+          title="Buka / Tutup Pengaturan Header & Footer"
+        >
+          <SlidersHorizontal size={13} />
+          <span className="hidden sm:inline">Kop & Footer</span>
+          {hasActiveBranding && !isBrandingOpen && (
+            <span className="w-1.5 h-1.5 rounded-none bg-teal-400"></span>
+          )}
+          {isBrandingOpen ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+        </button>
+
+        {/* Tombol Pratinjau Layar Penuh (Lightbox) */}
+        <button
+          type="button"
+          onClick={() => setIsLightboxOpen(true)}
+          className="p-2 bg-slate-900/90 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700 transition-colors cursor-pointer rounded-none shadow-sm"
+          title="Pratinjau Layar Penuh"
+        >
+          <Maximize2 size={15} />
+        </button>
+
+        {/* Tombol Unduh PNG Resmi */}
+        <button
+          type="button"
+          onClick={handleDownloadImage}
+          disabled={isDownloading}
+          className="px-3.5 sm:px-4 py-2 bg-teal-700 hover:bg-teal-600 disabled:bg-teal-900 border border-teal-600 text-white font-bold text-xs uppercase tracking-wider inline-flex items-center gap-1.5 transition-colors cursor-pointer rounded-none shadow-sm"
+          title="Unduh berkas PNG ke komputer"
+        >
+          {isDownloading ? (
+            <>
+              <Loader2 size={13} className="animate-spin text-teal-200" />
+              <span className="hidden sm:inline">Mengunduh...</span>
+            </>
+          ) : (
+            <>
+              <Download size={13} />
+              <span>Unduh PNG</span>
+            </>
+          )}
+        </button>
       </div>
 
-      {/* ── MODULAR BRANDING BAR (PENGATURAN DI ATAS) ── */}
+      {/* ── MODULAR BRANDING BAR (PENGATURAN DI ATAS FLOATING) ── */}
       {isBrandingOpen && brandingData && (
-        <div className="w-full flex-shrink-0 z-10 shadow-lg">
+        <div className="absolute top-14 left-4 right-4 sm:left-auto sm:right-4 z-30 max-w-2xl w-full shadow-2xl">
           <PosterBrandingBar
             branding={brandingData}
             onChange={handleBrandingChange}
@@ -320,7 +353,7 @@ export const PosterShowcaseStage: React.FC<PosterShowcaseStageProps> = ({
 
       {/* ── LOADING REVISI OVERLAY ── */}
       {isGenerating && (
-        <div className="absolute inset-0 z-30 bg-slate-950/80 backdrop-blur-xs flex flex-col items-center justify-center text-white space-y-3 select-none rounded-none">
+        <div className="absolute inset-0 z-40 bg-slate-950/80 backdrop-blur-xs flex flex-col items-center justify-center text-white space-y-3 select-none rounded-none">
           <div className="w-9 h-9 border-3 border-teal-400 border-t-transparent animate-spin rounded-none" />
           <span className="text-xs font-bold uppercase tracking-widest text-teal-300">
             Merender Versi Revisi Berikutnya...
@@ -328,13 +361,16 @@ export const PosterShowcaseStage: React.FC<PosterShowcaseStageProps> = ({
         </div>
       )}
 
-      {/* ── KANVAS UTAMA DI BAWAH (OUTPUT PRATINJAU LEGA & PROPORSIONAL) ── */}
-      <div className="flex-1 min-h-0 w-full p-2 sm:p-4 md:p-6 flex items-center justify-center overflow-hidden">
-        <div className="@container relative max-h-full max-w-full flex items-center justify-center shadow-2xl drop-shadow-2xl rounded-none select-none">
+      {/* ── KANVAS UTAMA FULL LEBAR LEGA (UKURAN PROMINEN & RESPONSIF ZOOM) ── */}
+      <div className="w-full min-h-[750px] lg:min-h-[900px] pt-18 pb-12 px-4 sm:px-8 md:px-12 flex items-center justify-center overflow-x-auto">
+        <div
+          style={{ maxWidth: `${Math.round(860 * (zoom / 100))}px` }}
+          className="@container relative w-full flex items-center justify-center shadow-2xl drop-shadow-2xl rounded-none select-none transition-all duration-200"
+        >
           <img
             src={fullImageUrl}
             alt={session.title || 'Infografis BRIDA Mimika'}
-            className="max-h-[calc(100vh-210px)] max-w-full w-auto h-auto object-contain rounded-none select-none block"
+            className="w-full h-auto object-contain rounded-none select-none block"
             loading="lazy"
           />
 

@@ -75,6 +75,41 @@ function getAuthHeaders(): Record<string, string> {
   return headers;
 }
 
+async function safeParseJsonResponse(response: Response, defaultErrorMsg: string): Promise<any> {
+  const text = await response.text();
+  let json: any = null;
+  try {
+    json = JSON.parse(text);
+  } catch {
+    // Respons bukan JSON (kemungkinan besar halaman error HTML dari Nginx seperti 504 atau 502)
+    if (response.status === 504) {
+      throw new Error(
+        'Proses pembuatan infografis membutuhkan waktu lebih dari batas timeout server (504 Gateway Time-out). Tambahkan "proxy_read_timeout 300s;" pada konfigurasi Nginx reverse proxy Anda.'
+      );
+    }
+    if (response.status === 502) {
+      throw new Error(
+        'Server backend tidak merespons (502 Bad Gateway). Jalankan "docker logs --tail 50 brida-be" pada VPS untuk melihat kendala pada backend.'
+      );
+    }
+    if (response.status === 404) {
+      throw new Error(
+        `Endpoint API tidak ditemukan (404 Not Found): ${response.url}. Pastikan konfigurasi Nginx meneruskan request /api ke container brida-be.`
+      );
+    }
+
+    const titleMatch = text.match(/<title>([^<]+)<\/title>/i);
+    const title = titleMatch ? titleMatch[1].trim() : `HTTP ${response.status} ${response.statusText}`;
+    throw new Error(`${defaultErrorMsg} (${title})`);
+  }
+
+  if (!response.ok || json?.success === false) {
+    throw new Error(json?.message || defaultErrorMsg);
+  }
+
+  return json;
+}
+
 export const InfographicApi = {
   /**
    * Membuat sesi baru dan menghasilkan poster v1
@@ -86,10 +121,7 @@ export const InfographicApi = {
       body: JSON.stringify(payload),
     });
 
-    const result = await response.json();
-    if (!response.ok || result?.success === false) {
-      throw new Error(result?.message || 'Gagal memulai sesi pembuatan infografis.');
-    }
+    const result = await safeParseJsonResponse(response, 'Gagal memulai sesi pembuatan infografis.');
     return result.data;
   },
 
@@ -105,10 +137,7 @@ export const InfographicApi = {
       body: JSON.stringify(payload),
     });
 
-    const result = await response.json();
-    if (!response.ok || result?.success === false) {
-      throw new Error(result?.message || 'Gagal mengirim instruksi revisi infografis.');
-    }
+    const result = await safeParseJsonResponse(response, 'Gagal mengirim instruksi revisi infografis.');
     return result.data;
   },
 
@@ -140,10 +169,7 @@ export const InfographicApi = {
       headers: getAuthHeaders(),
     });
 
-    const result = await response.json();
-    if (!response.ok || result?.success === false) {
-      throw new Error(result?.message || 'Gagal memuat detail sesi infografis.');
-    }
+    const result = await safeParseJsonResponse(response, 'Gagal memuat detail sesi infografis.');
     return result.data;
   },
 
@@ -156,10 +182,7 @@ export const InfographicApi = {
       headers: getAuthHeaders(),
     });
 
-    const result = await response.json();
-    if (!response.ok || result?.success === false) {
-      throw new Error(result?.message || 'Gagal menghapus sesi infografis.');
-    }
+    await safeParseJsonResponse(response, 'Gagal menghapus sesi infografis.');
   },
 
   /**

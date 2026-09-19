@@ -3,6 +3,7 @@ import type { Editor } from '@tiptap/react';
 import {
     Loader2,
     Download,
+    FileText,
     ArrowLeft,
     Bold,
     Italic,
@@ -33,6 +34,7 @@ interface ArticlePreviewEditorHeaderProps {
     editor: Editor | null;
     isSaving: boolean;
     isPrinting: boolean;
+    isExportingDocx?: boolean;
     isDirty: boolean;
     articleTitle: string;
     activeSessionTitle: string;
@@ -43,6 +45,7 @@ interface ArticlePreviewEditorHeaderProps {
     zoomLevel: number;
     onSaveAndBack: () => void;
     onPrint: () => void;
+    onExportDocx?: () => void;
     onFontFamilyChange: (value: FontFamilyKey) => void;
     onLineSpacingChange: (value: number) => void;
     onApplyFontSize: (size: string) => void;
@@ -62,6 +65,7 @@ export const ArticlePreviewEditorHeader: React.FC<ArticlePreviewEditorHeaderProp
     editor,
     isSaving,
     isPrinting,
+    isExportingDocx = false,
     isDirty,
     articleTitle,
     activeSessionTitle,
@@ -72,6 +76,7 @@ export const ArticlePreviewEditorHeader: React.FC<ArticlePreviewEditorHeaderProp
     zoomLevel,
     onSaveAndBack,
     onPrint,
+    onExportDocx,
     onFontFamilyChange,
     onLineSpacingChange,
     onApplyFontSize,
@@ -112,7 +117,7 @@ export const ArticlePreviewEditorHeader: React.FC<ArticlePreviewEditorHeaderProp
                 <div className="flex items-center gap-4 text-left">
                     <button
                         onClick={onSaveAndBack}
-                        disabled={isSaving || isPrinting}
+                        disabled={isSaving || isPrinting || isExportingDocx}
                         className="px-3 py-1.5 bg-transparent hover:bg-transparent text-slate-700 disabled:opacity-50 inline-flex items-center gap-1.5 cursor-pointer font-bold text-xs uppercase border-none shadow-none rounded-none"
                     >
                         {isSaving ? <Loader2 size={12} className="animate-spin" /> : <ArrowLeft size={12} />}
@@ -130,17 +135,44 @@ export const ArticlePreviewEditorHeader: React.FC<ArticlePreviewEditorHeaderProp
                     </div>
                 </div>
 
-                {onConvertToInfographic && (
+                <div className="flex items-center gap-2">
+                    {onExportDocx && (
+                        <button
+                            type="button"
+                            onClick={onExportDocx}
+                            disabled={isSaving || isPrinting || isExportingDocx}
+                            className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-300 font-bold text-xs uppercase inline-flex items-center gap-1.5 rounded-none cursor-pointer transition-colors shadow-xs disabled:opacity-50"
+                            title="Unduh naskah sebagai berkas Word (.docx)"
+                        >
+                            {isExportingDocx ? <Loader2 size={13} className="animate-spin text-blue-600" /> : <FileText size={13} className="text-blue-600" />}
+                            <span>Unduh Word</span>
+                        </button>
+                    )}
+
                     <button
                         type="button"
-                        onClick={onConvertToInfographic}
-                        className="px-3 py-1.5 bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-300 font-bold text-xs uppercase inline-flex items-center gap-1.5 rounded-none cursor-pointer transition-colors shadow-xs"
-                        title="Buat infografis dari artikel ini di Studio Infografis"
+                        onClick={onPrint}
+                        disabled={isSaving || isPrinting || isExportingDocx}
+                        className="px-3 py-1.5 bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-300 font-bold text-xs uppercase inline-flex items-center gap-1.5 rounded-none cursor-pointer transition-colors shadow-xs disabled:opacity-50"
+                        title="Cetak atau unduh naskah resmi (.pdf)"
                     >
-                        <Sparkles size={13} className="text-teal-600" />
-                        <span>Buat Infografis</span>
+                        {isPrinting ? <Loader2 size={13} className="animate-spin text-teal-600" /> : <Download size={13} className="text-teal-600" />}
+                        <span>Cetak PDF</span>
                     </button>
-                )}
+
+                    {onConvertToInfographic && (
+                        <button
+                            type="button"
+                            onClick={onConvertToInfographic}
+                            disabled={isSaving || isPrinting || isExportingDocx}
+                            className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-800 border border-slate-300 font-bold text-xs uppercase inline-flex items-center gap-1.5 rounded-none cursor-pointer transition-colors shadow-xs disabled:opacity-50"
+                            title="Buat infografis dari artikel ini di Studio Infografis"
+                        >
+                            <Sparkles size={13} className="text-slate-600" />
+                            <span>Buat Infografis</span>
+                        </button>
+                    )}
+                </div>
             </div>
 
             <div className="px-6 py-2 bg-slate-50 flex flex-wrap items-center justify-between gap-4 select-none">
