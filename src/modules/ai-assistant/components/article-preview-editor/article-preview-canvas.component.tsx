@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { EditorContent } from '@tiptap/react';
 import type { Editor } from '@tiptap/react';
-import { Loader2, Download, Send } from 'lucide-react';
+import { Loader2, Download, Send, FileText } from 'lucide-react';
 
 interface ArticlePreviewCanvasProps {
   editor: Editor | null;
@@ -17,9 +17,11 @@ interface ArticlePreviewCanvasProps {
   ) => void;
   isSaving: boolean;
   isPrinting: boolean;
+  isExportingDocx?: boolean;
   isDirty: boolean;
   onSaveAndBack: () => void;
   onPrint: () => void;
+  onExportDocx?: () => void;
   onShareWa?: () => void;
   fontSize: string;
   fontFamily: string;
@@ -74,7 +76,9 @@ export const ArticlePreviewCanvas: React.FC<ArticlePreviewCanvasProps> = ({
   onScroll,
   isSaving,
   isPrinting,
+  isExportingDocx = false,
   onPrint,
+  onExportDocx,
   onShareWa,
   fontSize,
   fontFamily,
@@ -406,10 +410,22 @@ export const ArticlePreviewCanvas: React.FC<ArticlePreviewCanvasProps> = ({
             width: '100%',
           }}
         >
+          {onExportDocx && (
+            <button
+              type="button"
+              onClick={onExportDocx}
+              disabled={isSaving || isPrinting || isExportingDocx}
+              className="px-6 py-2.5 bg-blue-700 hover:bg-blue-800 text-white font-bold text-xs uppercase tracking-wider cursor-pointer transition-colors disabled:opacity-50 inline-flex items-center gap-1.5 shadow-md rounded-none"
+            >
+              {isExportingDocx ? <Loader2 size={13} className="animate-spin" /> : <FileText size={13} />}
+              <span>Unduh Word (.docx)</span>
+            </button>
+          )}
+
           <button
             type="button"
             onClick={onPrint}
-            disabled={isSaving || isPrinting}
+            disabled={isSaving || isPrinting || isExportingDocx}
             className="px-6 py-2.5 bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs uppercase tracking-wider cursor-pointer transition-colors disabled:opacity-50 inline-flex items-center gap-1.5 shadow-md rounded-none"
           >
             {isPrinting ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
@@ -420,7 +436,7 @@ export const ArticlePreviewCanvas: React.FC<ArticlePreviewCanvasProps> = ({
             <button
               type="button"
               onClick={onShareWa}
-              disabled={isSaving || isPrinting}
+              disabled={isSaving || isPrinting || isExportingDocx}
               className="px-6 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs uppercase tracking-wider cursor-pointer transition-colors disabled:opacity-50 inline-flex items-center gap-1.5 shadow-md rounded-none"
             >
               <Send size={13} />

@@ -17,6 +17,7 @@ import { CitationUrlNode } from '../components/article-preview-editor/citation-u
 import { AiAssistantService } from '../../../services/ai-assistant.service';
 import type { ArticleSessionDetail } from '../../../services/ai-assistant.service';
 import { PdfExportService } from '../../../services/pdf-export.service';
+import { DocxExportService } from '../../../services/docx-export.service';
 import { MarkupConverter } from '../utils/markup-converter.util';
 import { useEditorStore } from '../store/useEditorStore';
 import type { FontFamilyKey, EditorFormatting } from '../store/useEditorStore';
@@ -230,6 +231,7 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [isPrinting, setIsPrinting] = useState<boolean>(false);
+  const [isExportingDocx, setIsExportingDocx] = useState<boolean>(false);
 
   const [isWaModalOpen, setIsWaModalOpen] = useState(false);
   const [waContacts, setWaContacts] = useState<any[]>([]);
@@ -546,6 +548,64 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
     }
   };
 
+  const handleExportDocx = async () => {
+    if (!editor) {
+      showToast('Tidak ada naskah untuk diunduh.');
+      return;
+    }
+
+    setIsExportingDocx(true);
+    const editorStateHtml = editor.getHTML();
+
+    const resolvedTitle = articleTitle || activeSession?.articleTitle || activeSession?.title || 'Draf_Kebijakan_BRIDA_Mimika';
+    const safeFilename = sanitizeFilenameForDownload(resolvedTitle);
+
+    if (sessionId) {
+      try {
+        await AiAssistantService.updateArticleSessionContent(sessionId, resolvedTitle, editorStateHtml);
+        useEditorStore.getState().initSession(sessionId, resolvedTitle, editorStateHtml);
+        markSaved();
+      } catch (err) {
+        console.warn('Gagal memperbarui judul sesi saat ekspor DOCX:', err);
+      }
+    }
+
+    try {
+      showToast(`Merakit berkas Word (.docx): ${safeFilename}.docx...`);
+      const targetFontSize = parseFloat(fontSize);
+
+      const stripNoPrintElements = (htmlString: string): string => {
+        try {
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(htmlString, 'text/html');
+          doc.querySelectorAll('.no-print, [data-auto-page-spacer]').forEach((el) => el.remove());
+          return doc.body.innerHTML;
+        } catch {
+          return htmlString;
+        }
+      };
+
+      const cleanHtmlForDocx = stripNoPrintElements(editorStateHtml);
+
+      await DocxExportService.exportCustomFormattedArticleDocx(
+        cleanHtmlForDocx,
+        {
+          fontFamily,
+          fontSize: isNaN(targetFontSize) ? 11 : targetFontSize,
+          lineSpacing,
+          marginCm,
+        },
+        safeFilename
+      );
+
+      showToast(`Dokumen '${safeFilename}.docx' berhasil diunduh!`);
+    } catch (err: any) {
+      showToast(`Ekspor Word DOCX gagal: ${err.message}`);
+    } finally {
+      setIsExportingDocx(false);
+    }
+  };
+
   const handleApplyFontSize = useCallback((size: string) => {
     setFormatting({ fontSize: size });
     if (editor && !editor.isDestroyed) {
@@ -637,6 +697,7 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
         editor={editor}
         isSaving={isSaving || isUploadingMedia}
         isPrinting={isPrinting}
+        isExportingDocx={isExportingDocx}
         isDirty={isDirty}
         articleTitle={articleTitle}
         activeSessionTitle={activeSession.title}
@@ -647,6 +708,7 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
         zoomLevel={zoomLevel}
         onSaveAndBack={handleSaveAndBack}
         onPrint={handlePrint}
+        onExportDocx={handleExportDocx}
         onFontFamilyChange={handleFontFamilyChange}
         onLineSpacingChange={(value) => setFormatting({ lineSpacing: value })}
         onApplyFontSize={handleApplyFontSize}
@@ -681,9 +743,11 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
           onScroll={handleScroll}
           isSaving={isSaving || isUploadingMedia}
           isPrinting={isPrinting}
+          isExportingDocx={isExportingDocx}
           isDirty={isDirty}
           onSaveAndBack={handleSaveAndBack}
           onPrint={handlePrint}
+          onExportDocx={handleExportDocx}
           onShareWa={handleOpenWaModal}
           fontSize={fontSize}
           fontFamily={fontFamily}
