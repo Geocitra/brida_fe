@@ -44,6 +44,10 @@ const DEFAULT_BRANDING: (posterId: string) => PosterBrandingData = (posterId) =>
     footerBgColor: '#0F1E36',
     footerTextColor: '#F8FAFC',
     footerAlignment: 'center',
+    headerFontSize: 'normal',
+    footerFontSize: 'normal',
+    logoPosition: 'left',
+    logoSize: 'normal',
   },
   composedUrl: null,
   brandingHash: null,
@@ -336,15 +340,16 @@ export const PosterShowcaseStage: React.FC<PosterShowcaseStageProps> = ({
         </button>
       </div>
 
-      {/* ── MODULAR BRANDING BAR (PENGATURAN DI ATAS FLOATING) ── */}
+      {/* ── MODULAR BRANDING BAR (PENGATURAN DI ATAS FLOATING LEGA) ── */}
       {isBrandingOpen && brandingData && (
-        <div className="absolute top-14 left-4 right-4 sm:left-auto sm:right-4 z-30 max-w-2xl w-full shadow-2xl">
+        <div className="absolute top-14 left-4 right-4 sm:left-auto sm:right-4 z-30 max-w-3xl w-full shadow-2xl max-h-[calc(100vh-90px)] overflow-y-auto">
           <PosterBrandingBar
             branding={brandingData}
             onChange={handleBrandingChange}
             onUploadLogo={handleUploadLogo}
             onDeleteLogo={handleDeleteLogo}
             onReset={handleResetBranding}
+            onClose={() => setIsBrandingOpen(false)}
             isSaving={isSavingBranding}
             isUploadingLogo={isUploadingLogo}
           />
