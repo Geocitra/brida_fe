@@ -15,6 +15,8 @@ import {
   Compass,
   MessageSquareCode,
   Layers,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from 'lucide-react';
 import { InfographicApi } from '../services/infographic.api';
 import type {
@@ -45,6 +47,7 @@ export const InfographicStudioView: React.FC<InfographicStudioViewProps> = ({
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [mobileTab, setMobileTab] = useState<'chat' | 'showcase'>('chat');
+  const [isChatCollapsed, setIsChatCollapsed] = useState<boolean>(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -98,6 +101,7 @@ export const InfographicStudioView: React.FC<InfographicStudioViewProps> = ({
     setAttachedFile(null);
     setErrorMessage(null);
     setMobileTab('chat');
+    setIsChatCollapsed(false);
   };
 
   const handleDeleteSession = async (e: React.MouseEvent, sessionId: string) => {
@@ -206,29 +210,41 @@ export const InfographicStudioView: React.FC<InfographicStudioViewProps> = ({
   return (
     <div className="w-full h-[calc(100vh-64px)] flex flex-col bg-slate-100 font-roboto select-none overflow-hidden rounded-none">
       {/* ── TOP HEADER BANNER RESPONSIVE ── */}
-      <div className="px-4 sm:px-6 py-2.5 sm:py-3.5 bg-white border-b border-slate-200 flex items-center justify-between gap-3 shrink-0 rounded-none z-10">
+      <div className="px-4 sm:px-6 py-2 bg-white border-b border-slate-200 flex items-center justify-between gap-3 shrink-0 rounded-none z-10">
         <div className="flex items-center gap-2.5 min-w-0">
-          <div className="p-1.5 sm:p-2 bg-teal-50 border border-teal-200 text-teal-800 rounded-none shrink-0">
-            <Sparkles size={15} />
+          <div className="p-1.5 bg-teal-50 border border-teal-200 text-teal-800 rounded-none shrink-0">
+            <Sparkles size={14} />
           </div>
           <div className="min-w-0">
             <h1 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-slate-900 truncate">
               Studio Infografis AI &bull; Asisten Kreatif BRIDA
             </h1>
-            <p className="text-[10px] sm:text-[11px] text-slate-500 font-medium truncate sm:whitespace-normal">
+            <p className="text-[10px] text-slate-500 font-medium truncate hidden sm:block">
               Rancang infografis resmi berbasis data riset daerah dan internet live.
             </p>
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={handleCreateNewSession}
-          className="px-3 sm:px-4 py-1.5 sm:py-2 bg-teal-700 hover:bg-teal-800 text-white font-bold text-[11px] sm:text-xs uppercase tracking-wider inline-flex items-center gap-1.5 transition-colors cursor-pointer rounded-none shrink-0"
-        >
-          <Plus size={13} />
-          <span>Infografis Baru</span>
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={() => setIsChatCollapsed(!isChatCollapsed)}
+            className="hidden lg:inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-slate-700 hover:text-slate-950 bg-slate-100 hover:bg-slate-200 border border-slate-300 uppercase tracking-wider rounded-none cursor-pointer transition-colors"
+            title={isChatCollapsed ? "Buka panel obrolan AI" : "Sembunyikan panel obrolan"}
+          >
+            {isChatCollapsed ? <PanelLeftOpen size={13} /> : <PanelLeftClose size={13} />}
+            <span>{isChatCollapsed ? "Buka Obrolan" : "Sembunyikan Obrolan"}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleCreateNewSession}
+            className="px-3 sm:px-4 py-1.5 bg-teal-700 hover:bg-teal-800 text-white font-bold text-[11px] sm:text-xs uppercase tracking-wider inline-flex items-center gap-1.5 transition-colors cursor-pointer rounded-none shrink-0"
+          >
+            <Plus size={13} />
+            <span>Infografis Baru</span>
+          </button>
+        </div>
       </div>
 
       {/* ── MOBILE VIEW SELECTOR TABS (< 1024px) ── */}
@@ -331,8 +347,8 @@ export const InfographicStudioView: React.FC<InfographicStudioViewProps> = ({
 
         {/* ── PANE KIRI: CONVERSATIONAL CHAT STREAM ── */}
         <div
-          className={`w-full lg:w-[460px] bg-white border-r border-slate-200 flex flex-col shrink-0 overflow-hidden rounded-none ${
-            mobileTab === 'chat' ? 'flex' : 'hidden lg:flex'
+          className={`w-full lg:w-[460px] bg-white border-r border-slate-200 flex flex-col shrink-0 overflow-hidden rounded-none transition-all duration-200 ${
+            isChatCollapsed ? 'hidden' : mobileTab === 'chat' ? 'flex' : 'hidden lg:flex'
           }`}
         >
           {/* Header Kontrol Chat */}
@@ -536,7 +552,7 @@ export const InfographicStudioView: React.FC<InfographicStudioViewProps> = ({
         {/* ── PANE KANAN: PANGGUNG SHOWCASE INFOGRAFIS ── */}
         <div
           className={`flex-1 overflow-hidden flex flex-col ${
-            mobileTab === 'showcase' ? 'flex' : 'hidden lg:flex'
+            mobileTab === 'showcase' || isChatCollapsed ? 'flex' : 'hidden lg:flex'
           }`}
         >
           <PosterShowcaseStage
