@@ -229,6 +229,20 @@ export const PosterShowcaseStage: React.FC<PosterShowcaseStageProps> = ({
     );
 
     try {
+      // Jika ada pending save branding (debounce), flush terlebih dahulu
+      // agar DB sudah ter-update sebelum backend mengomposisi gambar
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+        saveTimeoutRef.current = null;
+        if (brandingData) {
+          try {
+            await InfographicApi.saveBranding(activePoster.id, brandingData);
+          } catch (saveErr) {
+            console.warn('Gagal flush branding sebelum download:', saveErr);
+          }
+        }
+      }
+
       // Selalu unduh via endpoint backend authoritative dengan token JWT
       await InfographicApi.downloadPosterFile(
         activePoster.id,
