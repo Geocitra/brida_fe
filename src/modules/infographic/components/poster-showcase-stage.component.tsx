@@ -137,6 +137,18 @@ export const PosterShowcaseStage: React.FC<PosterShowcaseStageProps> = ({
     }, 600);
   };
 
+  const handleHeaderHeightPercentChange = (percent: number) => {
+    if (!brandingData) return;
+    const updated: PosterBrandingData = {
+      ...brandingData,
+      layoutConfig: {
+        ...(brandingData.layoutConfig || {}),
+        headerHeightPercent: percent,
+      },
+    };
+    handleBrandingChange(updated);
+  };
+
   const handleUploadLogo = async (file: File) => {
     if (!activePoster) return;
     setIsUploadingLogo(true);
@@ -345,6 +357,7 @@ export const PosterShowcaseStage: React.FC<PosterShowcaseStageProps> = ({
         <div className="absolute top-14 left-4 right-4 sm:left-auto sm:right-4 z-30 max-w-3xl w-full shadow-2xl max-h-[calc(100vh-90px)] overflow-y-auto">
           <PosterBrandingBar
             branding={brandingData}
+            aspectRatio={activePoster?.aspectRatio || session.aspectRatio}
             onChange={handleBrandingChange}
             onUploadLogo={handleUploadLogo}
             onDeleteLogo={handleDeleteLogo}
@@ -383,6 +396,7 @@ export const PosterShowcaseStage: React.FC<PosterShowcaseStageProps> = ({
           <PosterBrandingOverlay
             branding={brandingData}
             aspectRatio={activePoster?.aspectRatio || session.aspectRatio}
+            onHeaderHeightPercentChange={handleHeaderHeightPercentChange}
           />
         </div>
       </div>

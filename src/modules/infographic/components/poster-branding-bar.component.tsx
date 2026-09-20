@@ -15,14 +15,17 @@ import {
   Image,
   Layout,
   SlidersHorizontal,
+  Minus,
+  Plus,
 } from 'lucide-react';
-import type { PosterBrandingData } from '../types/poster-branding.types';
-import { BRANDING_COLOR_PRESETS } from '../types/poster-branding.types';
+import type { PosterBrandingData, PosterAspectRatio } from '../types/poster-branding.types';
+import { BRANDING_COLOR_PRESETS, BRANDING_SAFE_AREA_CONFIG } from '../types/poster-branding.types';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
 
 interface PosterBrandingBarProps {
   branding: PosterBrandingData;
+  aspectRatio?: PosterAspectRatio | string;
   onChange: (updated: PosterBrandingData) => void;
   onUploadLogo: (file: File) => Promise<void>;
   onDeleteLogo: () => Promise<void>;
@@ -34,6 +37,7 @@ interface PosterBrandingBarProps {
 
 export const PosterBrandingBar: React.FC<PosterBrandingBarProps> = ({
   branding,
+  aspectRatio,
   onChange,
   onUploadLogo,
   onDeleteLogo,
@@ -116,13 +120,7 @@ export const PosterBrandingBar: React.FC<PosterBrandingBarProps> = ({
   };
 
   const handleHeaderHeight = (height: 'compact' | 'normal' | 'spacious') => {
-    onChange({
-      ...branding,
-      layoutConfig: {
-        ...(branding.layoutConfig || {}),
-        headerHeight: height,
-      },
-    });
+    handleHeaderHeightPreset(height);
   };
 
   const handleFooterFontSize = (size: 'compact' | 'normal' | 'large') => {
@@ -160,6 +158,44 @@ export const PosterBrandingBar: React.FC<PosterBrandingBarProps> = ({
   const currentHeaderHeight = branding.layoutConfig?.headerHeight || 'normal';
   const currentFooterFontSize = branding.layoutConfig?.footerFontSize || 'normal';
   const currentFooterAlignment = branding.layoutConfig?.footerAlignment || 'center';
+
+  const ratioKey = (aspectRatio && aspectRatio in BRANDING_SAFE_AREA_CONFIG)
+    ? (aspectRatio as PosterAspectRatio)
+    : '9:16';
+  const baseRatioPercent = BRANDING_SAFE_AREA_CONFIG[ratioKey]?.headerBarPercent ?? 9.5;
+  const currentHeaderHeightPercent = branding.layoutConfig?.headerHeightPercent;
+  const effectiveHeightPercent = currentHeaderHeightPercent ?? Number(
+    (baseRatioPercent * (currentHeaderHeight === 'compact' ? 0.85 : currentHeaderHeight === 'spacious' ? 1.2 : 1.0)).toFixed(1)
+  );
+
+  const handleHeaderHeightPercentChange = (percent: number) => {
+    const clamped = Math.min(25, Math.max(4, Math.round(percent * 2) / 2));
+    onChange({
+      ...branding,
+      layoutConfig: {
+        ...(branding.layoutConfig || {}),
+        headerHeightPercent: clamped,
+      },
+    });
+  };
+
+  const handleHeaderHeightPreset = (sz: 'compact' | 'normal' | 'spacious') => {
+    const mult = sz === 'compact' ? 0.85 : sz === 'spacious' ? 1.2 : 1.0;
+    const target = Number((baseRatioPercent * mult).toFixed(1));
+    onChange({
+      ...branding,
+      layoutConfig: {
+        ...(branding.layoutConfig || {}),
+        headerHeight: sz,
+        headerHeightPercent: target,
+      },
+    });
+  };
+
+  const handleStepHeight = (delta: number) => {
+    const nextVal = Math.min(25, Math.max(4, Number((effectiveHeightPercent + delta).toFixed(1))));
+    handleHeaderHeightPercentChange(nextVal);
+  };
 
   const fullLogoUrl = branding.logoUrl
     ? branding.logoUrl.startsWith('http')
@@ -364,28 +400,74 @@ export const PosterBrandingBar: React.FC<PosterBrandingBarProps> = ({
             </div>
           </div>
 
-          {/* Tinggi Kop Header */}
-          <div className="flex items-center gap-2">
+          {/* Tinggi Kop Header Dinamis (Slider + Stepper + Preset) */}
+          <div className="flex flex-wrap items-center gap-2">
             <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 flex items-center gap-1">
               <SlidersHorizontal size={11} className="text-teal-400" />
               <span>Tinggi Kop:</span>
             </span>
+
+            {/* Live Percent Badge */}
+            <span className="px-1.5 py-0.5 bg-teal-950/80 border border-teal-500/50 text-teal-300 font-mono text-[10px] font-bold rounded-none">
+              {effectiveHeightPercent.toFixed(1)}%
+            </span>
+
+            {/* Stepper Minus, Slider, Stepper Plus */}
+            <div className="flex items-center border border-slate-700 rounded-none bg-slate-900">
+              <button
+                type="button"
+                disabled={!branding.headerEnabled || effectiveHeightPercent <= 4}
+                onClick={() => handleStepHeight(-0.5)}
+                className="px-1.5 py-1 text-slate-400 hover:text-white hover:bg-slate-800 disabled:opacity-30 cursor-pointer rounded-none transition-colors"
+                title="Kurangi tinggi kop (-0.5%)"
+              >
+                <Minus size={11} />
+              </button>
+
+              <div className="px-2 flex items-center">
+                <input
+                  type="range"
+                  min="4"
+                  max="25"
+                  step="0.5"
+                  disabled={!branding.headerEnabled}
+                  value={effectiveHeightPercent}
+                  onChange={(e) => handleHeaderHeightPercentChange(parseFloat(e.target.value))}
+                  className="w-20 sm:w-28 h-1.5 bg-slate-800 accent-teal-400 cursor-pointer rounded-none"
+                  title={`Tinggi Kop: ${effectiveHeightPercent.toFixed(1)}%`}
+                />
+              </div>
+
+              <button
+                type="button"
+                disabled={!branding.headerEnabled || effectiveHeightPercent >= 25}
+                onClick={() => handleStepHeight(0.5)}
+                className="px-1.5 py-1 text-slate-400 hover:text-white hover:bg-slate-800 disabled:opacity-30 cursor-pointer rounded-none transition-colors border-l border-slate-800"
+                title="Tambah tinggi kop (+0.5%)"
+              >
+                <Plus size={11} />
+              </button>
+            </div>
+
+            {/* Quick Presets */}
             <div className="flex items-center border border-slate-700 rounded-none bg-slate-900 p-0.5">
               {(['compact', 'normal', 'spacious'] as const).map((sz) => {
                 const labels = { compact: 'Ringkas', normal: 'Standar', spacious: 'Lega' };
-                const isSelected = currentHeaderHeight === sz;
+                const mult = sz === 'compact' ? 0.85 : sz === 'spacious' ? 1.2 : 1.0;
+                const presetVal = Number((baseRatioPercent * mult).toFixed(1));
+                const isSelected = Math.abs(effectiveHeightPercent - presetVal) < 0.2;
                 return (
                   <button
                     key={sz}
                     type="button"
                     disabled={!branding.headerEnabled}
-                    onClick={() => handleHeaderHeight(sz)}
+                    onClick={() => handleHeaderHeightPreset(sz)}
                     className={`px-2 py-1 text-[10px] font-bold uppercase cursor-pointer rounded-none transition-colors ${
                       isSelected
                         ? 'bg-teal-700 text-white'
                         : 'text-slate-400 hover:text-white disabled:opacity-40'
                     }`}
-                    title={`Tinggi Kop: ${labels[sz]}`}
+                    title={`Preset ${labels[sz]} (${presetVal}%)`}
                   >
                     {labels[sz]}
                   </button>

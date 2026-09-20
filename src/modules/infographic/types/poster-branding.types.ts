@@ -13,8 +13,12 @@ export interface PosterLayoutConfig {
   footerFontSize?: 'compact' | 'normal' | 'large';
   logoPosition?: 'left' | 'right' | 'center';
   logoSize?: 'compact' | 'normal' | 'large';
-  /** Tinggi / ketebalan kop header: compact (~85%), normal (100%), spacious (~120%) */
+  /** Preset tinggi kop header: compact (~85%), normal (100%), spacious (~120%) */
   headerHeight?: 'compact' | 'normal' | 'spacious';
+  /** Tinggi persentase dinamis untuk kop header (misal: 4.0% - 25.0%) */
+  headerHeightPercent?: number;
+  /** Tinggi persentase dinamis untuk footer (misal: 2.0% - 15.0%) */
+  footerHeightPercent?: number;
 }
 
 /**

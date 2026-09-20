@@ -1,3 +1,4 @@
+import React, { useRef, useState, useEffect } from 'react';
 import {
   BRANDING_SAFE_AREA_CONFIG,
   type PosterBrandingData,
@@ -9,35 +10,54 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000
 interface PosterBrandingOverlayProps {
   branding: PosterBrandingData | null;
   aspectRatio?: PosterAspectRatio | string;
+  onHeaderHeightPercentChange?: (percent: number) => void;
 }
 
 /**
  * Menghitung proporsi tinggi header dan footer adaptif sinkron dengan engine backend
  * dan konfigurasi Safe Area sentral (BRANDING_SAFE_AREA_CONFIG).
+ * Mendukung persentase dinamis (custom drag / slider).
  */
 export function getOverlayDimensions(
   aspectRatio?: string,
   headerHeightOption?: 'compact' | 'normal' | 'spacious',
+  customHeaderHeightPercent?: number,
+  customFooterHeightPercent?: number,
 ): {
   headerHeight: string;
   footerHeight: string;
+  headerHeightNum: number;
+  footerHeightNum: number;
 } {
   const ratioKey = (aspectRatio && aspectRatio in BRANDING_SAFE_AREA_CONFIG)
     ? (aspectRatio as PosterAspectRatio)
     : '9:16';
   const config = BRANDING_SAFE_AREA_CONFIG[ratioKey];
 
-  const headerMultiplier =
-    headerHeightOption === 'compact' ? 0.85 : headerHeightOption === 'spacious' ? 1.2 : 1.0;
+  let headerNum: number;
+  if (typeof customHeaderHeightPercent === 'number' && customHeaderHeightPercent > 0) {
+    headerNum = customHeaderHeightPercent;
+  } else {
+    const headerMultiplier =
+      headerHeightOption === 'compact' ? 0.85 : headerHeightOption === 'spacious' ? 1.2 : 1.0;
+    headerNum = Number((config.headerBarPercent * headerMultiplier).toFixed(1));
+  }
 
-  const headerPercent = (config.headerBarPercent * headerMultiplier).toFixed(2);
-  const footerPercent = config.footerBarPercent.toFixed(2);
+  let footerNum: number;
+  if (typeof customFooterHeightPercent === 'number' && customFooterHeightPercent > 0) {
+    footerNum = customFooterHeightPercent;
+  } else {
+    footerNum = config.footerBarPercent;
+  }
 
   return {
-    headerHeight: `${headerPercent}%`,
-    footerHeight: `${footerPercent}%`,
+    headerHeight: `${headerNum}%`,
+    footerHeight: `${footerNum}%`,
+    headerHeightNum: headerNum,
+    footerHeightNum: footerNum,
   };
 }
+
 
 
 function isDarkColor(hex?: string): boolean {
@@ -78,7 +98,14 @@ const LOGO_HEIGHT_CLASSES = {
   large: 'h-[88%]',
 };
 
-export const PosterBrandingOverlay: React.FC<PosterBrandingOverlayProps> = ({ branding, aspectRatio }) => {
+export const PosterBrandingOverlay: React.FC<PosterBrandingOverlayProps> = ({
+  branding,
+  aspectRatio,
+  onHeaderHeightPercentChange,
+}) => {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
+
   if (!branding) return null;
 
   const {
@@ -93,7 +120,12 @@ export const PosterBrandingOverlay: React.FC<PosterBrandingOverlayProps> = ({ br
 
   if (!headerEnabled && !footerEnabled) return null;
 
-  const dims = getOverlayDimensions(aspectRatio, layoutConfig.headerHeight);
+  const dims = getOverlayDimensions(
+    aspectRatio,
+    layoutConfig.headerHeight,
+    layoutConfig.headerHeightPercent,
+    layoutConfig.footerHeightPercent,
+  );
 
   const headerBgColor = layoutConfig.headerBgColor || '#FFFFFF';
   const headerTextColor = layoutConfig.headerTextColor || (isDarkColor(headerBgColor) ? '#FFFFFF' : '#0F1E36');
@@ -128,8 +160,46 @@ export const PosterBrandingOverlay: React.FC<PosterBrandingOverlayProps> = ({ br
       ? 'items-center text-center'
       : 'items-start text-left';
 
+  const handleUpdateHeight = (clientY: number) => {
+    if (!containerRef.current || !onHeaderHeightPercentChange) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    if (rect.height <= 0) return;
+    const offsetY = clientY - rect.top;
+    const rawPercent = (offsetY / rect.height) * 100;
+    // Batasi dari minimal 4% sampai maksimal 25% dengan presisi 0.5%
+    const clamped = Math.min(25, Math.max(4, Math.round(rawPercent * 2) / 2));
+    onHeaderHeightPercentChange(clamped);
+  };
+
+  const handleDragStart = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+
+    const handleMouseMove = (ev: MouseEvent) => {
+      ev.preventDefault();
+      handleUpdateHeight(ev.clientY);
+    };
+
+    const handleMouseUp = () => {
+      setIsDragging(false);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    document.body.style.cursor = 'ns-resize';
+    document.body.style.userSelect = 'none';
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+  };
+
   return (
-    <div className="absolute inset-0 pointer-events-none z-10 overflow-hidden font-roboto rounded-none select-none">
+    <div
+      ref={containerRef}
+      className="absolute inset-0 pointer-events-none z-10 overflow-hidden font-roboto rounded-none select-none"
+    >
       {/* ── HEADER RESMI DETERMINISTIK ── */}
       {headerEnabled && (
         <div
@@ -167,6 +237,38 @@ export const PosterBrandingOverlay: React.FC<PosterBrandingOverlayProps> = ({ br
               </span>
             )}
           </div>
+
+          {/* Interactive Drag Handle (Ubah tinggi kop langsung dengan kursor) */}
+          {onHeaderHeightPercentChange && (
+            <div
+              onMouseDown={handleDragStart}
+              className={`absolute -bottom-3 left-0 right-0 h-6 cursor-ns-resize pointer-events-auto flex items-center justify-center group z-30 select-none ${
+                isDragging ? 'opacity-100' : 'hover:opacity-100'
+              }`}
+              title="Tarik kursor ke atas/bawah untuk mengubah tinggi kop secara dinamis"
+            >
+              {/* Full Width Dynamic Guideline Line */}
+              <div
+                className={`absolute inset-x-0 top-1/2 -translate-y-1/2 h-[2px] transition-all duration-150 ${
+                  isDragging
+                    ? 'bg-teal-400 shadow-[0_0_8px_rgba(45,212,191,0.9)] opacity-100'
+                    : 'bg-teal-500/30 group-hover:bg-teal-400 group-hover:shadow-[0_0_6px_rgba(45,212,191,0.7)] opacity-0 group-hover:opacity-100'
+                }`}
+              />
+
+              {/* Central Grip Badge */}
+              <div
+                className={`relative px-2.5 py-0.5 border text-[9px] font-mono font-bold uppercase tracking-wider rounded-none shadow-xl flex items-center gap-1.5 transition-all duration-150 ${
+                  isDragging
+                    ? 'bg-slate-900 border-teal-400 text-teal-300 scale-105 shadow-teal-500/20'
+                    : 'bg-slate-900/90 border-slate-600 text-slate-300 group-hover:border-teal-400 group-hover:text-teal-300'
+                }`}
+              >
+                <span className="text-teal-400 text-[11px] leading-none">⇅</span>
+                <span>{dims.headerHeightNum.toFixed(1)}%</span>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
