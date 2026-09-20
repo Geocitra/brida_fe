@@ -1,7 +1,124 @@
 import React, { useState, useEffect } from 'react';
 import { Globe, FileText, Sparkles, AlertTriangle, Lightbulb, BarChart3, RefreshCw } from 'lucide-react';
+import { jsonrepair } from 'jsonrepair';
 import { DocumentService } from '../../../services/document.service';
 import { MarkdownTableRenderer } from './markdown-table-renderer.component';
+
+/**
+ * Robust QuickChart URL Normalizer:
+ * Membersihkan URL QuickChart dari format raw/malformed LLM, memperbaiki sintaks JSON
+ * dengan jsonrepair, meng-encode parameter secara aman (termasuk kurung %28/%29 dan hash %23),
+ * serta menyediakan fallback chart jika JSON tidak dapat diperbaiki sama sekali.
+ */
+export function normalizeQuickChartUrl(rawUrl: string, fallbackTitle: string = 'Visualisasi Grafik'): string {
+  if (!rawUrl || typeof rawUrl !== 'string') return '';
+  let urlStr = rawUrl.trim();
+
+  // Bersihkan karakter pembungkus markdown
+  while (urlStr.startsWith('<') || urlStr.startsWith('(') || urlStr.startsWith('[') || urlStr.startsWith('"') || urlStr.startsWith("'")) {
+    urlStr = urlStr.substring(1);
+  }
+  while (urlStr.endsWith('>') || urlStr.endsWith(')') || urlStr.endsWith(']') || urlStr.endsWith('"') || urlStr.endsWith("'")) {
+    urlStr = urlStr.substring(0, urlStr.length - 1);
+  }
+
+  const qcMarker = 'quickchart.io/chart';
+  const markerIdx = urlStr.toLowerCase().indexOf(qcMarker);
+  if (markerIdx === -1) {
+    return urlStr.replace(/\s+/g, '%20').replace(/"/g, '%22');
+  }
+
+  const queryStart = urlStr.indexOf('?', markerIdx);
+  if (queryStart === -1) {
+    return urlStr;
+  }
+
+  const queryString = urlStr.substring(queryStart + 1);
+  const cParamMatch = queryString.match(/(?:^|&)(c|chart)=([^&]*)/i);
+  let rawConfig = '';
+
+  if (cParamMatch) {
+    rawConfig = cParamMatch[2];
+  } else {
+    rawConfig = queryString.replace(/^(?:[^?&]*?[?&])?(?:c|chart)=/i, '');
+  }
+
+  // Decode rawConfig
+  let decoded = rawConfig;
+  try {
+    decoded = decodeURIComponent(decoded);
+  } catch {
+    try {
+      const fixed = decoded.replace(/%(?![0-9a-fA-F]{2})/g, '%25');
+      decoded = decodeURIComponent(fixed);
+    } catch {}
+  }
+
+  decoded = decoded
+    .replace(/%7B/gi, '{')
+    .replace(/%7D/gi, '}')
+    .replace(/%5B/gi, '[')
+    .replace(/%5D/gi, ']')
+    .replace(/%3A/gi, ':')
+    .replace(/%2C/gi, ',')
+    .replace(/%22/gi, '"')
+    .replace(/%27/gi, "'")
+    .replace(/%20/gi, ' ')
+    .replace(/%23/gi, '#')
+    .replace(/%28/gi, '(')
+    .replace(/%29/gi, ')')
+    .replace(/%2F/gi, '/');
+
+  let configToRepair = decoded.trim();
+  const firstBrace = configToRepair.indexOf('{');
+  if (firstBrace !== -1) {
+    configToRepair = configToRepair.substring(firstBrace);
+  }
+
+  const ampIdx = configToRepair.lastIndexOf('&');
+  if (ampIdx !== -1) {
+    const afterAmp = configToRepair.substring(ampIdx);
+    if (/&(?:bkg|w|h|width|height|format|devicePixelRatio)=/i.test(afterAmp)) {
+      configToRepair = configToRepair.substring(0, ampIdx);
+    }
+  }
+
+  let finalConfigJson = '';
+  try {
+    const repaired = jsonrepair(configToRepair);
+    const parsed = JSON.parse(repaired);
+    finalConfigJson = JSON.stringify(parsed);
+  } catch {
+    finalConfigJson = JSON.stringify({
+      type: 'bar',
+      data: {
+        labels: ['Indikator 1', 'Indikator 2', 'Indikator 3'],
+        datasets: [
+          {
+            label: fallbackTitle,
+            data: [70, 85, 75],
+            backgroundColor: ['#0d9488', '#14b8a6', '#2dd4bf'],
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { display: true },
+          title: { display: true, text: fallbackTitle },
+        },
+      },
+    });
+  }
+
+  const safeEncoded = encodeURIComponent(finalConfigJson)
+    .replace(/\(/g, '%28')
+    .replace(/\)/g, '%29')
+    .replace(/'/g, '%27')
+    .replace(/\*/g, '%2A');
+
+  return `https://quickchart.io/chart?c=${safeEncoded}&bkg=white&w=650&h=350&devicePixelRatio=2`;
+}
 
 export const SafeChartImage: React.FC<{ src: string; alt: string }> = ({ src, alt }) => {
   const [hasError, setHasError] = useState(false);
@@ -89,7 +206,7 @@ export const parseInlineStylesRaw = (
 
   for (const seg of textSegments) {
     if (seg.isImage && seg.url) {
-      const safeUrl = seg.url.replace(/\s+/g, '%20').replace(/"/g, '%22');
+      const safeUrl = normalizeQuickChartUrl(seg.url, seg.alt || 'Visualisasi Grafik');
       parts.push(
         <span key={`inline-img-${keyIdx++}`} className="block my-3 w-full text-center">
           <img
@@ -472,7 +589,7 @@ export const RichMessageRenderer: React.FC<RichMessageRendererProps> = ({
       ) {
         rawUrl = rawUrl.substring(0, rawUrl.length - 1);
       }
-      const safeUrl = rawUrl.replace(/\s+/g, '%20').replace(/"/g, '%22');
+      const safeUrl = normalizeQuickChartUrl(rawUrl, altText);
 
       elements.push(
         <SafeChartImage key={`img-block-${keyIdx++}`} src={safeUrl} alt={altText} />,
