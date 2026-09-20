@@ -16,7 +16,7 @@ interface EditorState extends EditorFormatting {
     draftContent: string; // Menyimpan HTML/DOM visual resmi
     isDirty: boolean;
 
-    initSession: (sessionId: string, title: string, content: string) => void;
+    initSession: (sessionId: string, title: string, content: string, forceReload?: boolean) => void;
     setContent: (content: string) => void;
     setFormatting: (updates: Partial<EditorFormatting>) => void;
     markSaved: () => void;
@@ -39,13 +39,18 @@ export const useEditorStore = create<EditorState>()(
         (set, get) => ({
             ...initialState,
 
-            initSession: (sessionId: string, title: string, content: string) => {
+            initSession: (sessionId: string, title: string, content: string, forceReload: boolean = false) => {
                 const current = get();
 
-                // Lindungi draf yang belum disimpan dari crash atau reload tidak sengaja
-                if (current.sessionId === sessionId && current.isDirty) {
-                    console.warn(`[EditorStore] Memulihkan naskah aktif sesi ID: ${sessionId}`);
-                    return;
+                // Lindungi draf yang belum disimpan HANYA jika bukan force reload
+                // dan konten server tidak jauh lebih panjang dari draf lokal
+                if (!forceReload && current.sessionId === sessionId && current.isDirty) {
+                    if (content && content.length > (current.draftContent?.length || 0) + 200) {
+                        console.log(`[EditorStore] Memuat naskah baru yang lebih lengkap dari server (${content.length} chars).`);
+                    } else {
+                        console.warn(`[EditorStore] Memulihkan naskah aktif sesi ID: ${sessionId}`);
+                        return;
+                    }
                 }
 
                 set({

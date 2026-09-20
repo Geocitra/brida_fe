@@ -47,7 +47,7 @@ export function getOverlayDimensions(
   if (typeof customFooterHeightPercent === 'number' && customFooterHeightPercent > 0) {
     footerNum = customFooterHeightPercent;
   } else {
-    footerNum = config.footerBarPercent;
+    footerNum = Math.max(config.footerBarPercent, 5.2);
   }
 
   return {
@@ -280,7 +280,7 @@ export const PosterBrandingOverlay: React.FC<PosterBrandingOverlayProps> = ({
             color: footerTextColor,
             height: dims.footerHeight,
           }}
-          className={`absolute bottom-0 left-0 right-0 flex items-center px-[4%] border-t border-white/10 rounded-none transition-colors duration-150 ${
+          className={`absolute bottom-0 left-0 right-0 flex items-center px-[4%] border-t-2 border-teal-500 shadow-md rounded-none transition-colors duration-150 ${
             footerAlignment === 'center'
               ? 'justify-center text-center'
               : footerAlignment === 'right'
@@ -288,7 +288,7 @@ export const PosterBrandingOverlay: React.FC<PosterBrandingOverlayProps> = ({
               : 'justify-start text-left'
           }`}
         >
-          <span className={`${footerFontClass} font-medium tracking-wide truncate max-w-full`}>
+          <span className={`${footerFontClass} font-semibold tracking-wide truncate max-w-full`}>
             {footerText}
           </span>
         </div>

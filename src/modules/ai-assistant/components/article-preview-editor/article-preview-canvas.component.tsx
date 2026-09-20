@@ -35,8 +35,9 @@ const PAGE_GAP = 28;  // Jarak fisik antar lembar kertas A4 (px)
 
 /**
  * Mengambil blok-blok atomik yang dapat dipaginasi secara mandiri.
- * Mendekomposisi elemen majemuk (seperti <ul>/<ol> menjadi <li>, dan <table> menjadi <tr>)
- * sehingga tidak ada butir daftar atau baris yang terpotong di perbatasan kertas.
+ * Mendekomposisi elemen majemuk (seperti <ul>/<ol> menjadi <li>)
+ * agar setiap butir list dapat berpindah halaman secara alami seperti di Word.
+ * Tabel diperlakukan sebagai satu unit utuh agar baris tabel tidak terbelah di celah.
  */
 function getPaginatableBlocks(pm: HTMLElement): HTMLElement[] {
   const blocks: HTMLElement[] = [];
@@ -54,14 +55,8 @@ function getPaginatableBlocks(pm: HTMLElement): HTMLElement[] {
       } else {
         blocks.push(el);
       }
-    } else if (tag === 'table') {
-      const rows = Array.from(el.querySelectorAll('tbody > tr')) as HTMLElement[];
-      if (rows.length > 1) {
-        blocks.push(...rows);
-      } else {
-        blocks.push(el);
-      }
     } else {
+      // Tabel, paragraf, heading, blockquote, div diperlakukan sebagai blok utuh
       blocks.push(el);
     }
   });
@@ -91,136 +86,183 @@ export const ArticlePreviewCanvas: React.FC<ArticlePreviewCanvasProps> = ({
 
   const wrapperRef = useRef<HTMLDivElement>(null);
   const [pageCount, setPageCount] = useState<number>(1);
+  const isPaginatingRef = useRef(false);
+  const debounceTimerRef = useRef<any>(null);
 
-  // ── MESIN PAGINASI ATOMIK A4 (DEEP BLOCK-FLOW ENGINE SEPERTI MS WORD) ──
+  // ── MESIN PAGINASI PRESISI NYATA A4 (TRUE DOM RECT PAGINATION ALA MS WORD) ──
   const applyWordStylePagination = useCallback(() => {
-    if (!wrapperRef.current) return;
+    if (!wrapperRef.current || isPaginatingRef.current) return;
     const pm = wrapperRef.current.querySelector('.ProseMirror') as HTMLElement | null;
     if (!pm) return;
 
-    // Reset seluruh margin paginasi yang pernah disematkan (baik di direct children maupun sub-element)
-    const previouslyModified = pm.querySelectorAll('[data-page-margin-added]');
-    previouslyModified.forEach((el: any) => {
-      el.style.marginTop = '';
-      delete el.dataset.pageMarginAdded;
-    });
+    isPaginatingRef.current = true;
 
-    Array.from(pm.children).forEach((el: any) => {
-      if (el.dataset?.pageMarginAdded) {
-        el.style.marginTop = '';
+    try {
+      // 1. Reset seluruh margin paginasi sementara untuk mengukur tata letak murni
+      const previouslyModified = pm.querySelectorAll('[data-page-margin-added]');
+      previouslyModified.forEach((el: any) => {
+        el.style.removeProperty('--page-push-margin');
+        el.style.removeProperty('margin-top');
         delete el.dataset.pageMarginAdded;
+      });
+
+      Array.from(pm.children).forEach((el: any) => {
+        if (el.dataset?.pageMarginAdded) {
+          el.style.removeProperty('--page-push-margin');
+          el.style.removeProperty('margin-top');
+          delete el.dataset.pageMarginAdded;
+        }
+      });
+
+      // Paksa browser melakukan reflow kalkulasi layout bersih
+      void pm.offsetHeight;
+
+      const blocks = getPaginatableBlocks(pm);
+      if (blocks.length === 0) {
+        setPageCount(1);
+        onPageCountChange?.(1);
+        return;
       }
-    });
 
-    // Paksa browser melakukan reflow kalkulasi layout bersih
-    void pm.offsetHeight;
+      const pageSlotH = PAGE_H + PAGE_GAP;
+      const pageAvailableH = PAGE_H - 2 * marginPx;
+      let maxPageReached = 0;
 
-    const blocks = getPaginatableBlocks(pm);
-    if (blocks.length === 0) return;
+      // 2. Evaluasi sekuensial blok demi blok berdasarkan koordinat fisik riil DOM
+      for (let idx = 0; idx < blocks.length; idx++) {
+        const el = blocks[idx];
+        const pmRect = pm.getBoundingClientRect();
+        const elRect = el.getBoundingClientRect();
 
-    let currentPageIdx = 0;
-    let currentAccumulatedY = 0;
+        // Posisi absolut elemen di dalam kanvas kertas A4 (diskalakan bebas zoom)
+        const actualTop = (elRect.top - pmRect.top) / zoomLevel + marginPx;
+        const actualHeight = elRect.height / zoomLevel;
+        const actualBottom = actualTop + actualHeight;
 
-    blocks.forEach((el, idx) => {
-      const style = window.getComputedStyle(el);
-      const origMarginTop = parseFloat(style.marginTop) || 0;
-      const origMarginBottom = parseFloat(style.marginBottom) || 0;
+        // Halaman lembar A4 tempat puncak elemen saat ini berada
+        const currentPageIdx = Math.max(0, Math.floor(actualTop / pageSlotH));
+        const pageSheetTop = currentPageIdx * pageSlotH;
+        const pageSafeTop = pageSheetTop + marginPx;
+        const pageSafeBottom = pageSheetTop + PAGE_H - marginPx;
+        const nextPageSafeTop = (currentPageIdx + 1) * pageSlotH + marginPx;
 
-      const rect = el.getBoundingClientRect();
-      const elHeight = (rect.height > 0 ? rect.height : el.offsetHeight) + origMarginBottom;
+        // Cek manual page break node
+        const isPageBreak = el.getAttribute('data-type') === 'page-break';
+        if (isPageBreak) {
+          const pushDistance = nextPageSafeTop - actualTop;
+          if (pushDistance > 0) {
+            el.style.setProperty('--page-push-margin', `${pushDistance}px`);
+            el.style.setProperty('margin-top', `${pushDistance}px`, 'important');
+            el.dataset.pageMarginAdded = 'true';
+            const targetPageIdx = Math.floor(nextPageSafeTop / pageSlotH);
+            if (targetPageIdx > maxPageReached) maxPageReached = targetPageIdx;
+            void el.offsetHeight;
+          }
+          continue;
+        }
 
-      // Cegah Heading yatim di dasar halaman (Keep with Next Element)
-      const isHeading = ['H1', 'H2', 'H3', 'H4'].includes(el.tagName);
-      let nextWillOverflow = false;
+        // Cek apakah elemen adalah Heading atau Caption Judul Tabel / Gambar
+        const tag = el.tagName.toUpperCase();
+        const isHeading = ['H1', 'H2', 'H3', 'H4', 'H5'].includes(tag);
+        const text = el.textContent?.trim().toLowerCase() || '';
+        const isCaption =
+          tag === 'P' &&
+          (text.startsWith('tabel') ||
+           text.startsWith('grafik') ||
+           text.startsWith('gambar') ||
+           text.startsWith('diagram') ||
+           text.startsWith('bagan') ||
+           (Boolean(el.querySelector('strong')) && text.length < 100));
 
-      if (isHeading && idx < blocks.length - 1) {
-        const nextEl = blocks[idx + 1];
-        const nextStyle = window.getComputedStyle(nextEl);
-        const nextRect = nextEl.getBoundingClientRect();
-        const nextH =
-          (nextRect.height > 0 ? nextRect.height : nextEl.offsetHeight) +
-          (parseFloat(nextStyle.marginBottom) || 0);
-        if (currentAccumulatedY + elHeight + nextH > pageContentH) {
-          nextWillOverflow = true;
+        let shouldKeepWithNext = false;
+        if ((isHeading || isCaption) && idx < blocks.length - 1) {
+          const nextEl = blocks[idx + 1];
+          const nextRect = nextEl.getBoundingClientRect();
+          const nextH = nextRect.height / zoomLevel;
+          const nextTag = nextEl.tagName.toUpperCase();
+          const isNextTable = nextTag === 'TABLE' || nextEl.classList.contains('tableWrapper');
+          // Untuk tabel: butuh ruang penuh tabel agar tidak terpotong dari judulnya
+          const neededRoom = isNextTable ? Math.min(nextH, pageAvailableH) : Math.min(nextH, 150);
+          if (actualBottom + neededRoom > pageSafeBottom) {
+            shouldKeepWithNext = true;
+          }
+        }
+
+        // Evaluasi apakah elemen butuh didorong ke halaman berikutnya
+        const isTallerThanPage = actualHeight > pageAvailableH;
+
+        let needsPush = false;
+        let targetTop = nextPageSafeTop;
+
+        if (isTallerThanPage) {
+          // Jika elemen luar biasa tinggi (> 1 lembar), dorong jika belum di awal halaman
+          if (actualTop > pageSafeTop + 30) {
+            needsPush = true;
+            targetTop = nextPageSafeTop;
+          }
+        } else {
+          // Elemen normal: dorong jika melewati batas aman bawah atau keep-with-next
+          if (
+            actualBottom > pageSafeBottom ||
+            actualTop >= pageSafeBottom - 8 ||
+            shouldKeepWithNext
+          ) {
+            needsPush = true;
+            targetTop = nextPageSafeTop;
+          } else if (actualTop < pageSafeTop && actualTop >= pageSheetTop) {
+            needsPush = true;
+            targetTop = pageSafeTop;
+          }
+        }
+
+        if (needsPush) {
+          const pushDistance = targetTop - actualTop;
+          if (pushDistance > 0) {
+            el.style.setProperty('--page-push-margin', `${pushDistance}px`);
+            el.style.setProperty('margin-top', `${pushDistance}px`, 'important');
+            el.dataset.pageMarginAdded = 'true';
+
+            const targetPageIdx = Math.floor(targetTop / pageSlotH);
+            if (targetPageIdx > maxPageReached) {
+              maxPageReached = targetPageIdx;
+            }
+
+            // Paksa reflow instan agar elemen berikutnya membaca koordinat yang sudah bergeser
+            void el.offsetHeight;
+          }
+        } else {
+          if (currentPageIdx > maxPageReached) {
+            maxPageReached = currentPageIdx;
+          }
         }
       }
 
-      // Jika elemen saat ini melebihi sisa tinggi halaman, lompatkan ke awal lembar A4 berikutnya
-      if (
-        (currentAccumulatedY + elHeight > pageContentH || nextWillOverflow) &&
-        currentAccumulatedY > 0
-      ) {
-        const remainingOnCurrentPage = Math.max(0, pageContentH - currentAccumulatedY);
-        const pushMargin = remainingOnCurrentPage + pageJumpH;
+      // 3. Hitung total halaman akhir berdasarkan posisi elemen terbawah
+      const pmFinalRect = pm.getBoundingClientRect();
+      const lastElement = blocks[blocks.length - 1];
+      const lastRect = lastElement.getBoundingClientRect();
+      const docBottom = (lastRect.bottom - pmFinalRect.top) / zoomLevel + marginPx;
+      const finalCalculatedPages = Math.max(1, maxPageReached + 1, Math.ceil(docBottom / pageSlotH));
 
-        el.style.marginTop = `${origMarginTop + pushMargin}px`;
-        el.dataset.pageMarginAdded = 'true';
-
-        currentPageIdx += 1;
-        currentAccumulatedY = elHeight;
-      } else {
-        currentAccumulatedY += elHeight + origMarginTop;
-      }
-    });
-
-    const calculatedTotalPages = Math.max(1, currentPageIdx + 1);
-    setPageCount(calculatedTotalPages);
-    onPageCountChange?.(calculatedTotalPages);
-  }, [pageContentH, pageJumpH, onPageCountChange]);
+      setPageCount(finalCalculatedPages);
+      onPageCountChange?.(finalCalculatedPages);
+    } finally {
+      isPaginatingRef.current = false;
+    }
+  }, [marginPx, zoomLevel, onPageCountChange]);
 
   const schedulePagination = useCallback(() => {
-    requestAnimationFrame(() => {
-      applyWordStylePagination();
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    debounceTimerRef.current = setTimeout(() => {
       requestAnimationFrame(() => {
         applyWordStylePagination();
       });
-    });
+    }, 80);
   }, [applyWordStylePagination]);
 
-  // Pantau perubahan ukuran elemen / gambar yang baru selesai diunduh
-  useEffect(() => {
-    const el = wrapperRef.current;
-    if (!el) return;
-
-    const ro = new ResizeObserver(() => {
-      schedulePagination();
-    });
-    ro.observe(el);
-
-    const attachImageListeners = () => {
-      const images = el.querySelectorAll('img');
-      images.forEach((img) => {
-        if (!img.complete) {
-          img.onload = () => schedulePagination();
-          img.onerror = () => schedulePagination();
-        }
-      });
-    };
-
-    const handleMediaLoaded = () => {
-      schedulePagination();
-    };
-
-    window.addEventListener('tiptap-media-loaded', handleMediaLoaded);
-
-    attachImageListeners();
-    schedulePagination();
-
-    // Jalankan timer pengaman untuk menangkap chart eksternal
-    const t1 = setTimeout(schedulePagination, 200);
-    const t2 = setTimeout(schedulePagination, 600);
-    const t3 = setTimeout(schedulePagination, 1500);
-
-    return () => {
-      ro.disconnect();
-      window.removeEventListener('tiptap-media-loaded', handleMediaLoaded);
-      clearTimeout(t1);
-      clearTimeout(t2);
-      clearTimeout(t3);
-    };
-  }, [schedulePagination]);
-
-  // Jalankan paginasi setiap kali ada update teks dari TipTap
+  // Pantau event update dari TipTap editor
   useEffect(() => {
     if (!editor) return;
     const handler = () => {
@@ -231,6 +273,40 @@ export const ArticlePreviewCanvas: React.FC<ArticlePreviewCanvasProps> = ({
       editor.off('update', handler);
     };
   }, [editor, schedulePagination]);
+
+  // Pantau pemuatan media dan inisialisasi awal
+  useEffect(() => {
+    const handleMediaLoaded = () => {
+      schedulePagination();
+    };
+    window.addEventListener('tiptap-media-loaded', handleMediaLoaded);
+
+    const el = wrapperRef.current;
+    if (el) {
+      const images = el.querySelectorAll('img');
+      images.forEach((img) => {
+        if (!img.complete) {
+          img.onload = () => schedulePagination();
+          img.onerror = () => schedulePagination();
+        }
+      });
+    }
+
+    const tInit = setTimeout(schedulePagination, 150);
+
+    return () => {
+      window.removeEventListener('tiptap-media-loaded', handleMediaLoaded);
+      clearTimeout(tInit);
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, [schedulePagination]);
+
+  // Paginasi ulang jika konfigurasi tata letak berubah
+  useEffect(() => {
+    schedulePagination();
+  }, [fontSize, fontFamily, lineSpacing, marginCm, zoomLevel, schedulePagination]);
 
   const totalCanvasH = pageCount * PAGE_H + (pageCount - 1) * PAGE_GAP;
 
@@ -268,8 +344,8 @@ export const ArticlePreviewCanvas: React.FC<ArticlePreviewCanvasProps> = ({
           }
           
           .ProseMirror p {
-            line-height: ${lineSpacing} !important;
-            margin-top: 0 !important;
+            line-height: ${lineSpacing};
+            margin-top: 0;
             margin-bottom: 12px !important;
             text-align: justify;
           }
@@ -287,16 +363,22 @@ export const ArticlePreviewCanvas: React.FC<ArticlePreviewCanvasProps> = ({
             font-weight: 700 !important;
           }
 
-          .ProseMirror h1 { font-size: 1.4em !important; margin: 20px 0 10px !important; }
-          .ProseMirror h2 { font-size: 1.2em !important; margin: 18px 0 8px !important; }
-          .ProseMirror h3 { font-size: 1.05em !important; margin: 14px 0 6px !important; }
+          .ProseMirror h1 { font-size: 1.4em !important; margin-top: 20px; margin-bottom: 10px !important; }
+          .ProseMirror h2 { font-size: 1.2em !important; margin-top: 18px; margin-bottom: 8px !important; }
+          .ProseMirror h3 { font-size: 1.05em !important; margin-top: 14px; margin-bottom: 6px !important; }
 
           /* Tabel Kebijakan Anti-Meluber */
           .ProseMirror table {
             border-collapse: collapse !important;
             table-layout: fixed !important;
             width: 100% !important;
-            margin: 14px 0 18px !important;
+            margin-top: 14px;
+            margin-bottom: 18px !important;
+          }
+
+          .ProseMirror .tableWrapper {
+            margin-top: 14px;
+            margin-bottom: 18px !important;
           }
           
           .ProseMirror td, .ProseMirror th {
@@ -329,7 +411,8 @@ export const ArticlePreviewCanvas: React.FC<ArticlePreviewCanvasProps> = ({
             border-left: 3px solid #0d9488 !important;
             background: #f0fdfa !important;
             padding: 8px 14px !important;
-            margin: 14px 0 !important;
+            margin-top: 14px;
+            margin-bottom: 14px !important;
             color: #134e4a !important;
             font-style: normal !important;
           }
@@ -337,10 +420,31 @@ export const ArticlePreviewCanvas: React.FC<ArticlePreviewCanvasProps> = ({
           .ProseMirror .citation-url-node { display: none !important; }
           .ProseMirror ul { list-style-type: disc; padding-left: 1.5em; margin-bottom: 12px; }
           .ProseMirror ol { list-style-type: decimal; padding-left: 1.5em; margin-bottom: 12px; }
+          .ProseMirror li { margin-bottom: 4px; }
+          .ProseMirror li[data-page-margin-added] { list-style-position: outside !important; }
+
+          /* ── PENEGAKAN MARGIN PAGINASI DENGAN PRIORITAS TERTINGGI ── */
+          .ProseMirror [data-page-margin-added],
+          .ProseMirror p[data-page-margin-added],
+          .ProseMirror h1[data-page-margin-added],
+          .ProseMirror h2[data-page-margin-added],
+          .ProseMirror h3[data-page-margin-added],
+          .ProseMirror h4[data-page-margin-added],
+          .ProseMirror table[data-page-margin-added],
+          .ProseMirror .tableWrapper[data-page-margin-added],
+          .ProseMirror div[data-page-margin-added],
+          .ProseMirror blockquote[data-page-margin-added],
+          .ProseMirror li[data-page-margin-added] {
+            margin-top: var(--page-push-margin) !important;
+          }
 
           @media print {
             .no-print { display: none !important; }
             [data-page-margin-added] { margin-top: 0 !important; }
+            table, .tableWrapper { page-break-inside: avoid !important; break-inside: avoid !important; }
+            tr { page-break-inside: avoid !important; break-inside: avoid !important; }
+            h1, h2, h3, h4 { page-break-after: avoid !important; break-after: avoid !important; }
+            img { page-break-inside: avoid !important; break-inside: avoid !important; }
           }
         `}</style>
 
@@ -356,27 +460,54 @@ export const ArticlePreviewCanvas: React.FC<ArticlePreviewCanvasProps> = ({
               width: `${PAGE_W}px`,
               height: `${PAGE_H}px`,
               background: '#ffffff',
-              boxShadow: '0 4px 20px rgba(0,0,0,0.22), 0 1px 4px rgba(0,0,0,0.1)',
+              boxShadow: '0 4px 20px rgba(0,0,0,0.18), 0 1px 4px rgba(0,0,0,0.08)',
               border: '1px solid #cbd5e1',
               zIndex: 0,
             }}
           >
-            {/* Nomor Halaman di Margin Bawah Kertas */}
-            <span
-              className="no-print"
+            {/* Header Kertas Halus di Lembar Halaman (Kecuali Halaman 1 jika ada judul naskah) */}
+            {i > 0 && (
+              <div
+                className="no-print select-none pointer-events-none"
+                style={{
+                  position: 'absolute',
+                  top: '16px',
+                  left: `${marginPx}px`,
+                  right: `${marginPx}px`,
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  borderBottom: '1px solid #f1f5f9',
+                  paddingBottom: '4px',
+                  fontSize: '9px',
+                  fontWeight: 600,
+                  color: '#94a3b8',
+                  letterSpacing: '0.05em',
+                  textTransform: 'uppercase',
+                  fontFamily: 'Roboto, sans-serif',
+                }}
+              >
+                <span>BRIDA Kabupaten Mimika</span>
+                <span>Naskah Kebijakan</span>
+              </div>
+            )}
+
+            {/* Footer Kertas Rapi Terpasang di Layer Kertas (TIDAK MELAYANG DI ATAS TEKS!) */}
+            <div
+              className="no-print select-none pointer-events-none"
               style={{
                 position: 'absolute',
                 bottom: '16px',
-                right: '24px',
+                right: `${marginPx}px`,
                 fontSize: '9px',
-                fontWeight: 800,
+                fontWeight: 700,
                 color: '#94a3b8',
-                letterSpacing: '0.1em',
-                userSelect: 'none',
+                letterSpacing: '0.08em',
+                textTransform: 'uppercase',
+                fontFamily: 'Roboto, sans-serif',
               }}
             >
-              HALAMAN {i + 1} DARI {pageCount}
-            </span>
+              Halaman {i + 1} dari {pageCount}
+            </div>
           </div>
         ))}
 

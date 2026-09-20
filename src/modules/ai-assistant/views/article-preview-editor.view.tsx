@@ -161,7 +161,7 @@ const TabKeyExtension = Extension.create({
 
 const TIPTAP_EXTENSIONS = [
   StarterKit.configure({
-    heading: { levels: [1, 2, 3] },
+    heading: { levels: [1, 2, 3, 4, 5, 6] },
   }),
   TextAlign.configure({
     types: ['heading', 'paragraph'],
@@ -363,7 +363,7 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
               ? MarkupConverter.toHTML(session.fullArticleText)
               : '<p>Mempersiapkan draf naskah kebijakan...</p>');
 
-        initSession(sessionId, session.articleTitle || session.title || 'Draf Naskah Kebijakan', rawContent);
+        initSession(sessionId, session.articleTitle || session.title || 'Draf Naskah Kebijakan', rawContent, true);
       } catch (err: any) {
         console.error('Gagal memuat sesi artikel:', err);
         showToast('Gagal memuat sesi artikel dari database.');

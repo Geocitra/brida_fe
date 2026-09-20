@@ -222,32 +222,29 @@ export const PosterShowcaseStage: React.FC<PosterShowcaseStageProps> = ({
     if (!activePoster || isDownloading) return;
     setIsDownloading(true);
 
-    const downloadFilename = generateCleanDownloadFilename(
-      session?.title || 'Infografis',
-      activePoster.versionNumber,
-      hasActiveBranding,
-    );
-
     try {
-      // Jika ada pending save branding (debounce), flush terlebih dahulu
-      // agar DB sudah ter-update sebelum backend mengomposisi gambar
+      // 1. Batalkan pending debounce timer dan sinkronkan data branding terkini ke database
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
         saveTimeoutRef.current = null;
-        if (brandingData) {
-          try {
-            await InfographicApi.saveBranding(activePoster.id, brandingData);
-          } catch (saveErr) {
-            console.warn('Gagal flush branding sebelum download:', saveErr);
-          }
-        }
+      }
+      if (brandingData) {
+        await InfographicApi.saveBranding(activePoster.id, brandingData);
       }
 
-      // Selalu unduh via endpoint backend authoritative dengan token JWT
+      // 2. Hitung status aktif branding berdasarkan data mutakhir
+      const isBranded = !!(brandingData?.headerEnabled || brandingData?.footerEnabled);
+      const downloadFilename = generateCleanDownloadFilename(
+        session?.title || 'Infografis',
+        activePoster.versionNumber,
+        isBranded,
+      );
+
+      // 3. Selalu unduh via endpoint backend authoritative dengan token JWT
       await InfographicApi.downloadPosterFile(
         activePoster.id,
         downloadFilename,
-        hasActiveBranding,
+        isBranded,
       );
     } catch (err: any) {
       console.error('Pengunduhan berkas poster gagal:', err);

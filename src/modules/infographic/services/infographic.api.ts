@@ -211,10 +211,19 @@ export const InfographicApi = {
     posterId: string,
     payload: Partial<PosterBrandingData>,
   ): Promise<PosterBrandingData> {
+    // Sanitasi payload: Hanya kirim atribut branding murni (hindari metadata seperti id, posterId, createdAt)
+    const cleanPayload: Record<string, any> = {};
+    if (payload.headerEnabled !== undefined) cleanPayload.headerEnabled = payload.headerEnabled;
+    if (payload.institution !== undefined) cleanPayload.institution = payload.institution;
+    if (payload.subInstitution !== undefined) cleanPayload.subInstitution = payload.subInstitution;
+    if (payload.footerEnabled !== undefined) cleanPayload.footerEnabled = payload.footerEnabled;
+    if (payload.footerText !== undefined) cleanPayload.footerText = payload.footerText;
+    if (payload.layoutConfig !== undefined) cleanPayload.layoutConfig = payload.layoutConfig;
+
     const response = await fetch(`${API_BASE_URL}/infographic/agent/posters/${posterId}/branding`, {
       method: 'PUT',
       headers: getAuthHeaders(),
-      body: JSON.stringify(payload),
+      body: JSON.stringify(cleanPayload),
     });
 
     const result = await response.json();
@@ -273,45 +282,61 @@ export const InfographicApi = {
   },
 
   /**
-   * Mengunduh berkas poster resmi beresolusi tinggi langsung dari server dengan JWT
+   * Mengunduh berkas poster resmi beresolusi tinggi langsung dari server dengan nama .png resmi
    */
   async downloadPosterFile(
     posterId: string,
     filename: string,
     branded: boolean = true,
   ): Promise<void> {
+    const downloadUrl = `${API_BASE_URL}/infographic/agent/posters/${posterId}/download?branded=${branded}`;
+
+    // 1. Lakukan pre-flight GET fetch untuk memastikan proses komposit Puppeteer di server selesai
+    // Ini menjaga agar tombol tetap dalam status "Mengunduh..." selama Puppeteer menyusun gambar
     const token = sessionStorage.getItem('brida_auth_token');
     const headers: Record<string, string> = {};
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const url = `${API_BASE_URL}/infographic/agent/posters/${posterId}/download?branded=${branded}`;
-    const response = await fetch(url, {
-      method: 'GET',
-      headers,
-    });
-
-    if (!response.ok) {
-      let errMsg = `HTTP ${response.status}: Gagal mengunduh berkas poster`;
+    const preflightRes = await fetch(downloadUrl, { method: 'GET', headers });
+    if (!preflightRes.ok) {
+      let errMsg = `HTTP ${preflightRes.status}: Gagal mengunduh berkas poster`;
       try {
-        const errJson = await response.json();
+        const errJson = await preflightRes.json();
         if (errJson?.message) errMsg = errJson.message;
       } catch {}
       throw new Error(errMsg);
     }
 
-    const blob = await response.blob();
-    const objectUrl = window.URL.createObjectURL(blob);
+    // 2. Sanitasi nama berkas: wajib berakhiran .png
+    let safeName = (filename || 'Infografis_BRIDA.png').trim();
+    if (!safeName.toLowerCase().endsWith('.png')) {
+      safeName = `${safeName}.png`;
+    }
+
+    // 3. Picu Native Browser HTTP Download langsung dari URL endpoint server.
+    // Pendekatan ini TIDAK MENGGUNAKAN Blob URL (blob:http://...) yang pada Google Chrome / Incognito
+    // sering kali mengabaikan atribut download dan menghasilkan nama file GUID tanpa ekstensi.
+    // Dengan mengunduh langsung dari URL HTTP server, browser membaca header Content-Disposition
+    // dan 100% PASTI menyimpannya sebagai file gambar PNG resmi (.png).
     const link = document.createElement('a');
-    link.href = objectUrl;
-    link.download = filename;
+    link.style.position = 'fixed';
+    link.style.top = '-9999px';
+    link.style.left = '-9999px';
+    link.style.width = '1px';
+    link.style.height = '1px';
+    link.style.opacity = '0';
+    link.href = downloadUrl;
+    link.setAttribute('download', safeName);
+    link.download = safeName;
     document.body.appendChild(link);
     link.click();
-    document.body.removeChild(link);
 
     setTimeout(() => {
-      window.URL.revokeObjectURL(objectUrl);
-    }, 2000);
+      try {
+        if (link.parentNode) link.parentNode.removeChild(link);
+      } catch {}
+    }, 15000);
   },
 };
