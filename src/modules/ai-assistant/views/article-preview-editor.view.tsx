@@ -358,7 +358,7 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
         setActiveSession(session);
 
         const rawContent = session.editorDocumentState && session.editorDocumentState.trim().length > 0
-          ? session.editorDocumentState
+          ? MarkupConverter.sanitizeQuickChartHtml(session.editorDocumentState)
           : (session.fullArticleText && session.fullArticleText.trim().length > 0
               ? MarkupConverter.toHTML(session.fullArticleText)
               : '<p>Mempersiapkan draf naskah kebijakan...</p>');

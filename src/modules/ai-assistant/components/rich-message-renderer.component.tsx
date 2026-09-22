@@ -1,123 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { Globe, FileText, Sparkles, AlertTriangle, Lightbulb, BarChart3, RefreshCw } from 'lucide-react';
-import { jsonrepair } from 'jsonrepair';
 import { DocumentService } from '../../../services/document.service';
 import { MarkdownTableRenderer } from './markdown-table-renderer.component';
+import { MarkupConverter } from '../utils/markup-converter.util';
 
 /**
  * Robust QuickChart URL Normalizer:
- * Membersihkan URL QuickChart dari format raw/malformed LLM, memperbaiki sintaks JSON
- * dengan jsonrepair, meng-encode parameter secara aman (termasuk kurung %28/%29 dan hash %23),
- * serta menyediakan fallback chart jika JSON tidak dapat diperbaiki sama sekali.
+ * Menggunakan MarkupConverter.sanitizeQuickChartUrl untuk menormalkan konfigurasi Chart.js v3,
+ * memvalidasi chart type, mengonversi tipe tidak sah (flowchart/sankey) ke horizontal bar progres,
+ * serta memastikan parameter aman dan kompatibel.
  */
 export function normalizeQuickChartUrl(rawUrl: string, fallbackTitle: string = 'Visualisasi Grafik'): string {
-  if (!rawUrl || typeof rawUrl !== 'string') return '';
-  let urlStr = rawUrl.trim();
-
-  // Bersihkan karakter pembungkus markdown
-  while (urlStr.startsWith('<') || urlStr.startsWith('(') || urlStr.startsWith('[') || urlStr.startsWith('"') || urlStr.startsWith("'")) {
-    urlStr = urlStr.substring(1);
-  }
-  while (urlStr.endsWith('>') || urlStr.endsWith(')') || urlStr.endsWith(']') || urlStr.endsWith('"') || urlStr.endsWith("'")) {
-    urlStr = urlStr.substring(0, urlStr.length - 1);
-  }
-
-  const qcMarker = 'quickchart.io/chart';
-  const markerIdx = urlStr.toLowerCase().indexOf(qcMarker);
-  if (markerIdx === -1) {
-    return urlStr.replace(/\s+/g, '%20').replace(/"/g, '%22');
-  }
-
-  const queryStart = urlStr.indexOf('?', markerIdx);
-  if (queryStart === -1) {
-    return urlStr;
-  }
-
-  const queryString = urlStr.substring(queryStart + 1);
-  const cParamMatch = queryString.match(/(?:^|&)(c|chart)=([^&]*)/i);
-  let rawConfig = '';
-
-  if (cParamMatch) {
-    rawConfig = cParamMatch[2];
-  } else {
-    rawConfig = queryString.replace(/^(?:[^?&]*?[?&])?(?:c|chart)=/i, '');
-  }
-
-  // Decode rawConfig
-  let decoded = rawConfig;
-  try {
-    decoded = decodeURIComponent(decoded);
-  } catch {
-    try {
-      const fixed = decoded.replace(/%(?![0-9a-fA-F]{2})/g, '%25');
-      decoded = decodeURIComponent(fixed);
-    } catch {}
-  }
-
-  decoded = decoded
-    .replace(/%7B/gi, '{')
-    .replace(/%7D/gi, '}')
-    .replace(/%5B/gi, '[')
-    .replace(/%5D/gi, ']')
-    .replace(/%3A/gi, ':')
-    .replace(/%2C/gi, ',')
-    .replace(/%22/gi, '"')
-    .replace(/%27/gi, "'")
-    .replace(/%20/gi, ' ')
-    .replace(/%23/gi, '#')
-    .replace(/%28/gi, '(')
-    .replace(/%29/gi, ')')
-    .replace(/%2F/gi, '/');
-
-  let configToRepair = decoded.trim();
-  const firstBrace = configToRepair.indexOf('{');
-  if (firstBrace !== -1) {
-    configToRepair = configToRepair.substring(firstBrace);
-  }
-
-  const ampIdx = configToRepair.lastIndexOf('&');
-  if (ampIdx !== -1) {
-    const afterAmp = configToRepair.substring(ampIdx);
-    if (/&(?:bkg|w|h|width|height|format|devicePixelRatio)=/i.test(afterAmp)) {
-      configToRepair = configToRepair.substring(0, ampIdx);
-    }
-  }
-
-  let finalConfigJson = '';
-  try {
-    const repaired = jsonrepair(configToRepair);
-    const parsed = JSON.parse(repaired);
-    finalConfigJson = JSON.stringify(parsed);
-  } catch {
-    finalConfigJson = JSON.stringify({
-      type: 'bar',
-      data: {
-        labels: ['Indikator 1', 'Indikator 2', 'Indikator 3'],
-        datasets: [
-          {
-            label: fallbackTitle,
-            data: [70, 85, 75],
-            backgroundColor: ['#0d9488', '#14b8a6', '#2dd4bf'],
-          },
-        ],
-      },
-      options: {
-        responsive: true,
-        plugins: {
-          legend: { display: true },
-          title: { display: true, text: fallbackTitle },
-        },
-      },
-    });
-  }
-
-  const safeEncoded = encodeURIComponent(finalConfigJson)
-    .replace(/\(/g, '%28')
-    .replace(/\)/g, '%29')
-    .replace(/'/g, '%27')
-    .replace(/\*/g, '%2A');
-
-  return `https://quickchart.io/chart?c=${safeEncoded}&bkg=white&w=650&h=350&devicePixelRatio=2`;
+  return MarkupConverter.sanitizeQuickChartUrl(rawUrl, fallbackTitle);
 }
 
 export const SafeChartImage: React.FC<{ src: string; alt: string }> = ({ src, alt }) => {
@@ -209,20 +103,7 @@ export const parseInlineStylesRaw = (
       const safeUrl = normalizeQuickChartUrl(seg.url, seg.alt || 'Visualisasi Grafik');
       parts.push(
         <span key={`inline-img-${keyIdx++}`} className="block my-3 w-full text-center">
-          <img
-            src={safeUrl}
-            alt={seg.alt || 'Grafik Visual'}
-            className="inline-block max-w-full h-auto max-h-[380px] border border-slate-300 bg-white p-2 shadow-xs rounded-none"
-            loading="lazy"
-            onError={(e) => {
-              e.currentTarget.style.display = 'none';
-            }}
-          />
-          {seg.alt && (
-            <span className="block text-[10.5px] font-bold text-slate-600 uppercase tracking-wider mt-1.5 text-center font-roboto">
-              {seg.alt}
-            </span>
-          )}
+          <SafeChartImage src={safeUrl} alt={seg.alt || 'Visualisasi Grafik'} />
         </span>,
       );
       continue;
@@ -469,7 +350,9 @@ export const RichMessageRenderer: React.FC<RichMessageRendererProps> = ({
     .replace(/\\+\[/g, '[')
     .replace(/\\+\]/g, ']');
 
-  const lines = cleanedText.split('\n');
+  // Sanitasi QuickChart Markdown (menormalkan tipe tidak valid, JSON multi-line, & parameter Chart.js v3)
+  const sanitizedText = MarkupConverter.sanitizeQuickChartMarkdown(cleanedText);
+  const lines = sanitizedText.split('\n');
   const elements: React.ReactNode[] = [];
 
   let tableBuffer: string[] = [];
@@ -566,26 +449,40 @@ export const RichMessageRenderer: React.FC<RichMessageRendererProps> = ({
     const trimmed = line.trim();
 
     // 0. Parser Gambar Markdown / QuickChart Chart Tunggal (![alt](url) atau varian [url])
-    const singleImageMatch = trimmed.match(
-      /^!?\[*([^\]]*)\]*\(?\s*(https?:\/\/(?:quickchart\.io\/chart\?[^\s\n\r"'>]+|[^\s\)]+\.(?:png|jpe?g|gif|webp|svg)[^\)]*))\s*\)?\]*$/i,
-    );
-    if (singleImageMatch) {
+    let altText = '';
+    let rawUrl = '';
+
+    const mdImgMatch = trimmed.match(/^!\[([^\]]*)\]\((https?:\/\/.+)\)$/s);
+    if (mdImgMatch) {
+      altText = mdImgMatch[1]?.replace(/[\[\]]/g, '').trim() || 'Visualisasi Grafik / Diagram';
+      rawUrl = mdImgMatch[2]?.trim();
+    } else {
+      const fallbackImgMatch = trimmed.match(
+        /^!?\[*([^\]]*)\]*\(?\s*(https?:\/\/(?:quickchart\.io\/chart\S*|\S+\.(?:png|jpe?g|gif|webp|svg)\S*))\s*\)?\]*$/i,
+      );
+      if (fallbackImgMatch) {
+        altText = fallbackImgMatch[1]?.replace(/[\[\]]/g, '').trim() || 'Visualisasi Grafik / Diagram';
+        rawUrl = fallbackImgMatch[2]?.trim();
+      }
+    }
+
+    if (rawUrl) {
       flushAllBuffers();
-      const altText =
-        singleImageMatch[1]?.replace(/[\[\]]/g, '').trim() ||
-        'Visualisasi Grafik / Diagram';
-      let rawUrl = singleImageMatch[2]?.trim();
       while (
         rawUrl.startsWith('(') ||
         rawUrl.startsWith('<') ||
-        rawUrl.startsWith('[')
+        rawUrl.startsWith('[') ||
+        rawUrl.startsWith('"') ||
+        rawUrl.startsWith("'")
       ) {
         rawUrl = rawUrl.substring(1);
       }
       while (
         rawUrl.endsWith(')') ||
         rawUrl.endsWith('>') ||
-        rawUrl.endsWith(']')
+        rawUrl.endsWith(']') ||
+        rawUrl.endsWith('"') ||
+        rawUrl.endsWith("'")
       ) {
         rawUrl = rawUrl.substring(0, rawUrl.length - 1);
       }
