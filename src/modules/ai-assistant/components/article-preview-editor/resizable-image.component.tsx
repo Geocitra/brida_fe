@@ -239,6 +239,7 @@ export const ResizableImageComponent: React.FC<NodeViewProps> = ({
           ref={imageRef}
           src={getDisplaySrc(node.attrs.src)}
           alt={node.attrs.alt || ''}
+          crossOrigin="anonymous"
           onLoad={() => {
             window.dispatchEvent(new CustomEvent('tiptap-media-loaded'));
           }}

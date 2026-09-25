@@ -574,18 +574,48 @@ export const ArticlePreviewEditorView: React.FC<ArticlePreviewEditorViewProps> =
       showToast(`Merakit berkas Word (.docx): ${safeFilename}.docx...`);
       const targetFontSize = parseFloat(fontSize);
 
-      const stripNoPrintElements = (htmlString: string): string => {
+      const prepareHtmlForDocx = async (htmlString: string): Promise<string> => {
         try {
           const parser = new DOMParser();
           const doc = parser.parseFromString(htmlString, 'text/html');
           doc.querySelectorAll('.no-print, [data-auto-page-spacer]').forEach((el) => el.remove());
+
+          // Pre-inlining gambar yang sudah selesai dirender di browser kanvas
+          const imgElements = Array.from(doc.querySelectorAll('img'));
+          const domImages = Array.from(document.querySelectorAll<HTMLImageElement>('.ProseMirror img'));
+
+          for (const img of imgElements) {
+            const src = img.getAttribute('src');
+            if (!src || src.startsWith('data:image/')) continue;
+
+            const matchedDomImg = domImages.find(
+              (d) => d.src === src || d.getAttribute('src') === src || d.currentSrc === src
+            );
+
+            if (matchedDomImg && matchedDomImg.complete && matchedDomImg.naturalWidth > 0) {
+              try {
+                const canvas = document.createElement('canvas');
+                canvas.width = matchedDomImg.naturalWidth;
+                canvas.height = matchedDomImg.naturalHeight;
+                const ctx = canvas.getContext('2d');
+                if (ctx) {
+                  ctx.drawImage(matchedDomImg, 0, 0);
+                  const dataUrl = canvas.toDataURL('image/png');
+                  img.setAttribute('src', dataUrl);
+                }
+              } catch (canvasErr) {
+                console.warn('[DocxExport] Canvas conversion skipped, fallback to backend:', canvasErr);
+              }
+            }
+          }
+
           return doc.body.innerHTML;
         } catch {
           return htmlString;
         }
       };
 
-      const cleanHtmlForDocx = stripNoPrintElements(editorStateHtml);
+      const cleanHtmlForDocx = await prepareHtmlForDocx(editorStateHtml);
 
       await DocxExportService.exportCustomFormattedArticleDocx(
         cleanHtmlForDocx,

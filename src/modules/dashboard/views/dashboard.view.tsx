@@ -120,8 +120,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
     fetchDashboardMetadata();
 
+    const handleTokenUpdated = () => {
+      fetchDashboardMetadata();
+    };
+    window.addEventListener('brida-token-updated', handleTokenUpdated);
+
     return () => {
       isMounted = false;
+      window.removeEventListener('brida-token-updated', handleTokenUpdated);
     };
   }, []);
 

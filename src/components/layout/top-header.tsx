@@ -14,7 +14,10 @@ import {
   ChevronRight,
   Shield,
   User,
+  Database,
 } from 'lucide-react';
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
 
 interface TopHeaderProps {
   activeRoute: string;
@@ -24,6 +27,12 @@ interface TopHeaderProps {
 
 export const TopHeader: React.FC<TopHeaderProps> = ({ activeRoute, onNavigate, onLogout }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
+  const [tokenBudget, setTokenBudget] = useState<{
+    remainingTokens: number;
+    remainingCostIdr: number;
+    quotaPercentage: number;
+    paguStatus: 'SAFE' | 'ALERT' | 'WARNING';
+  } | null>(null);
   const role = sessionStorage.getItem('brida_user_role') || 'USER';
 
   const navItems = [
@@ -51,6 +60,30 @@ export const TopHeader: React.FC<TopHeaderProps> = ({ activeRoute, onNavigate, o
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  // Ambil data anggaran token secara berkala & tangkap event mutasi token real-time
+  useEffect(() => {
+    let isMounted = true;
+    const fetchBudget = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/analysis/dashboard-meta`);
+        const resJson = await response.json();
+        if (isMounted && resJson.success && resJson.data?.tokenBudget) {
+          setTokenBudget(resJson.data.tokenBudget);
+        }
+      } catch {
+        // Fallback hening jika server belum siap
+      }
+    };
+
+    fetchBudget();
+    const handleUpdate = () => fetchBudget();
+    window.addEventListener('brida-token-updated', handleUpdate);
+    return () => {
+      isMounted = false;
+      window.removeEventListener('brida-token-updated', handleUpdate);
+    };
+  }, [activeRoute]);
 
   // Tutup menu mobile saat tombol Escape ditekan
   useEffect(() => {
@@ -118,6 +151,47 @@ export const TopHeader: React.FC<TopHeaderProps> = ({ activeRoute, onNavigate, o
 
         {/* ── BAGIAN KANAN: STATUS, ROLE BADGE & LOGOUT DESKTOP ── */}
         <div className="hidden lg:flex items-center gap-3 shrink-0">
+          {/* Widget Kuota AI Real-Time ("Token yang di Depan") */}
+          {tokenBudget && (
+            <button
+              onClick={() => onNavigate('dashboard')}
+              title={`Sisa Kuota AI: ${tokenBudget.remainingTokens.toLocaleString('id-ID')} Token (Rp ${tokenBudget.remainingCostIdr.toLocaleString('id-ID')}). Klik untuk rincian kuota di Dashboard.`}
+              className="flex items-center gap-2.5 px-3 py-1.5 bg-slate-800/90 border border-slate-700 hover:border-teal-500/80 transition-all cursor-pointer rounded-none group text-left"
+            >
+              <div className="flex items-center gap-2">
+                <Database size={13} className="text-teal-400 group-hover:scale-110 transition-transform" />
+                <div className="flex flex-col leading-tight">
+                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
+                    SISA TOKEN
+                  </span>
+                  <span className="text-xs font-mono font-bold text-teal-300">
+                    {tokenBudget.remainingTokens >= 1000000
+                      ? `${(tokenBudget.remainingTokens / 1000000).toFixed(1)}M`
+                      : tokenBudget.remainingTokens.toLocaleString('id-ID')}
+                  </span>
+                </div>
+              </div>
+              <div className="h-5 w-px bg-slate-700" />
+              <div className="flex flex-col leading-tight">
+                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
+                  SALDO
+                </span>
+                <span className="text-[11px] font-mono font-bold text-slate-200">
+                  Rp {(tokenBudget.remainingCostIdr / 1000).toFixed(0)}K
+                </span>
+              </div>
+              <div
+                className={`w-2 h-2 rounded-none shrink-0 ${
+                  tokenBudget.paguStatus === 'WARNING'
+                    ? 'bg-rose-500 animate-pulse'
+                    : tokenBudget.paguStatus === 'ALERT'
+                    ? 'bg-amber-500'
+                    : 'bg-emerald-400'
+                }`}
+              />
+            </button>
+          )}
+
           <div className="flex items-center gap-1.5 px-2 py-1 bg-slate-800/80 border border-slate-700/80 text-[10px] font-bold text-slate-300 uppercase tracking-wider rounded-none">
             {role === 'ADMIN' ? <Shield size={11} className="text-amber-400" /> : <User size={11} className="text-teal-400" />}
             <span>{role}</span>
@@ -136,6 +210,21 @@ export const TopHeader: React.FC<TopHeaderProps> = ({ activeRoute, onNavigate, o
 
         {/* ── BAGIAN KANAN MOBILE / TABLET (< 1024px) ── */}
         <div className="flex lg:hidden items-center gap-2 shrink-0">
+          {/* Badge Token Ringkas di Mobile */}
+          {tokenBudget && (
+            <button
+              onClick={() => onNavigate('dashboard')}
+              className="flex items-center gap-1.5 px-2 py-1 bg-slate-800 border border-slate-700 text-teal-300 text-[11px] font-mono font-bold rounded-none"
+              title="Sisa Token AI"
+            >
+              <Database size={11} className="text-teal-400" />
+              <span>
+                {tokenBudget.remainingTokens >= 1000000
+                  ? `${(tokenBudget.remainingTokens / 1000000).toFixed(1)}M`
+                  : tokenBudget.remainingTokens.toLocaleString('id-ID')}
+              </span>
+            </button>
+          )}
           {/* Badge Rute Aktif di Mobile agar pengguna tahu posisinya */}
           {activeItem && (
             <div className="flex items-center gap-1.5 px-2 py-1 bg-teal-950/70 border border-teal-800/80 text-[10px] font-bold text-teal-300 uppercase tracking-wider rounded-none max-w-[140px] truncate">

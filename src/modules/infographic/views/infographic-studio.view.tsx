@@ -129,6 +129,7 @@ export const InfographicStudioView: React.FC<InfographicStudioViewProps> = ({
         const posters = createdSession.posters || [];
         setActivePoster(posters[posters.length - 1] || null);
         loadSessionsList();
+        window.dispatchEvent(new CustomEvent('brida-token-updated'));
       } else {
         // Kirim instruksi revisi & buat infografis versi baru (v2, v3, ...)
         const result = await InfographicApi.sendRevisionChat({
@@ -146,6 +147,7 @@ export const InfographicStudioView: React.FC<InfographicStudioViewProps> = ({
         });
         setActivePoster(result.latestPoster);
         loadSessionsList();
+        window.dispatchEvent(new CustomEvent('brida-token-updated'));
       }
 
       setInputPrompt('');

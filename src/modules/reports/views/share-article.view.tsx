@@ -71,7 +71,8 @@ export const ShareArticleView: React.FC = () => {
     setIsExportingPdf(true);
     try {
       // Dapatkan naskah bersih tanpa Kop Surat mentah untuk mencegah duplikasi
-      const cleanBody = stripCoverPage(article.content);
+      const rawArticleText = article.editorDocumentState || article.fullArticleText || article.content || '';
+      const cleanBody = stripCoverPage(rawArticleText);
 
       // Konversikan ke HTML resmi dan hapus citation-url-node agar PDF bersih
       const rawHtml = MarkupConverter.toHTML(cleanBody);
@@ -129,7 +130,8 @@ export const ShareArticleView: React.FC = () => {
     if (!article) return;
     setIsExportingDocx(true);
     try {
-      const cleanBody = stripCoverPage(article.content || '');
+      const rawArticleText = article.editorDocumentState || article.fullArticleText || article.content || '';
+      const cleanBody = stripCoverPage(rawArticleText);
       const rawHtml = MarkupConverter.toHTML(cleanBody);
       const parser = new DOMParser();
       const doc = parser.parseFromString(rawHtml, 'text/html');
@@ -200,8 +202,9 @@ export const ShareArticleView: React.FC = () => {
 
   // Bersihkan konten dari Kop Surat mentah, lalu konversi markdown ke HTML resmi dan hapus citation-url-node (Link 1, Link 2)
   const cleanContent = React.useMemo(() => {
-    if (!article?.content) return '';
-    const stripped = stripCoverPage(article.content);
+    const rawArticleText = article?.editorDocumentState || article?.fullArticleText || article?.content || '';
+    if (!rawArticleText) return '';
+    const stripped = stripCoverPage(rawArticleText);
     const rawHtml = MarkupConverter.toHTML(stripped);
 
     try {
@@ -213,7 +216,7 @@ export const ShareArticleView: React.FC = () => {
     } catch {
       return rawHtml;
     }
-  }, [article?.content]);
+  }, [article?.editorDocumentState, article?.fullArticleText, article?.content]);
 
   // Hitung halaman dinamis dengan A4DocumentSegmenter (Pure Fabrication)
   useEffect(() => {

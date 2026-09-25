@@ -415,7 +415,8 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
         setCurrentDraft(firstSession.fullArticleText || '');
 
         handleLoadSession(firstSession.id);
-        showToast('✨ Draf naskah berhasil disusun oleh Asisten AI!');
+        window.dispatchEvent(new CustomEvent('brida-token-updated'));
+        showToast('✨ Draf naskah berhasil disusun! Kuota AI terpakai (-35.000 Token)');
       } else {
         const response = await AiAssistantService.sendQuery(
           activeSessionId!,
@@ -452,6 +453,7 @@ export const ArticleGeneratorView: React.FC<ArticleGeneratorViewProps> = ({
         };
 
         setMessages((prev) => [...prev, aiMsg]);
+        window.dispatchEvent(new CustomEvent('brida-token-updated'));
       }
 
       loadHistory();
